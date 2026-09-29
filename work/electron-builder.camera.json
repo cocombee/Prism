@@ -1,0 +1,10 @@
+{
+  "appId": "com.cocombees.prismfoundry.3dcamera.eighteenth.20260830",
+  "productName": "Prism 3D Camera Eighteenth Flight Tester",
+  "asar": true,
+  "extraMetadata": { "main": "out-camera/main/main.js", "name": "prism-3d-camera-eighteenth-20260830" },
+  "directories": { "output": "/tmp/prism-camera-eighteenth-replacement" },
+  "files": ["out-camera/**/*", "package.json", "node_modules/ffmpeg-static/**/*"],
+  "asarUnpack": ["out-camera/ffmpeg-static/ffmpeg", "node_modules/ffmpeg-static/ffmpeg"],
+  "mac": { "identity": "-", "category": "public.app-category.graphics-design", "target": [{ "target": "dir", "arch": ["arm64"] }], "hardenedRuntime": false, "gatekeeperAssess": false }
+}

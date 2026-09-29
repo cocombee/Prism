@@ -1,0 +1,79 @@
+{
+  "stylesPath": "/tmp/prism-work/src/renderer/src/styles-next.css",
+  "groups": [
+    {
+      "id": "video-compact", "surface": "video", "className": "compact-video-footer-group compact-video-footer", "width": 315, "gap": 7,
+      "rows": [
+        { "gridTemplateColumns": "115px 65px 55px 59px", "gap": 7, "controls": [
+          { "id": "model", "kind": "selector", "fullLabel": "Seedance 2 Mini · References", "compactLabel": "Seedance 2 Mini", "defaultLabel": "Seedance 2 Mini · References", "labelTier": "compact", "leading": true },
+          { "id": "motion", "kind": "selector", "fullLabel": "Native", "defaultLabel": "Native" },
+          { "id": "ratio", "kind": "selector", "fullLabel": "16:9", "defaultLabel": "16:9" },
+          { "id": "duration", "kind": "selector", "fullLabel": "10s", "defaultLabel": "10s" }
+        ]},
+        { "gridTemplateColumns": "62px 105px 64px 28px 28px", "gap": 7, "controls": [
+          { "id": "quantity", "kind": "bounded-elastic", "value": "x1" },
+          { "id": "resolution", "kind": "selector", "fullLabel": "480p", "defaultLabel": "480p" },
+          { "id": "sound", "kind": "intrinsic" },
+          { "id": "settings", "kind": "fixed-action" },
+          { "id": "run", "kind": "fixed-action" }
+        ]}
+      ]
+    },
+    {
+      "id": "video-minimum", "surface": "video", "className": "compact-video-footer-group compact-video-footer", "width": 315, "gap": 7,
+      "rows": [{ "gridTemplateColumns": "72px 72px 64px 86px", "gap": 7, "controls": [
+        { "id": "model", "kind": "selector", "fullLabel": "Seedance 2 Mini · References", "compactLabel": "Seedance 2 Mini", "defaultLabel": "Seedance 2 Mini · References", "labelTier": "minimum", "leading": true },
+        { "id": "motion", "kind": "selector", "fullLabel": "Native", "defaultLabel": "Native" },
+        { "id": "ratio", "kind": "selector", "fullLabel": "16:9", "defaultLabel": "16:9" },
+        { "id": "duration", "kind": "selector", "fullLabel": "10s", "defaultLabel": "10s" }
+      ]}]
+    },
+    {
+      "id": "primary-labels", "surface": "labels", "className": "primary-node-controls", "width": 331, "gap": 7,
+      "rows": [{ "gridTemplateColumns": "100px 100px 101px", "gap": 7, "controls": [
+        { "id": "native-fps", "kind": "selector", "caption": "Native FPS", "fullLabel": "24 fps", "defaultLabel": "24 fps" },
+        { "id": "quality", "kind": "selector", "caption": "Quality", "fullLabel": "High", "defaultLabel": "High" },
+        { "id": "file", "kind": "selector", "caption": "File", "fullLabel": "Balanced", "defaultLabel": "Balanced" }
+      ]}]
+    },
+    {
+      "id": "voice-labels", "surface": "labels", "className": "voice-primary-row voice-primary-row-two", "width": 315, "gap": 7,
+      "rows": [{ "gridTemplateColumns": "154px 154px", "gap": 7, "controls": [
+        { "id": "model", "kind": "selector", "caption": "Model", "fullLabel": "ElevenLabs Eleven v3", "compactLabel": "ElevenLabs v3", "defaultLabel": "ElevenLabs Eleven v3", "leading": true },
+        { "id": "voice", "kind": "selector", "caption": "Voice", "fullLabel": "Rachel", "defaultLabel": "Rachel" }
+      ]}]
+    },
+    {
+      "id": "quantity-x1", "surface": "image", "className": "compact-image-footer-group compact-image-footer-row", "width": 315, "gap": 6,
+      "rows": [{ "gridTemplateColumns": "96px 213px", "gap": 6, "controls": [
+        { "id": "quantity", "kind": "bounded-elastic", "value": "x1" },
+        { "id": "ratio", "kind": "selector", "fullLabel": "16:9", "defaultLabel": "16:9" }
+      ]}]
+    },
+    {
+      "id": "quantity-x99", "surface": "image", "className": "compact-image-footer-group compact-image-footer-row", "width": 315, "gap": 6,
+      "rows": [{ "gridTemplateColumns": "120px 189px", "gap": 6, "controls": [
+        { "id": "quantity", "kind": "bounded-elastic", "value": "x99" },
+        { "id": "ratio", "kind": "selector", "fullLabel": "16:9", "defaultLabel": "16:9" }
+      ]}]
+    },
+    {
+      "id": "storyboard-footer", "surface": "storyboard-footer", "className": "storyboard-footer-group", "width": 315, "gap": 6,
+      "rows": [{ "gridTemplateColumns": "minmax(0,1fr) 58px max-content max-content", "gap": 6, "controls": [
+        { "id": "assistant-model", "kind": "selector", "fullLabel": "Claude Opus 5", "compactLabel": "Claude Opus 5", "defaultLabel": "Claude Opus 5", "labelTier": "full", "leading": true },
+        { "id": "budget", "kind": "bounded-elastic", "value": "5 / 5s" },
+        { "id": "save", "kind": "intrinsic" },
+        { "id": "revamp", "kind": "intrinsic" }
+      ]}]
+    },
+    {
+      "id": "terminal-actions", "surface": "terminal", "className": "compact-image-footer-group", "width": 130, "gap": 6,
+      "rows": [{ "gridTemplateColumns": "repeat(4,28px)", "gap": 6, "controls": [
+        { "id": "settings", "kind": "fixed-action" },
+        { "id": "play", "kind": "fixed-action" },
+        { "id": "stop", "kind": "fixed-action" },
+        { "id": "rerun", "kind": "fixed-action" }
+      ]}]
+    }
+  ]
+}

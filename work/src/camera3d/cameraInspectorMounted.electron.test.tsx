@@ -1,0 +1,98 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { spawnSync } from 'node:child_process'
+import { buildSync } from 'esbuild'
+import electronPath from 'electron'
+import { describe, expect, it } from 'vitest'
+
+function runInspector(width: number) {
+  const directory = mkdtempSync(join(tmpdir(), 'prism-camera-inspector-settled-'))
+  const entry = join(directory, 'entry.tsx')
+  const bundle = join(directory, 'renderer.js')
+  const html = join(directory, 'index.html')
+  const main = join(directory, 'main.cjs')
+  const component = resolve(import.meta.dirname, 'exactCanvasCamera.tsx')
+  const model = resolve(import.meta.dirname, 'model.ts')
+  const sharedCss = pathToFileURL(resolve(import.meta.dirname, '../renderer/src/styles-next.css')).href
+  const cameraCss = pathToFileURL(resolve(import.meta.dirname, 'camera3d.css')).href
+  writeFileSync(entry, `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{CameraOpticsInspector,CameraTransformInspector}from${JSON.stringify(component)};import{addEntity,addEntity as add,createCameraDocument,toggleEntityLockScope}from${JSON.stringify(model)};const initial=add(add(createCameraDocument('settled-mounted'),'camera','Camera'),'human','Human');function App(){const[d,setD]=useState(initial);const camera=d.entities.find(e=>e.kind==='camera');const shot=d.shots[0];return <main style={{width:'${width+20}px',padding:'10px'}}><CameraTransformInspector entity={camera} frame={0} disabled={false} onDraft={()=>{}} onCommit={()=>{}} onKeyframe={()=>{}} onReset={()=>{}} onResetTransform={()=>{}} onTransformLock={()=>setD(toggleEntityLockScope(d,camera.id,'transform'))}/><CameraOpticsInspector entity={camera} entities={d.entities} disabled={false} durationSeconds={2} fps={24} shotBoundary={shot.boundary} onBoundaryChange={boundary=>{window.__boundary=boundary;setD({...d,shots:d.shots.map(s=>s.id===shot.id?{...s,boundary}:s)})}} onDurationFrames={()=>{}} onChange={next=>setD({...d,entities:d.entities.map(e=>e.id===next.id?next:e)})} onSectionKeyframe={()=>{}} onMasterReset={()=>{}} onSettingsLock={()=>setD(toggleEntityLockScope(d,camera.id,'settings'))}/></main>}createRoot(document.getElementById('root')).render(<App/>);`)
+  buildSync({ entryPoints: [entry], outfile: bundle, bundle: true, format: 'iife', platform: 'browser', target: 'chrome120', nodePaths: [resolve(process.cwd(), 'node_modules')], jsx: 'automatic', logLevel: 'silent' })
+  writeFileSync(html, `<style>html,body,#root{margin:0;width:100%;min-height:100%;background:#111;color:#ddd}*{box-sizing:border-box}</style><link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${cameraCss}"><div id="root"></div><script src="${pathToFileURL(bundle).href}"></script>`)
+  const probe = `(async()=>{const rect=e=>{const r=e?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth}:null};const rangeRect=node=>{if(!node)return null;const range=document.createRange();range.selectNode(node);const r=range.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};const textRect=node=>{if(!node)return null;const range=document.createRange();range.selectNodeContents(node);const r=range.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};const directTextRect=node=>{if(!node?.firstChild)return null;const range=document.createRange();range.selectNodeContents(node.firstChild);const r=range.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};const section=document.querySelector('.camera3d-camera-section');const rotation=document.querySelector('.camera3d-rotation-section');const transform=document.querySelector('.camera3d-transform-section');const cameraRows=[...section.querySelectorAll(':scope .camera3d-keyframe-control')];const transformRows=[...rotation.querySelectorAll('.camera3d-transform-property')];const styleOf=e=>e?getComputedStyle(e).color:null;const foregrounds=[...document.querySelectorAll('.camera3d-section-heading label,.camera3d-transform-header label,.camera3d-keyframe-control span,.camera3d-transform-property>span,.camera3d-keyframe-control button,.camera3d-transform-property button')].map(styleOf);const target=section.querySelector('[aria-label="Target"]');target?.click();await new Promise(requestAnimationFrame);const options=[...document.querySelectorAll('[role="option"]')].map(e=>e.textContent?.trim());[...document.querySelectorAll('[role="option"]')].find(e=>e.textContent?.trim()==='Target')?.click();await new Promise(requestAnimationFrame);const targetRow=section.querySelector('.camera3d-target-control');const targetAsset=targetRow?.querySelector('[aria-label="Target Asset"]');const targetActions=targetRow?.querySelector('.camera3d-camera-action-row');return{rotationDivider:rect(rotation.querySelector('.camera3d-transform-divider')),cameraDivider:rect(section.querySelector('.camera3d-camera-pre-divider')),rotationHeading:rect(rotation.querySelector('.camera3d-transform-header')),cameraHeadingRect:rect(section.querySelector('.camera3d-section-heading')),focalSelector:rect(section.querySelector('.camera3d-keyframe-control .storyboard-compact-select > button')),lens:rect(document.querySelector('.camera3d-lens-readouts')),lensOutputs:[...document.querySelectorAll('.camera3d-lens-readouts output')].map(rect),masterResets:[...document.querySelectorAll('.camera3d-transform-header > .camera3d-property-reset,.camera3d-section-heading > .camera3d-property-reset')].map(rect),cameraLabels:cameraRows.map(row=>row.querySelector('input[aria-label*="Duration"]')?'Duration':row.querySelector('.adaptive-control-label > span')?.textContent?.trim()||''),selectorLabels:cameraRows.map(row=>row.querySelector('.storyboard-compact-select > button')?.getAttribute('aria-label')||''),cameraActions:cameraRows.map(row=>[...row.querySelectorAll(':scope > .camera3d-camera-action-row button')].map(b=>b.getAttribute('aria-label'))),cameraActionRects:cameraRows.map(row=>rect(row.querySelector(':scope > .camera3d-camera-action-row'))),cameraHeading:[...section.querySelectorAll('.camera3d-section-heading button')].map(b=>b.getAttribute('aria-label')),transformHeading:[...transform.querySelectorAll('.camera3d-transform-header button')].map(b=>b.getAttribute('aria-label')),allHeadingLabels:[...document.querySelectorAll('.camera3d-section-heading button,.camera3d-transform-header button')].map(b=>b.getAttribute('aria-label')),transformLabels:transformRows.map(row=>row.querySelector(':scope > span')?.textContent?.trim()||''),transformRows:transformRows.map(row=>({label:row.querySelector(':scope > span')?.textContent?.trim()||'',outer:rect(row),labelRect:rect(row.querySelector(':scope > span')),scrub:rect(row.querySelector('.camera3d-scrub-wheel')),numeric:rect(row.querySelector('input[type=text]')),actions:rect(row.querySelector(':scope > .camera3d-camera-action-row'))})),axisRects:[...transform.querySelectorAll('.camera3d-axis-row')].map(row=>({outer:rect(row),label:rect(row.querySelector(':scope > .camera3d-axis-label > span')),glyph:rect(row.querySelector('.camera3d-axis-fields label:first-child > span')),fields:[...row.querySelectorAll('input')].map(rect),actions:rect(row.querySelector(':scope > .camera3d-camera-action-row'))})),rotationWidths:transformRows.filter(row=>['Pitch','Yaw','Roll'].includes(row.querySelector(':scope > span')?.textContent?.trim()||'')).map(row=>rect(row.querySelector('input[type=text]'))?.width),rowInline:cameraRows.map(row=>{const l=row.querySelector('.adaptive-control-label > span'),c=row.querySelector('.storyboard-compact-select > button')||row.querySelector('input[aria-label*="Duration"]');const lr=rect(l),cr=rect(c);return {ok:Boolean(lr&&cr&&Math.abs(lr.top-cr.top)<12),label:lr,control:cr,outer:rect(row),labels:[...row.querySelectorAll('.adaptive-control-label > span')].map(rect),selectors:[...row.querySelectorAll('.storyboard-compact-select > button,input[aria-label*="Duration"]')].map(rect)}}),lensTextRects:[...document.querySelectorAll('.camera3d-lens-readouts > label')].flatMap(label=>[directTextRect(label),directTextRect(label.querySelector('output'))]),lensComputed:(()=>{const output=document.querySelector('.camera3d-lens-readouts output');const style=output?getComputedStyle(output):null;return style?{paddingLeft:style.paddingLeft,paddingRight:style.paddingRight,marginLeft:style.marginLeft,marginRight:style.marginRight,textAlign:style.textAlign,width:style.width,display:style.display}:null})(),durationContinuity:[...section.querySelectorAll('.camera3d-balanced-row [data-fluid-control-id]')].map(wrapper=>({child:rect(wrapper),label:rect(wrapper.querySelector('label > span')),selector:rect(wrapper.querySelector('input, .storyboard-compact-select > button'))})),durationContinuityPainted:{durationInput:rect(section.querySelector('[aria-label="Camera Duration (seconds)"]')),continuityLabel:directTextRect(section.querySelector('[data-fluid-control-id="continuity"] .adaptive-control-label > span')),continuitySelector:rect(section.querySelector('[data-fluid-control-id="continuity"] .storyboard-compact-select > button'))},targetInline:{asset:rect(targetAsset),actions:rect(targetActions),row:rect(targetRow)},overflow:[...document.querySelectorAll('.camera3d-camera-section,.camera3d-transform-section,.camera3d-keyframe-control,.camera3d-transform-property')].map(e=>({...rect(e),className:e.className,text:e.textContent?.trim().slice(0,40)})),foregrounds,options,shotSettings:Boolean(document.querySelector('.camera3d-shot-settings')),enable:Boolean(transform.querySelector('.camera3d-transform-enable')),boundary:window.__boundary||'continue',divider:rect(transform.querySelector('.camera3d-transform-divider'))}})()`
+  writeFileSync(main, `const{app,BrowserWindow}=require('electron'),path=require('node:path');app.setPath('userData',path.join(${JSON.stringify(directory)},'u'));app.whenReady().then(async()=>{const w=new BrowserWindow({show:false,width:${width+40},height:768,useContentSize:true,webPreferences:{contextIsolation:false,sandbox:false}});await w.loadFile(${JSON.stringify(html)});await new Promise(r=>setTimeout(r,400));const result=await w.webContents.executeJavaScript(${JSON.stringify(probe)});console.log('CAMERA_INSPECTOR_SETTLED:'+JSON.stringify(result));w.close();app.quit()})`)
+  const run = spawnSync(electronPath as unknown as string, [main], { cwd: directory, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined }, timeout: 50000 })
+  try { const marker = run.stdout.split('\n').find((line) => line.startsWith('CAMERA_INSPECTOR_SETTLED:')); expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0); expect(marker, `${run.stdout}\n${run.stderr}`).toBeDefined(); return JSON.parse(marker!.slice('CAMERA_INSPECTOR_SETTLED:'.length)) } finally { rmSync(directory, { recursive: true, force: true }) }
+}
+
+describe('mounted Camera Inspector settled contract', () => {
+  it('renders complete inline Camera rows and exact action grammar at wide and narrow widths', () => {
+    for (const width of [331]) {
+      const result = runInspector(width)
+      console.log(`CAMERA_INSPECTOR_MEASUREMENTS:${width}:${JSON.stringify({ transformRows: result.transformRows, axisRects: result.axisRects, rowInline: result.rowInline, durationContinuity: result.durationContinuity, targetInline: result.targetInline, lens: result.lens, lensOutputs: result.lensOutputs, lensTextRects: result.lensTextRects, durationContinuityPainted: result.durationContinuityPainted, masterResets: result.masterResets, rotationDivider: result.rotationDivider, cameraDivider: result.cameraDivider, rotationHeading: result.rotationHeading, cameraHeadingRect: result.cameraHeadingRect, overflow: result.overflow.slice(0, 8) })}`)
+      expect(result.cameraLabels).toEqual(['Focal Length','Duration','Continuity','Movement','Target'])
+      expect(result.selectorLabels).toEqual(['Focal Length','','Continuity','Camera Movement','Target'])
+      expect(result.cameraActions).toEqual([['Previous Focal Length keyframe','Keyframe Focal Length','Next Focal Length keyframe','Reset Focal Length'],[],[],['Previous Camera Movement keyframe','Keyframe Camera Movement','Next Camera Movement keyframe','Reset Camera Movement'],['Previous Target keyframe','Keyframe Target','Next Target keyframe','Reset Target']])
+      expect(result.rowInline.map((item: {ok:boolean}) => item.ok)).toEqual([true,true,true,true,true])
+      expect(result.options).toEqual(['None','Human'])
+      expect(result.cameraHeading).toEqual(['Lock Camera Settings','Reset Camera Settings'])
+      expect(result.transformHeading).toEqual(['Lock Transform','Reset Transform'])
+      expect(result.allHeadingLabels).toEqual(expect.arrayContaining(['Lock Camera Settings','Lock Transform']))
+      expect(result.transformLabels).toEqual(['Pitch','Yaw','Roll'])
+      expect(result.enable).toBe(false)
+      expect(result.shotSettings).toBe(false)
+      expect(result.cameraActionRects.filter(Boolean).map((r: {width:number;height:number}) => [r.width,r.height])).toEqual([[88,28],[88,28],[88,28]])
+      expect(result.transformRows.map((item: {outer:{width:number;height:number};labelRect:{clientWidth:number;scrollWidth:number};scrub:{width:number;height:number};numeric:{width:number;height:number};actions:{width:number;height:number}}) => [item.outer.width,item.outer.height])).toEqual([[width,28],[width,28],[width,28]])
+      expect(result.transformRows.every((item: {labelRect:{clientWidth:number;scrollWidth:number}}) => item.labelRect.clientWidth >= item.labelRect.scrollWidth)).toBe(true)
+      expect(result.transformRows.every((item: {outer:{width:number;height:number};scrub:{left:number;right:number;width:number;height:number};numeric:{width:number;height:number;right:number};actions:{right:number;width:number;height:number}}) => item.outer.width === width && item.outer.height === 28 && Math.abs(item.scrub.left - 80.63) < .1 && Math.abs(item.scrub.right - 214.21) < .1 && Math.abs(item.scrub.width - 133.58) < .1 && item.scrub.height === 15 && Math.abs(item.numeric.width - 46.79) < .1 && Math.abs(item.numeric.right - 261) < .1 && item.numeric.height === 28 && Math.abs(item.actions.width - 88) < .1 && item.actions.height === 28 && Math.abs(item.actions.right - (width + 10)) < .1)).toBe(true)
+      expect(result.axisRects.every((item: {outer:{left:number;width:number;height:number};label:{left:number;clientWidth:number;scrollWidth:number};fields:{width:number;height:number}[];actions:{width:number;height:number}}) => item.outer.width === width && item.outer.height === 28 && Math.abs(item.label.left - item.outer.left) < 1 && item.label.clientWidth >= item.label.scrollWidth && item.fields.every(field => field.width >= 40 && field.height === 28) && item.actions.width === 88)).toBe(true)
+      const positionLeft = result.axisRects[0].glyph.left
+      const positionZ = result.axisRects[0].fields[2]
+      expect(positionLeft).toBeCloseTo(80.63, 1)
+      expect(positionZ.right).toBeCloseTo(262, 1)
+      expect(result.focalSelector.right).toBeCloseTo(261, 1)
+      expect([result.focalSelector.left, result.rowInline[3].control.left, result.rowInline[4].control.left].every((left: number) => Math.abs(left - 80.63) < .1)).toBe(true)
+      expect([result.focalSelector.right, result.rowInline[3].control.right, result.rowInline[4].control.right].every((right: number) => right === 261)).toBe(true)
+      expect(result.axisRects[1].fields.every((field: {width:number;height:number}) => field.width >= 40 && field.height === 28)).toBe(true)
+      expect(result.axisRects[1].fields[2].right).toBeCloseTo(262, 1)
+      expect(result.transformRows.every((row: {numeric:{width:number;height:number;right:number}}) => row.numeric.height === 28 && Math.abs(row.numeric.width - 46.79) < .1 && Math.abs(row.numeric.right - 261) < .1)).toBe(true)
+      expect(result.targetInline.actions.width).toBe(88)
+      expect(result.masterResets.every((reset: {width:number;height:number;right:number}) => reset.width === 20 && reset.height === 28 && reset.right === 341)).toBe(true)
+      expect(result.lens.width).toBe(331)
+      expect(result.lens.height).toBe(10)
+      expect(result.lensOutputs).toHaveLength(2)
+      expect(result.lensTextRects[3].right).toBe(341)
+      expect(result.overflow.every((item: {right:number}) => item.right <= 341)).toBe(true)
+      expect(result.lens.scrollWidth).toBeLessThanOrEqual(result.lens.clientWidth)
+      expect(result.lensTextRects).toHaveLength(4)
+      expect(Math.max(...result.lensTextRects.map((range: {top:number}) => range.top)) - Math.min(...result.lensTextRects.map((range: {top:number}) => range.top))).toBeLessThanOrEqual(2)
+      expect(Math.max(...result.lensTextRects.map((range: {top:number;bottom:number}) => (range.top + range.bottom) / 2)) - Math.min(...result.lensTextRects.map((range: {top:number;bottom:number}) => (range.top + range.bottom) / 2))).toBeLessThanOrEqual(2)
+      expect(Math.max(...result.lensTextRects.map((range: {right:number}) => range.right))).toBeLessThanOrEqual(341)
+      expect(result.lensTextRects[3].right).toBe(341)
+      expect(result.transformRows[1].outer.top - result.transformRows[0].outer.bottom).toBe(18)
+      expect(result.transformRows[2].outer.top - result.transformRows[1].outer.bottom).toBe(18)
+      expect(result.axisRects[1].outer.top - result.axisRects[0].outer.bottom).toBe(9)
+      expect(result.rotationDivider.height).toBe(1)
+      expect(result.cameraDivider.height).toBe(1)
+      expect(result.rotationDivider.top - result.axisRects[1].outer.bottom).toBe(30)
+      expect(result.rotationHeading.top - result.rotationDivider.bottom).toBe(20)
+      expect(result.cameraDivider.top - result.transformRows[2].outer.bottom).toBe(61)
+      expect(result.cameraHeadingRect.top - result.cameraDivider.bottom).toBe(20)
+      expect(result.targetInline.asset).toBe(null)
+      expect(result.targetInline.actions.width).toBe(88)
+      expect(result.durationContinuity).toHaveLength(2)
+      expect(result.durationContinuity.every((item: {child:{top:number;bottom:number;height:number};label:{clientWidth:number;scrollWidth:number};selector:{width:number;height:number}}) => item.child.height === 28 && item.label.clientWidth >= item.label.scrollWidth && item.selector.width >= 56 && item.selector.height === 28)).toBe(true)
+      expect(Math.abs(result.durationContinuity[0].child.bottom - result.durationContinuity[1].child.bottom)).toBe(0)
+      expect(Math.abs(result.durationContinuity[1].child.left - result.durationContinuity[0].child.right)).toBe(6)
+      expect(result.durationContinuityPainted.durationInput.right).toBe(168)
+      expect(result.durationContinuityPainted.continuityLabel.left).toBe(178)
+      expect(result.durationContinuityPainted.continuityLabel.right).toBeCloseTo(234.234375, 2)
+      expect(result.durationContinuityPainted.continuitySelector.left).toBeCloseTo(244.234375, 2)
+      expect(result.durationContinuityPainted.continuitySelector.right).toBe(341)
+      expect(result.durationContinuityPainted.continuityLabel.left - result.durationContinuityPainted.durationInput.right).toBe(10)
+      expect(result.durationContinuityPainted.continuitySelector.left - result.durationContinuityPainted.continuityLabel.right).toBeCloseTo(10, 1)
+      expect(result.foregrounds).not.toContain('rgb(255, 255, 255)')
+    }
+  }, 60000)
+})

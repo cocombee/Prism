@@ -1,0 +1,4 @@
+import { describe, expect, it } from 'vitest'
+import { createControlledTextHistory, recordControlledText, redoControlledText, undoControlledText } from './controlledTextHistory'
+const snap=(value:string,start=value.length,end=start)=>({value,start,end,direction:'none' as const,scrollTop:7,scrollLeft:0})
+describe('controlled prompt history',()=>{it('undoes and redoes multiple middle edits with selection',()=>{let h=createControlledTextHistory(snap('hello world',5));h=recordControlledText(h,snap('hello brave world',11));h=recordControlledText(h,snap('hello bold world',10,14));h=undoControlledText(h);expect(h.current).toMatchObject({value:'hello brave world',start:11});h=undoControlledText(h);expect(h.current.value).toBe('hello world');h=redoControlledText(h);h=redoControlledText(h);expect(h.current).toMatchObject({value:'hello bold world',start:10,end:14,scrollTop:7})})})

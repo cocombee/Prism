@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prism Foundry Product Standard"
+  short_description: "Preserve Prism Foundry UX and workflow rules"
+  default_prompt: "Use $prism-foundry-product-standard to design, implement, or review this Prism Foundry change consistently."

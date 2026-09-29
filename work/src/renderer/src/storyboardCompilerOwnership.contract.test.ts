@@ -1,0 +1,67 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+const app = readFileSync(new URL('./AppNext.tsx', import.meta.url), 'utf8')
+const card = readFileSync(new URL('./NodeCardNext.tsx', import.meta.url), 'utf8')
+const tagged = readFileSync(new URL('./TaggedPromptTextarea.tsx', import.meta.url), 'utf8')
+const styles = readFileSync(new URL('./styles-next.css', import.meta.url), 'utf8')
+
+describe('active Storyboard Video prompt ownership', () => {
+  it('uses the active NodeCardNext boundary and one mode-derived prompt state for display and requests', () => {
+    expect(app).toContain("from './NodeCardNext'")
+    expect(app).toContain('videoPromptState')
+    expect(app).toContain('setVideoPromptMode')
+    expect(app).toContain('resetManualPrompt')
+    expect(card).toContain("const videoPrompt = data.kind === 'video-generator' ? runtime?.videoPromptState(id) : null")
+    expect(card).toContain('value={videoPrompt?.activePrompt ?? data.prompt ?? \'\'}')
+  })
+
+  it('renders exact Auto/Manual radio and read-only contracts without a second prompt surface', () => {
+    expect(card).toContain('role="radiogroup" aria-label="Video prompt mode"')
+    expect(card).toContain('role="radio"')
+    expect(card).toContain('aria-label="Use Locked Storyboard Prompt"')
+    expect(card).toContain('aria-label="Use User Prompt"')
+    expect(card).toContain("videoPrompt?.mode === 'auto' ? 'Locked' : 'Lock'")
+    expect(card).toContain('>User</button>')
+    expect(card).toContain('readOnly={videoPrompt?.mode === \'auto\'}')
+    expect(card).toContain('aria-readonly={videoPrompt?.mode === \'auto\'}')
+    expect(card).toContain('availableTags={videoPrompt?.mode === \'auto\' ? [] : availablePromptTags}')
+    expect(tagged).toContain('props.readOnly ? [] : focused && !menuDismissed ? promptTagSuggestions')
+  })
+
+  it('uses Manual-only Reset and preserves the resize corner', () => {
+    expect(card).toContain('aria-label="Reset Manual Prompt to Auto"')
+    expect(card).toContain('<RefreshCcw size={11}')
+    expect(card).toContain('runtime?.resetManualPrompt(id)')
+    expect(card).toContain('className="storyboard-prompt-actions video-prompt-actions"')
+    expect(card).toContain('className="storyboard-transition-choice"')
+    expect(card).toContain('className={`storyboard-transition-option')
+    expect(card).toContain("videoPrompt?.mode === 'auto' ? 'Locked' : 'Lock'")
+    expect(card).toContain('className="storyboard-shot-action"')
+    expect(styles).toContain('.studio-node.kind-video-generator { width: 315px; }')
+    expect(app).toContain("node.data.kind === 'video-generator'")
+    expect(app).toContain("style: { ...node.style, width: 315 }")
+    expect(styles).not.toMatch(/\.video-prompt-mode\s*\{[^}]*(?:height|border|background|border-radius)/)
+    expect(styles).not.toMatch(/\.video-prompt-reset\s*\{[^}]*(?:width|height|border|background|border-radius)/)
+    expect(card).not.toContain('className="video-prompt-reset-tooltip"')
+    expect(card).toContain("disabled={videoPrompt?.mode !== 'manual' || videoPrompt.resetDisabled}")
+    expect(card).toContain('onClick={() => runtime?.resetManualPrompt(id)}')
+  })
+
+  it('maps live Auto conflicts to C-04, exposes disabled Auto help, and keeps equal text corridors', () => {
+    expect(card).toContain("videoPrompt?.mode === 'auto' ? videoPrompt.autoError || displayError")
+    expect(card).not.toContain('className="video-prompt-auto-tooltip"')
+    expect(card).toContain("const [videoPromptRovingMode, setVideoPromptRovingMode]")
+    expect(card).toContain("onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setVideoPromptRovingMode(videoPrompt?.mode || 'manual') }}")
+    expect(card).toContain("tabIndex={videoPromptRovingTabIndex('auto', videoPromptRovingMode)}")
+    expect(card).toContain("tabIndex={videoPromptRovingTabIndex('manual', videoPromptRovingMode)}")
+    expect(card).toContain("setVideoPromptRovingMode(nextMode)")
+    expect(card).toContain("event.currentTarget.closest('.storyboard-transition-choice')")
+    expect(card).toContain("aria-disabled={!videoPrompt?.connected}")
+    expect(card).not.toContain(' disabled={!videoPrompt?.connected}')
+    expect(card).toContain("if (buttons[next].getAttribute('aria-disabled') !== 'true') runtime?.setVideoPromptMode")
+    expect(styles).toMatch(/\.video-prompt-owner-shell \.tagged-prompt-shell > textarea,\s*\.video-prompt-owner-shell \.tagged-prompt-highlight pre \{[^}]*padding-bottom:\s*38px;/)
+    expect(styles).not.toMatch(/video-prompt-owner-shell[^}]*padding-right:\s*108px/)
+    expect(card).toContain('Manual draft copied once from the current Auto prompt.')
+  })
+})

@@ -1,0 +1,10 @@
+{
+  "appId": "com.cocombees.prismfoundry.3dcamera.v14.replacement.20260901",
+  "productName": "Prism 3D Camera Smooth Arrow Alt Roll V14 Flight Tester Replacement",
+  "asar": true,
+  "extraMetadata": { "main": "out-camera/main/main.js", "name": "prism-3d-camera-smooth-arrow-alt-roll-v14-replacement" },
+  "directories": { "output": "/tmp/prism-work/outputs/candidates/2026-09-01-smooth-arrow-alt-roll-v14-replacement" },
+  "files": ["out-camera/**/*", "package.json", "node_modules/ffmpeg-static/**/*"],
+  "asarUnpack": ["out-camera/ffmpeg-static/ffmpeg", "node_modules/ffmpeg-static/ffmpeg"],
+  "mac": { "identity": "-", "category": "public.app-category.graphics-design", "target": [{ "target": "dir", "arch": ["arm64"] }], "hardenedRuntime": false, "gatekeeperAssess": false }
+}

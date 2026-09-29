@@ -1,0 +1,45 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { spawnSync } from 'node:child_process'
+import { buildSync } from 'esbuild'
+import electronPath from 'electron'
+import { describe, expect, it } from 'vitest'
+import { addEntity, createCameraDocument, deployCameraShot } from './model'
+
+function runProbe() {
+  const directory = mkdtempSync(join(tmpdir(), 'prism-held-arrow-mounted-'))
+  const entry = join(directory, 'entry.ts'); const bundle = join(directory, 'renderer.js'); const html = join(directory, 'index.html'); const main = join(directory, 'main.cjs')
+  const interaction = resolve(import.meta.dirname, 'interaction.ts'); const model = resolve(import.meta.dirname, 'model.ts')
+  writeFileSync(entry, `import{createHeldArrowController}from${JSON.stringify(interaction)};import{addEntity,createCameraDocument}from${JSON.stringify(model)};const d=addEntity(createCameraDocument('mounted-held'),'human','Human'),id=d.entities[0].id;let t=0,frames=[],commits=0,pans=0,queue=[],controller;const scheduler={requestFrame:cb=>{queue.push(cb);return queue.length},cancelFrame:()=>{}};function step(ms){t+=ms;const q=queue.splice(0);q.forEach(cb=>cb(t))}function run(){controller=createHeldArrowController({document:d,entityId:id,preview:x=>frames.push(x),commit:()=>commits++,restore:()=>{},scheduler,now:()=>t});controller.start({key:'ArrowRight',altKey:true,metaKey:false,ctrlKey:false,shiftKey:false});for(let i=0;i<60;i++){controller.start({key:'ArrowRight',altKey:true,metaKey:false,ctrlKey:false,shiftKey:false});step(50)}const long=frames.at(-1).rotation[2];controller.keyup('ArrowRight');return{frames:frames.length,commits,long,pans}}window.result=run();`)
+  buildSync({entryPoints:[entry],outfile:bundle,bundle:true,format:'iife',platform:'browser',target:'chrome120',nodePaths:[resolve(process.cwd(),'node_modules')],logLevel:'silent'})
+  writeFileSync(html, `<div id="root"></div><script src="${pathToFileURL(bundle).href}"></script>`)
+  writeFileSync(main, `const{app,BrowserWindow}=require('electron'),path=require('node:path');app.setPath('userData',path.join(${JSON.stringify(directory)},'u'));app.whenReady().then(async()=>{const w=new BrowserWindow({show:false,webPreferences:{contextIsolation:false,sandbox:false}});await w.loadFile(${JSON.stringify(html)});console.log('HELD:'+JSON.stringify(await w.webContents.executeJavaScript('window.result')));w.close();app.quit()})`)
+  const run=spawnSync(electronPath as unknown as string,[main],{cwd:directory,encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:undefined},timeout:60000})
+  try { const line=run.stdout.split('\n').find(x=>x.startsWith('HELD:')); expect(run.status,run.stderr).toBe(0); expect(line).toBeDefined(); return JSON.parse(line!.slice(5)) } finally { rmSync(directory,{recursive:true,force:true}) }
+}
+
+describe('V14 mounted held-arrow controller',()=>{it('runs the mounted transaction seam through rAF previews and one final commit',()=>{const result=runProbe();expect(result.frames).toBeGreaterThan(1);expect(result.commits).toBe(1);expect(result.long).toBeGreaterThan(5);expect(result.pans).toBe(0)},60000)})
+
+function runActualNodeProbe() {
+  const directory = mkdtempSync(join(tmpdir(), 'prism-actual-arrow-mounted-'))
+  const entry = join(directory, 'entry.tsx'); const bundle = join(directory, 'renderer.js'); const html = join(directory, 'index.html'); const main = join(directory, 'main.cjs')
+  const app = resolve(import.meta.dirname, '../camera-tester/CameraTesterApp.tsx')
+  const sharedCss = pathToFileURL(resolve(import.meta.dirname, '../renderer/src/styles-next.css')).href
+  const cameraCss = pathToFileURL(resolve(import.meta.dirname, 'camera3d.css')).href
+  let fixture = addEntity(createCameraDocument('actual-arrow'), 'camera', 'Camera')
+  fixture = addEntity(fixture, 'human', 'Human')
+  const fixtureCamera = fixture.entities.find((entity) => entity.kind === 'camera')!
+  fixture = { ...fixture, entities: fixture.entities.map((entity) => entity.id === fixtureCamera.id ? { ...entity, transform: { ...entity.transform, position: [0, 1, 4] as [number, number, number] }, camera: { ...entity.camera!, target: { mode: 'free' } } } : entity) }
+  fixture = deployCameraShot(fixture, [0, 0, 0])
+  const fixtureJson = JSON.stringify(fixture)
+  writeFileSync(entry, `import React from 'react';import{createRoot}from'react-dom/client';import{CameraTesterApp}from${JSON.stringify(app)};window.__trace={saves:[]};window.cameraTester={loadNodeState:async()=>({document:${fixtureJson}}),saveNodeState:async(_id,state)=>window.__trace.saves.push(state),mediaUrl:async()=>({ok:false,reason:'not used'}),revealMedia:async()=>false,deleteMedia:async()=>false,startRender:async()=>({jobId:'unused',total:0}),writeRenderFrame:async()=>({}),finishRender:async()=>({}),cancelRender:async()=>{},objectAssistantStatus:async()=>({connected:false,vision:false}),createObjectRecipe:async()=>null};createRoot(document.getElementById('root')).render(<React.StrictMode><CameraTesterApp/></React.StrictMode>);`)
+  buildSync({ entryPoints: [entry], outfile: bundle, bundle: true, format: 'iife', platform: 'browser', target: 'chrome120', nodePaths: [resolve(process.cwd(), 'node_modules')], jsx: 'automatic', loader: { '.png': 'file' }, logLevel: 'silent' })
+  writeFileSync(html, `<style>html,body,#root{margin:0;width:100%;min-height:100%;background:#111;color:#ddd}*{box-sizing:border-box}</style><link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${cameraCss}"><div id="root"></div><script src="${pathToFileURL(bundle).href}"></script>`)
+  const probe = `(async()=>{const wait=ms=>new Promise(r=>setTimeout(r,ms));const frame=()=>new Promise(requestAnimationFrame);await wait(800);const select=document.querySelector('.camera3d-shot-select');if(!select)throw new Error('camera selection control missing');select.click();await frame();const canvas=document.querySelector('.camera3d-stage canvas');if(!canvas)throw new Error('camera canvas missing');canvas.focus();const pos=()=>['X','Y','Z'].map(axis=>document.querySelector('[aria-label="Position '+axis+' value"]')?.value).join(',');const fire=(type,alt=false)=>canvas.dispatchEvent(new KeyboardEvent(type,{bubbles:true,cancelable:true,key:'ArrowRight',code:'ArrowRight',altKey:alt}));const before={input:pos(),selected:document.querySelector('.camera3d-shot-row')?.getAttribute('aria-selected'),saved:window.__trace.saves.length,viewer:document.querySelector('[data-viewer-position]')?.getAttribute('data-viewer-position'),target:document.querySelector('[data-viewer-target]')?.getAttribute('data-viewer-target')};fire('keydown');await wait(1000);const during={input:pos(),saved:window.__trace.saves.length};fire('keyup');await wait(100);const plain={input:pos(),saved:window.__trace.saves.length};const v=document.querySelector('[data-viewer-position]');const t=document.querySelector('[data-viewer-target]');const vb=v?.getAttribute('data-viewer-position'),tb=t?.getAttribute('data-viewer-target');fire('keydown',true);await wait(180);const altDuring={input:pos(),viewer:v?.getAttribute('data-viewer-position'),target:t?.getAttribute('data-viewer-target')};fire('keyup',true);await wait(100);return{before,during,plain,altDuring,after:{input:pos(),saved:window.__trace.saves.length,viewer:v?.getAttribute('data-viewer-position'),target:t?.getAttribute('data-viewer-target')},viewerBefore:vb,targetBefore:tb}})()`
+  writeFileSync(main, `const{app,BrowserWindow}=require('electron'),path=require('node:path');app.setPath('userData',path.join(${JSON.stringify(directory)},'u'));app.whenReady().then(async()=>{const w=new BrowserWindow({show:true,width:1400,height:900,useContentSize:true,webPreferences:{contextIsolation:false,sandbox:false}});await w.loadFile(${JSON.stringify(html)});const result=await w.webContents.executeJavaScript(${JSON.stringify(probe)});console.log('ACTUAL_ARROW:'+JSON.stringify(result));w.close();app.quit()})`)
+  try { const run=spawnSync(electronPath as unknown as string,[main],{cwd:directory,encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:undefined},timeout:60000}); const marker=run.stdout.split('\n').find(line=>line.startsWith('ACTUAL_ARROW:')); expect(run.status,`${run.stdout}\n${run.stderr}`).toBe(0); expect(marker,`${run.stdout}\n${run.stderr}`).toBeDefined(); return JSON.parse(marker!.slice('ACTUAL_ARROW:'.length)) } finally { rmSync(directory,{recursive:true,force:true}) }
+}
+
+it('reaches the real Prism3DCameraNode canvas and moves the selected camera before one commit',()=>{const result=runActualNodeProbe();expect(result.during.input).not.toBe(result.before.input);expect(result.plain.saved).toBe(result.before.saved+1);expect(result.altDuring.input).toBe(result.plain.input);expect(result.altDuring.viewer).toBe(result.viewerBefore);expect(result.altDuring.target).toBe(result.targetBefore);expect(result.after.saved).toBe(result.plain.saved+1)},60000)

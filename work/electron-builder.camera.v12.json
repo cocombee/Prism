@@ -1,0 +1,10 @@
+{
+  "appId": "com.cocombees.prismfoundry.3dcamera.v12.20260901",
+  "productName": "Prism 3D Camera Pilot Sync Latency V12 Flight Tester",
+  "asar": true,
+  "extraMetadata": { "main": "out-camera/main/main.js", "name": "prism-3d-camera-pilot-sync-latency-v12" },
+  "directories": { "output": "/tmp/prism-work/outputs/candidates/2026-09-01-camera-pilot-sync-latency-v12" },
+  "files": ["out-camera/**/*", "package.json", "node_modules/ffmpeg-static/**/*"],
+  "asarUnpack": ["out-camera/ffmpeg-static/ffmpeg", "node_modules/ffmpeg-static/ffmpeg"],
+  "mac": { "identity": "-", "category": "public.app-category.graphics-design", "target": [{ "target": "dir", "arch": ["arm64"] }], "hardenedRuntime": false, "gatekeeperAssess": false }
+}

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="80" x2="900" y2="950" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B79AFF"/>
+      <stop offset="0.48" stop-color="#7B5AE8"/>
+      <stop offset="1" stop-color="#4630A8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(512 460) rotate(90) scale(460)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="30" stdDeviation="35" flood-color="#251462" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect x="62" y="62" width="900" height="900" rx="224" fill="url(#bg)" filter="url(#shadow)"/>
+  <rect x="82" y="82" width="860" height="860" rx="206" fill="url(#glow)" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="8"/>
+  <circle cx="512" cy="512" r="252" fill="#2B1B70" fill-opacity="0.22" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="8"/>
+  <path d="M512 250C532 354 551 405 652 426C551 447 532 497 512 602C491 497 472 447 372 426C472 405 491 354 512 250Z" fill="#FFFFFF"/>
+  <path d="M683 480C696 545 709 577 772 590C709 603 696 635 683 700C670 635 657 603 594 590C657 577 670 545 683 480Z" fill="#D9CCFF"/>
+  <path d="M350 514C360 564 370 589 419 599C370 609 360 634 350 684C340 634 330 609 281 599C330 589 340 564 350 514Z" fill="#9FF0E8"/>
+</svg>

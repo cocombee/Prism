@@ -1,0 +1,41 @@
+# Dependencies and compiled output
+node_modules/
+out/
+out-camera/
+dist/
+outputs/
+release-candidates/
+backups/
+obsidian-sync-outbox/
+*.app
+*.app.archived
+*.dmg
+*.zip
+
+# Local Hermes state, inspection data, and caches
+.hermes/
+.design-inspector/
+.prism-camera-smoke/
+.v7-asar-check/
+.git-source-audit/
+coverage/
+.vite/
+.cache/
+.DS_Store
+*.log
+*.tsbuildinfo
+
+# Local credentials and environment
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+credentials.json
+secrets.json
+api-keys.json
+
+# Generated camera tester copies at the implementation root
+/work/main.js
+/work/index.html

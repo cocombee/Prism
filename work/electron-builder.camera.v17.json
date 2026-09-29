@@ -1,0 +1,10 @@
+{
+  "appId": "com.cocombees.prismfoundry.3dcamera.continuous-modifier-hold.20260901.v17",
+  "productName": "Prism 3D Camera Continuous Modifier Hold V17 Flight Tester",
+  "asar": true,
+  "extraMetadata": { "main": "out-camera/main/main.js", "name": "prism-3d-camera-continuous-modifier-hold-v17" },
+  "directories": { "output": "/tmp/prism-work/outputs/candidates/2026-09-01-continuous-modifier-hold-v17" },
+  "files": ["out-camera/**/*", "package.json", "node_modules/ffmpeg-static/**/*"],
+  "asarUnpack": ["out-camera/ffmpeg-static/ffmpeg", "node_modules/ffmpeg-static/ffmpeg"],
+  "mac": { "identity": "-", "category": "public.app-category.graphics-design", "target": [{ "target": "dir", "arch": ["arm64"] }], "hardenedRuntime": false, "gatekeeperAssess": false }
+}

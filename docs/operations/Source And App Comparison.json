@@ -1,0 +1,1341 @@
+{
+  "app_path": "/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/work/outputs/build/camera331-final/mac-arm64/Prism Foundry.app",
+  "app_asar_sha256": "d8d10d14d46029991be5acc27692899c4537aef8190133cdd39159702592b614",
+  "app_info": {
+    "CFBundleDisplayName": "Prism Foundry",
+    "CFBundleIdentifier": "com.cocombees.prismfoundry",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "0.1.0"
+  },
+  "own_output": [
+    {
+      "path": "out/main/index.js",
+      "app_sha256": "4946cbcfca725af3d37d9d77fd68fb93d919f02ae626370880b063046cc34619",
+      "saved_sha256": "4946cbcfca725af3d37d9d77fd68fb93d919f02ae626370880b063046cc34619",
+      "fresh_sha256": "4946cbcfca725af3d37d9d77fd68fb93d919f02ae626370880b063046cc34619"
+    },
+    {
+      "path": "out/preload/index.js",
+      "app_sha256": "0c3b60c2eff1531798f9b98605c52dea69ec97d4d299b1e1e2895499d2cef166",
+      "saved_sha256": "0c3b60c2eff1531798f9b98605c52dea69ec97d4d299b1e1e2895499d2cef166",
+      "fresh_sha256": "0c3b60c2eff1531798f9b98605c52dea69ec97d4d299b1e1e2895499d2cef166"
+    },
+    {
+      "path": "out/renderer/assets/back-BZKpm5NB.png",
+      "app_sha256": "82ed582a3f18f83b781b7419de5b934ddb1be71663aa95be0b88a39e33cc5c4d",
+      "saved_sha256": "82ed582a3f18f83b781b7419de5b934ddb1be71663aa95be0b88a39e33cc5c4d",
+      "fresh_sha256": "82ed582a3f18f83b781b7419de5b934ddb1be71663aa95be0b88a39e33cc5c4d"
+    },
+    {
+      "path": "out/renderer/assets/back-DmfwK4dy.png",
+      "app_sha256": "94f761eaaf6a267dd85907d4913029dc97edb254339a0b3a98efa101e7943ce6",
+      "saved_sha256": "94f761eaaf6a267dd85907d4913029dc97edb254339a0b3a98efa101e7943ce6",
+      "fresh_sha256": "94f761eaaf6a267dd85907d4913029dc97edb254339a0b3a98efa101e7943ce6"
+    },
+    {
+      "path": "out/renderer/assets/back-body-Dh4ozIgz.png",
+      "app_sha256": "c1d1ec453e58435c2493d5f29d33cdde0c0e2146fcb1dd2cf3647d7a55d1e667",
+      "saved_sha256": "c1d1ec453e58435c2493d5f29d33cdde0c0e2146fcb1dd2cf3647d7a55d1e667",
+      "fresh_sha256": "c1d1ec453e58435c2493d5f29d33cdde0c0e2146fcb1dd2cf3647d7a55d1e667"
+    },
+    {
+      "path": "out/renderer/assets/face-D-LePd8b.png",
+      "app_sha256": "283a68ec383ff45d155bf48a1ce19014746a50b26b8e777fd448dc61b8b4ba14",
+      "saved_sha256": "283a68ec383ff45d155bf48a1ce19014746a50b26b8e777fd448dc61b8b4ba14",
+      "fresh_sha256": "283a68ec383ff45d155bf48a1ce19014746a50b26b8e777fd448dc61b8b4ba14"
+    },
+    {
+      "path": "out/renderer/assets/front-CWZAFddv.png",
+      "app_sha256": "fcc2acb2e8054124d4aa009a5738892752f1eb3308f5715dce15c865f138b046",
+      "saved_sha256": "fcc2acb2e8054124d4aa009a5738892752f1eb3308f5715dce15c865f138b046",
+      "fresh_sha256": "fcc2acb2e8054124d4aa009a5738892752f1eb3308f5715dce15c865f138b046"
+    },
+    {
+      "path": "out/renderer/assets/full-body-C-3jaT0I.png",
+      "app_sha256": "2188eb8c72f4393890d1b8b9aeb302265309addb600e2437736c9746d07d0a37",
+      "saved_sha256": "2188eb8c72f4393890d1b8b9aeb302265309addb600e2437736c9746d07d0a37",
+      "fresh_sha256": "2188eb8c72f4393890d1b8b9aeb302265309addb600e2437736c9746d07d0a37"
+    },
+    {
+      "path": "out/renderer/assets/index-next-BAQCkujT.js",
+      "app_sha256": "e70f502c40788f2da9a7cf20e6ec76863e5c33de2379c6f9e1ea05ab5f9e6c0a",
+      "saved_sha256": "e70f502c40788f2da9a7cf20e6ec76863e5c33de2379c6f9e1ea05ab5f9e6c0a",
+      "fresh_sha256": "e70f502c40788f2da9a7cf20e6ec76863e5c33de2379c6f9e1ea05ab5f9e6c0a"
+    },
+    {
+      "path": "out/renderer/assets/index-next-DJnQLbYZ.css",
+      "app_sha256": "384566a7a6756efcf3d8ad947a049fc9c5e2d512530fe5e02574cae5de41ed23",
+      "saved_sha256": "384566a7a6756efcf3d8ad947a049fc9c5e2d512530fe5e02574cae5de41ed23",
+      "fresh_sha256": "384566a7a6756efcf3d8ad947a049fc9c5e2d512530fe5e02574cae5de41ed23"
+    },
+    {
+      "path": "out/renderer/assets/left-three-quarter-B9CDd7i2.png",
+      "app_sha256": "62b40408bc79de38efeaf9ffa532a1967db609db5635d3f2dc96ac45693cc5b1",
+      "saved_sha256": "62b40408bc79de38efeaf9ffa532a1967db609db5635d3f2dc96ac45693cc5b1",
+      "fresh_sha256": "62b40408bc79de38efeaf9ffa532a1967db609db5635d3f2dc96ac45693cc5b1"
+    },
+    {
+      "path": "out/renderer/assets/profile-DRK7kMzf.png",
+      "app_sha256": "954e19134e9bcad3585dcc12067a2c823c80c8a934238581c6d9bde7b922030d",
+      "saved_sha256": "954e19134e9bcad3585dcc12067a2c823c80c8a934238581c6d9bde7b922030d",
+      "fresh_sha256": "954e19134e9bcad3585dcc12067a2c823c80c8a934238581c6d9bde7b922030d"
+    },
+    {
+      "path": "out/renderer/assets/side-D1N-ts7z.png",
+      "app_sha256": "8dbaed68e38cf7bdd5e2aa2cfd4cd61b5271ad5774e44e17c0f7e43d025ccdb1",
+      "saved_sha256": "8dbaed68e38cf7bdd5e2aa2cfd4cd61b5271ad5774e44e17c0f7e43d025ccdb1",
+      "fresh_sha256": "8dbaed68e38cf7bdd5e2aa2cfd4cd61b5271ad5774e44e17c0f7e43d025ccdb1"
+    },
+    {
+      "path": "out/renderer/assets/side-body-Bz3cNC0E.png",
+      "app_sha256": "5290a71c5f8bea3262dd7c3dd1cf50124cfceaa26042fa53ae696694093dfc97",
+      "saved_sha256": "5290a71c5f8bea3262dd7c3dd1cf50124cfceaa26042fa53ae696694093dfc97",
+      "fresh_sha256": "5290a71c5f8bea3262dd7c3dd1cf50124cfceaa26042fa53ae696694093dfc97"
+    },
+    {
+      "path": "out/renderer/assets/smile-CQO5y_7b.png",
+      "app_sha256": "1c9115574122a286c54062a59f09fcdaf9c291e40cfd6539daf0dafd1d93c98e",
+      "saved_sha256": "1c9115574122a286c54062a59f09fcdaf9c291e40cfd6539daf0dafd1d93c98e",
+      "fresh_sha256": "1c9115574122a286c54062a59f09fcdaf9c291e40cfd6539daf0dafd1d93c98e"
+    },
+    {
+      "path": "out/renderer/assets/three-quarter-B1FgRSLh.png",
+      "app_sha256": "ad814a93914b7611d7beeb5c2c463f9e7320ce9c59f5f1f198df4ff6a110dee6",
+      "saved_sha256": "ad814a93914b7611d7beeb5c2c463f9e7320ce9c59f5f1f198df4ff6a110dee6",
+      "fresh_sha256": "ad814a93914b7611d7beeb5c2c463f9e7320ce9c59f5f1f198df4ff6a110dee6"
+    },
+    {
+      "path": "out/renderer/assets/three-quarter-uMqpHdTe.png",
+      "app_sha256": "93771147f2a0b4c1d0f2b37b3609f8608af0b9cdbd8dd4d26137a785fbb550bb",
+      "saved_sha256": "93771147f2a0b4c1d0f2b37b3609f8608af0b9cdbd8dd4d26137a785fbb550bb",
+      "fresh_sha256": "93771147f2a0b4c1d0f2b37b3609f8608af0b9cdbd8dd4d26137a785fbb550bb"
+    },
+    {
+      "path": "out/renderer/index-next.html",
+      "app_sha256": "824d9711728f79edebbfa4ce2267600da3049c899f97091612a4fb39813521d9",
+      "saved_sha256": "824d9711728f79edebbfa4ce2267600da3049c899f97091612a4fb39813521d9",
+      "fresh_sha256": "824d9711728f79edebbfa4ce2267600da3049c899f97091612a4fb39813521d9"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/cinematic-naturalism.jpg",
+      "app_sha256": "0ebcc25ff04c5b57f301cab4e6f2badc595d5cd5b1f839a803b08a54e268e782",
+      "saved_sha256": "0ebcc25ff04c5b57f301cab4e6f2badc595d5cd5b1f839a803b08a54e268e782",
+      "fresh_sha256": "0ebcc25ff04c5b57f301cab4e6f2badc595d5cd5b1f839a803b08a54e268e782"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/dimensional-comic.jpg",
+      "app_sha256": "3311063b09907a7b04716c92cbfc54ef6597382790f013a36a7a6701389c257a",
+      "saved_sha256": "3311063b09907a7b04716c92cbfc54ef6597382790f013a36a7a6701389c257a",
+      "fresh_sha256": "3311063b09907a7b04716c92cbfc54ef6597382790f013a36a7a6701389c257a"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/film-noir.jpg",
+      "app_sha256": "71bde267989676095787977ab58687bd3469f9d7cd7185cc8e1b2d7e390aac97",
+      "saved_sha256": "71bde267989676095787977ab58687bd3469f9d7cd7185cc8e1b2d7e390aac97",
+      "fresh_sha256": "71bde267989676095787977ab58687bd3469f9d7cd7185cc8e1b2d7e390aac97"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/heroic-panel-comics.png",
+      "app_sha256": "5e51fdfc751d477d0f1940d59f804bda61b4b67334f33c324caa104eeb18a23f",
+      "saved_sha256": "5e51fdfc751d477d0f1940d59f804bda61b4b67334f33c324caa104eeb18a23f",
+      "fresh_sha256": "5e51fdfc751d477d0f1940d59f804bda61b4b67334f33c324caa104eeb18a23f"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/painterly-martial-arts.jpg",
+      "app_sha256": "d7494a76ce2dc877f7f6d58c1d4e3bba144f282066c40cc038a2bbac8fe2db98",
+      "saved_sha256": "d7494a76ce2dc877f7f6d58c1d4e3bba144f282066c40cc038a2bbac8fe2db98",
+      "fresh_sha256": "d7494a76ce2dc877f7f6d58c1d4e3bba144f282066c40cc038a2bbac8fe2db98"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/retro-35mm.jpg",
+      "app_sha256": "cfa96851604736469f45db4c05974cf2390107d71974ff98346e3175756c485b",
+      "saved_sha256": "cfa96851604736469f45db4c05974cf2390107d71974ff98346e3175756c485b",
+      "fresh_sha256": "cfa96851604736469f45db4c05974cf2390107d71974ff98346e3175756c485b"
+    },
+    {
+      "path": "out/renderer/style-thumbnails/storybook-gouache.jpg",
+      "app_sha256": "46776fa74ed8b1225c30711646cf6d6f4d9e4f003ffebb7a549987b9014ef907",
+      "saved_sha256": "46776fa74ed8b1225c30711646cf6d6f4d9e4f003ffebb7a549987b9014ef907",
+      "fresh_sha256": "46776fa74ed8b1225c30711646cf6d6f4d9e4f003ffebb7a549987b9014ef907"
+    }
+  ],
+  "dependencies": {
+    "matched": 8927,
+    "different": [
+      {
+        "path": "node_modules/@derhuerst/http-basic/package.json",
+        "app_sha256": "27a471c3d643471507dea51e5408d0acd94784950068a95115385dbd3684e87b",
+        "source_dependency_sha256": "c5eb371b5691a1f2e002420beb948244e84290a19dbfbef1b286ca305423cd20"
+      },
+      {
+        "path": "node_modules/@fal-ai/client/package.json",
+        "app_sha256": "c789300a359053aaf3571248c53d472570e097129be0f5a2cd89ebd7b89cae38",
+        "source_dependency_sha256": "9bc00feb99c8d51cdf63c6030de642f8aa47a9778162bb2863cd545f15aa7892"
+      },
+      {
+        "path": "node_modules/@img/colour/package.json",
+        "app_sha256": "d8de837c60986566ef156246162f79d5ebc90d9dfe515f3207406759962b4b14",
+        "source_dependency_sha256": "bc38c5097693ed53b91c32f35fb0a52569736c7854ba2eb6d080f3252071f75c"
+      },
+      {
+        "path": "node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node",
+        "app_sha256": "c9be447f2a855751c823d4f3791fc0752ef406448b1b0a6a33a527922cb33524",
+        "source_dependency_sha256": "5efbf349396808af22ae4f6b67c327767297a97b54a1ecf04dedec63aeff4d46"
+      },
+      {
+        "path": "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+        "app_sha256": "bc2104ce215ac004dc8175906470c6abebed1ac240ece5cd3edd158c1490baca",
+        "source_dependency_sha256": "50090a3a7c8f455de3c6cf2b274d231ddcc92901f4b1957c3b3391b6b9877989"
+      },
+      {
+        "path": "node_modules/@msgpack/msgpack/package.json",
+        "app_sha256": "db9991657ac2c081d59abba8687b54f5e66a0e5f3a9aaeab9cb82f83c32cc15c",
+        "source_dependency_sha256": "2c481eb6a64d6ab3e6c7b1cbd73fbb8d3461405699e193665b20e607f503b071"
+      },
+      {
+        "path": "node_modules/@types/d3-color/package.json",
+        "app_sha256": "2d03718f33750a9766d9a46d5022629433e20bf254b327ceaa9f1341e4dbe0ca",
+        "source_dependency_sha256": "409ac013405caa33f42ed394d92b357fde96b950ee4d5bbfb7de8d6dbebe6f37"
+      },
+      {
+        "path": "node_modules/@types/d3-drag/package.json",
+        "app_sha256": "fe0876d1cade4f431750a22fdf1b3ca3c13b7692417fe94fb37e186d7c43322c",
+        "source_dependency_sha256": "8d2695642e6eaf9da61aac7a1044aa23b42167ddd3eae3bbad7ed4a422e997a4"
+      },
+      {
+        "path": "node_modules/@types/d3-interpolate/package.json",
+        "app_sha256": "3b4d00b05d32e380f74a61a0f8386a32102fdd26b603e0037f3003a7f26487b8",
+        "source_dependency_sha256": "751bcbf0a81dc0b5e507e535e29d9c27b7132b74b3b950594391f9eea0b46a76"
+      },
+      {
+        "path": "node_modules/@types/d3-selection/package.json",
+        "app_sha256": "439be60d5f4c116a70f2edfd81928792323668ff4960a79bfaf7f1cef785c41e",
+        "source_dependency_sha256": "4d7bc2d92b94604f71f7eede9800b6d6f546906d27807b540b4aa25946417781"
+      },
+      {
+        "path": "node_modules/@types/d3-transition/package.json",
+        "app_sha256": "40b15c277ca58d905edeb65eab27c2f59c90f465a57c0c5e417574bb1d2b692a",
+        "source_dependency_sha256": "cd880a8ea664d612d89e8e33b3abd7511e655306e72567ef31e26e760ce6d052"
+      },
+      {
+        "path": "node_modules/@types/d3-zoom/package.json",
+        "app_sha256": "fa76aeed9552b65b9d052bbb35fbf3c7cc5e3682f9ef5aac1b1b8c63f36b69df",
+        "source_dependency_sha256": "14b452dbc4b6aae9fec09aa243b76f359bf4defa05be5e2dc2e0e045ec82ebff"
+      },
+      {
+        "path": "node_modules/@types/node/package.json",
+        "app_sha256": "c184f562ae361c23471acd852aa78a7b1b59f64b231d855234a5b6221a8f1089",
+        "source_dependency_sha256": "1e6d3bbbc5082745123d236b38dce0eacdab987d4ac9e57e299e55f780c170de"
+      },
+      {
+        "path": "node_modules/@xyflow/react/package.json",
+        "app_sha256": "ae81fbf13f12275593a24e1d6b0ffdc9f520fea5f36de277d3e84b6346cea568",
+        "source_dependency_sha256": "cc9a587caa48523a931c0316cf7994e098029b928f3343231e4e007781e10124"
+      },
+      {
+        "path": "node_modules/@xyflow/system/package.json",
+        "app_sha256": "fc652af204c6188e1087fdb80ec253d13e89d23fb3d2c42deed7805270ef3b36",
+        "source_dependency_sha256": "d79b1338d7a7f52a142ef7313ef1cdafa0ee5d048ec764826b19d3b3778dbbaf"
+      },
+      {
+        "path": "node_modules/agent-base/package.json",
+        "app_sha256": "1c22afa50ae7fedb6d51d34394cccb31fc4ed27163271d3060355b044a5b5777",
+        "source_dependency_sha256": "7a08cb2fe1d2b788e0a7bf6a9b7597dbeeeae804698c2fbd15de786d284d327c"
+      },
+      {
+        "path": "node_modules/buffer-from/package.json",
+        "app_sha256": "edcf5e26a08c20fb18d3eff018278f54363c5f5b1aa7cb3fdcbb7b11ed1c7bbb",
+        "source_dependency_sha256": "f7cde31d1db3e71738045206397d472e1f12513643ba4b9fd60ea337f22b1e3f"
+      },
+      {
+        "path": "node_modules/caseless/package.json",
+        "app_sha256": "88f1f073439e4c7dc888c3b5e21278e3d518adbdd7f318baa6990a22c4788706",
+        "source_dependency_sha256": "510eb2f69aab32a31b4eccd66ce2fafaeeeb7beca01597e0d6589a4cba6af82b"
+      },
+      {
+        "path": "node_modules/classcat/package.json",
+        "app_sha256": "5dd06f2766cce24155fe6b45d8b56f587cb54f64a34962c122426f8873565516",
+        "source_dependency_sha256": "3deeb9533e14dcea3a8a998716e3eb7d08496f71a1c699266aec7a5d39c09126"
+      },
+      {
+        "path": "node_modules/concat-stream/package.json",
+        "app_sha256": "5e13d87537a413e41bc721dba123f60c33c5c7e462aa44b369b558f3dc55639b",
+        "source_dependency_sha256": "d2f8ce0714a1bbb494502b703d1a04c014393df23f77be0cf8755b9fbe46d6ab"
+      },
+      {
+        "path": "node_modules/d3-color/package.json",
+        "app_sha256": "c7898667fae2cd0dda06ee1db8abe87aa5f15c12465118c1d92b94fc1be093dd",
+        "source_dependency_sha256": "3de1c3c467f09ffc0372c8b765f8981535c22e1d9f944d17a35ee37df1033516"
+      },
+      {
+        "path": "node_modules/d3-dispatch/package.json",
+        "app_sha256": "3de240f1339bb515e86b7d770a3735a2ebeb5d22323782013a859294740d8943",
+        "source_dependency_sha256": "6d9bb49819ec45e2187304df1b25e731c246d646cd2eb5aa2fe06e6c9cc7ad84"
+      },
+      {
+        "path": "node_modules/d3-drag/package.json",
+        "app_sha256": "0d630ae420a79af77631bebd6753e4febb835ec48b7a54f09765726d59633e93",
+        "source_dependency_sha256": "daecac22c0dfda72109fdd75e3817a15082a6f58d9bdc1380d77e06f7f44c218"
+      },
+      {
+        "path": "node_modules/d3-ease/package.json",
+        "app_sha256": "0656642d6f490cfb21e24ff6f3aae5785e14a96e630937c1c420631cbbe252cb",
+        "source_dependency_sha256": "393518c7886852c8cdeae42a54065c3ba54eddb701dd2da98c6d048f92cbc91c"
+      },
+      {
+        "path": "node_modules/d3-interpolate/package.json",
+        "app_sha256": "632647a64467a0107bc349df8ddf80c973e5f3c38209a0a779dfd524334e5ce8",
+        "source_dependency_sha256": "3e2ce33f9d7072b6bfedbae949c1df546e187994e44b6f4b3795abeb63914613"
+      },
+      {
+        "path": "node_modules/d3-selection/package.json",
+        "app_sha256": "7b400ba72b0e6ec23053ab23f1a95dce38fefae37bc0120cc48603399c39da5c",
+        "source_dependency_sha256": "adbb86f6d93c60a3789af9be6f6cdc40127ce15f63187a1e94c46fe26b0776ec"
+      },
+      {
+        "path": "node_modules/d3-timer/package.json",
+        "app_sha256": "85bcb3abaaddabb1228ad08e5d9a17a0972eac41ffb06b8b6d73d0c827fc6959",
+        "source_dependency_sha256": "d2b6cb2200728b60982aa30c4caf787f0bda2c066ef9176282ab54ba656403cb"
+      },
+      {
+        "path": "node_modules/d3-transition/package.json",
+        "app_sha256": "43474bb979828c6bf002f74ce4432eadc375db53b8036a1af9ce864df1b14953",
+        "source_dependency_sha256": "6ee7ce4fb0e59ee6be93d5a5fb33db804add32dbb3afb6c753659b99084fde84"
+      },
+      {
+        "path": "node_modules/d3-zoom/package.json",
+        "app_sha256": "210b9f0c2107d8677e1ce3c21ef3f4aca53f61be495a8c6bde8178c36d2c9df3",
+        "source_dependency_sha256": "0adc45c5f4e5830e8c639c3953761e73e9493f1cb5f3dea6abc2249adb8ff2a9"
+      },
+      {
+        "path": "node_modules/debug/package.json",
+        "app_sha256": "85f3f142cda5b1a1ed18f4a5181a6c6b31b07a6d35da48dacc507586924c7ccd",
+        "source_dependency_sha256": "ea8e33d63fe5f3a4c36609b6c3df8e2ef1f8b8ba2fc3a2e1e53cb27291f384af"
+      },
+      {
+        "path": "node_modules/detect-libc/package.json",
+        "app_sha256": "14eb612003e36897f20862653e538f26afa41f9662c4dd641e75618207b8851e",
+        "source_dependency_sha256": "ee88e5b954fdf3a8480b1d01ef767d68d8ca2c6da269f58c5cf1c5550e9aa2a7"
+      },
+      {
+        "path": "node_modules/env-paths/package.json",
+        "app_sha256": "de9602e1b482b8748b5550711f10f24fcc73d916806e1db497876fb2842ae6ba",
+        "source_dependency_sha256": "b92833e5851ec53bd4cd8093f6099d0c6e6818c4374ec1d09aa25d4f9ba91ec4"
+      },
+      {
+        "path": "node_modules/eventsource-parser/package.json",
+        "app_sha256": "7192d21dd2977e26072cca73123ae7d8f6d9863c24fc1664003bbc6ba5c36918",
+        "source_dependency_sha256": "ef5b0bb8909234bd3f1879c86d71b4b119b6a82bd27858fdbd434cf265d276ed"
+      },
+      {
+        "path": "node_modules/ffmpeg-static/ffmpeg",
+        "app_sha256": "5ceb7023c72ce58ffa3e4dc5c53565ebb0b2287fca2397ce39ec6a583e49037a",
+        "source_dependency_sha256": "a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584"
+      },
+      {
+        "path": "node_modules/ffmpeg-static/package.json",
+        "app_sha256": "2b3d5187b927250e607677f672d784bbd282a3a7d3f9b64480744e2e7fb05ec2",
+        "source_dependency_sha256": "646ba194bac40bdb76856effc9629463477c0e1e7ccded3888971328ff7761c5"
+      },
+      {
+        "path": "node_modules/http-response-object/package.json",
+        "app_sha256": "aeb97f31b5cd98cd3ead4e45b762a5b53a88d55d450d03f518d7293cd480226c",
+        "source_dependency_sha256": "abfa6f8e361bb183027a7c040287f6dee7503c1f39e5346f98a5af4f78962b5b"
+      },
+      {
+        "path": "node_modules/https-proxy-agent/dist/index.js",
+        "app_sha256": "7f18e187a92bf3691b1728523ad5863f08ace4d25599535e1471f1f81e90f2cd",
+        "source_dependency_sha256": "30165586fac3becbc9dbf2b7b5bdaa802a77ac34af9926208f6e94a3bd87ef31"
+      },
+      {
+        "path": "node_modules/https-proxy-agent/dist/index.js.map",
+        "app_sha256": "87ee8e0ed31bf580ee85f91cd0a0a05528a8b3a34336bd7b150d082b412ce82d",
+        "source_dependency_sha256": "8c0c9b0f8b34966e0e8ad5158bba82a8a54901713516ab0ca77c9dd54f645c82"
+      },
+      {
+        "path": "node_modules/https-proxy-agent/dist/parse-proxy-response.js",
+        "app_sha256": "24c1737b73db4c109a4cb184ca768b4e85f6cc6cfcc74ed3836388a995b3e557",
+        "source_dependency_sha256": "36a30ebcd66060fa8e3aba8295854757afbd60f2643d8992814727f249c5eba0"
+      },
+      {
+        "path": "node_modules/https-proxy-agent/dist/parse-proxy-response.js.map",
+        "app_sha256": "57a386a0393252db29cd35ca216a1da4e7a0896871cdc8c9caddec99572bb88b",
+        "source_dependency_sha256": "05da2a26a5ecca3c3f3e40b849467e096d747a5a317cfb1b9aa625ad29200747"
+      },
+      {
+        "path": "node_modules/https-proxy-agent/package.json",
+        "app_sha256": "5cb594f8198cff9c055f9fd0be3564d1230b4df27a40fe5279772dfdc4da874f",
+        "source_dependency_sha256": "b08c1977d38f14f4be7fb5be33aab545e3e5a6e2e12100733a6ad97dec995206"
+      },
+      {
+        "path": "node_modules/inherits/package.json",
+        "app_sha256": "8bde8d8aeedbe677961a91d01b8f6df07253d95b0e03c178e748e44969a8885d",
+        "source_dependency_sha256": "be645800bc94fd8de29c8ae91690549b316cc437100108aeea7b2f347693cc80"
+      },
+      {
+        "path": "node_modules/lucide-react/package.json",
+        "app_sha256": "675ea3ac8d6220234d6849486fda0f9cb2247079880850053a48b79eccb0a9df",
+        "source_dependency_sha256": "096cd90a47eb3a2722fa6b2d8a6219173bb1574003e61dd63095beed818edb90"
+      },
+      {
+        "path": "node_modules/ms/package.json",
+        "app_sha256": "f983ec581f1dd5a47b7f12b58f97c0b44c4e0cce56cbecc40140031aeef99bdf",
+        "source_dependency_sha256": "1a6b4d9739790c0b94ab96c8cc0507e281c164c311ff4fbf5e57fb8d26290b40"
+      },
+      {
+        "path": "node_modules/parse-cache-control/package.json",
+        "app_sha256": "5099979d7f7a1cea26348ba00c93b3d20aa252d7300699d9dd59d3b5acaf840e",
+        "source_dependency_sha256": "e035ad2f6690f96a507b6c20cd22021977444c8d771e85890a1e4c4dccd6cac5"
+      },
+      {
+        "path": "node_modules/progress/package.json",
+        "app_sha256": "1ac6cdcd1471dc5ba1fe5bfc34a9c0f6a11b021ce9c0ad211cdd7972985bbcfc",
+        "source_dependency_sha256": "3f58cfd421f075cda1017006c3cd287d0ad925466cb04af14caf0ee55c1ac54d"
+      },
+      {
+        "path": "node_modules/react/package.json",
+        "app_sha256": "02093fab32aa4f6e6ad9736e2f67c0bd636b7b19309665081da5a409a0345223",
+        "source_dependency_sha256": "e40c3ed9b633c9ecf188e09a4be309780a1ea0a9c068278a30ff6a27e7b2dbb6"
+      },
+      {
+        "path": "node_modules/react-dom/package.json",
+        "app_sha256": "fcc2d79ed1322eb61d94beacd4e975040c8ec8025c7586fec2a1b42f32218642",
+        "source_dependency_sha256": "7c82f0967114d4b5d38b1f07e543af87c9919e8d3243f9604004819319cb2200"
+      },
+      {
+        "path": "node_modules/readable-stream/lib/_stream_duplex.js",
+        "app_sha256": "e2e55263df344f33d016a3e051de1a86e2206989a2162951e651e5557665954c",
+        "source_dependency_sha256": "fd17d6a92dd9ba004c85f8e364b2771af10d012a83766437447dbae63879fa6b"
+      },
+      {
+        "path": "node_modules/readable-stream/lib/_stream_passthrough.js",
+        "app_sha256": "af6250df6a49a0148eed8b5f2e28b2f692c3ffa9df538a59dc716a4bd10901e2",
+        "source_dependency_sha256": "bf61450b1ff5f94fea9d46665e931119642034c903e63cc224b4c96472eed4d4"
+      },
+      {
+        "path": "node_modules/readable-stream/lib/_stream_readable.js",
+        "app_sha256": "9837de8cae91f9a80da75368855b45c3ada9a858983355fd873d8885cab1c5ab",
+        "source_dependency_sha256": "216e051224eff89a5d5eec76bef25addac078d9ebd2e88bd0a3d73a0e605091d"
+      },
+      {
+        "path": "node_modules/readable-stream/lib/_stream_transform.js",
+        "app_sha256": "a2f6e6d17a74dfa75bc7b34b50546ebcb76eeb2f4aac6d1090f80915aee20342",
+        "source_dependency_sha256": "56220d9dd58b976f1739bfc85948b267d79772ba23672ff402d13b6b3fcf4e40"
+      },
+      {
+        "path": "node_modules/readable-stream/lib/_stream_writable.js",
+        "app_sha256": "0f3f2accecd343dfae91d7daa72f3ad125b6f139d5883ff51362042d8cb65cf6",
+        "source_dependency_sha256": "e6359ac652ed97f5f328c586c7a6b8f163782a9ca13da476e609a981c75e0469"
+      },
+      {
+        "path": "node_modules/readable-stream/lib/internal/streams/destroy.js",
+        "app_sha256": "e1c1a185a2cc4bee2be5e7d33b5e294eb0fb55c1a47b61853a8c43e50cb822a4",
+        "source_dependency_sha256": "a59f90daec030125875a6028b32f93e2e2bc9fafd703991dbc36244f5cb21176"
+      },
+      {
+        "path": "node_modules/readable-stream/package.json",
+        "app_sha256": "6dbdb1bb224ffd1a4223d77be34faee9bb24e56f1f3526d4ab831fa46e805833",
+        "source_dependency_sha256": "67bde829e31cba3f50c77d14a30fa0f2295223b7ffa07f3b84606a5a79bb97f8"
+      },
+      {
+        "path": "node_modules/readable-stream/readable-browser.js",
+        "app_sha256": "c4ff3ea62ef65a2c68ea721dcbd58b621150660facd02be95ebfc556c4dd123f",
+        "source_dependency_sha256": "ec8e6f4e484d5269bc134752e11770b66b6be3a470217c2a0166e977965f53c6"
+      },
+      {
+        "path": "node_modules/readable-stream/readable.js",
+        "app_sha256": "2944f1d3c8c5d5c5e07e7c30d6cbef5fc37440b7c73de47aeb37fa8424f04bf1",
+        "source_dependency_sha256": "a1efa3fa06393aff652f3529ea1b1bc32134d49eb794b23272fb0ba13d214550"
+      },
+      {
+        "path": "node_modules/robot3/package.json",
+        "app_sha256": "2ec6f37696b6ee12e05eca3057184c069ea0718086162be47d353bd217213b36",
+        "source_dependency_sha256": "0617389ca8cf7bb022a203e8eed3268c9c1c4eaee9e8ce2c3d0354985cfd57c0"
+      },
+      {
+        "path": "node_modules/safe-buffer/package.json",
+        "app_sha256": "0bb53dcf379ffebc8f8baa2d2a4efc80be25f203509da73cc17864b97cb9556e",
+        "source_dependency_sha256": "3d8b6d944be9e931a178914afbb3d6b79bfa199c032872b687bed41ed996c747"
+      },
+      {
+        "path": "node_modules/scheduler/package.json",
+        "app_sha256": "dcfe24d76a1fe34cd650e2924b6c9ba1995fcf7d17f584af2c7f399b8b0e72c2",
+        "source_dependency_sha256": "393bb96b7e481bf50189a1a02c7e0e7f4d01acba5abc6fbe7d214638624462fc"
+      },
+      {
+        "path": "node_modules/semver/bin/semver.js",
+        "app_sha256": "bd6c871026985937dc945011fc54b74b47f5998154216d7b8d40d5ed782e4402",
+        "source_dependency_sha256": "a3ed56435cbd4b3f07a80c4a343edd86d787f89bf2cee0105bdf68cb653ba2a0"
+      },
+      {
+        "path": "node_modules/semver/package.json",
+        "app_sha256": "58ad67ac517e1610524a9327efa766de640856fb2ea62244f9fb45aa7f9f3694",
+        "source_dependency_sha256": "aa906c5bf8a2fa68683cae07d18553ae2538ed0d5a567911980b2ef25ee8b9ba"
+      },
+      {
+        "path": "node_modules/semver/range.bnf",
+        "app_sha256": "15d0baf9b7b98e6d862c0cb9e822d2533d2bc23e136bb75314d802ca1fcb0392",
+        "source_dependency_sha256": "ed628fdaff64be366d07f6cc4559eae4de109826f743ea7f5e1588c370bca49a"
+      },
+      {
+        "path": "node_modules/sharp/package.json",
+        "app_sha256": "3b5bb7731520f0fbe77fbca40ed1f30a7dcf536cf46f76fc98b1e342aea3b010",
+        "source_dependency_sha256": "0f3a7e7eb4f22978dfde46e6c7c6ecf3b86b43e33c3d366de88b334b4610c3ff"
+      },
+      {
+        "path": "node_modules/simple-icons/package.json",
+        "app_sha256": "b17ac743e16664ed567f1db37389d38f1de81af8900a8c4a47a28b5ff4a814a9",
+        "source_dependency_sha256": "85797588fcdce8802aefe898fe7b223dc4c44427c13ab8f7006e8baa120d1124"
+      },
+      {
+        "path": "node_modules/string_decoder/package.json",
+        "app_sha256": "ffdf79e038970aeb9b6a2c5b2f2779e2e9bcfefe779bfe197b19041d0d7efe86",
+        "source_dependency_sha256": "e278ca18803862a6d1b6bedc6a3394159ac86e5c4a162614fef006c79dcda3a2"
+      },
+      {
+        "path": "node_modules/three/package.json",
+        "app_sha256": "ad5a1db61e66a3f89106634833d92118549299b8bdcc4cef33cb38e871d8f134",
+        "source_dependency_sha256": "1d5c438acdc1fe5a52fb8ede2e417afd91fec91d22275c40f7b739591b24e4df"
+      },
+      {
+        "path": "node_modules/typedarray/package.json",
+        "app_sha256": "a538bd536bf00034d070eac5b70f54ab90607147bc2ed0ac2a9075b837e31479",
+        "source_dependency_sha256": "622ebab64ef61f10e4dd28a099e88545c477ccf7d5aa28d2eb4462c857e76fda"
+      },
+      {
+        "path": "node_modules/util-deprecate/package.json",
+        "app_sha256": "f621593e71540f5fee50dd9e89ee538b76bcefe60030cc6f262189fed4cc094d",
+        "source_dependency_sha256": "7bba467f049074957e693fc06672848b040c38fa071b6eed8690f5fbe090a8b2"
+      },
+      {
+        "path": "node_modules/zustand/package.json",
+        "app_sha256": "f39e0b89fdd06bf92da60d4ce987f423f80cecdc73fc6c9ab615fd878161cb34",
+        "source_dependency_sha256": "3be250433bb3c42b82b9a8a67654fca222d3e370f703204c69b4dfa4f6c74de6"
+      }
+    ],
+    "missing_in_source_dependencies": [
+      "node_modules/agent-base/dist/src/index.js",
+      "node_modules/agent-base/dist/src/index.js.map",
+      "node_modules/agent-base/dist/src/promisify.js",
+      "node_modules/agent-base/dist/src/promisify.js.map",
+      "node_modules/agent-base/src/index.ts",
+      "node_modules/agent-base/src/promisify.ts",
+      "node_modules/https-proxy-agent/dist/agent.js",
+      "node_modules/https-proxy-agent/dist/agent.js.map",
+      "node_modules/readable-stream/errors-browser.js",
+      "node_modules/readable-stream/errors.js",
+      "node_modules/readable-stream/experimentalWarning.js",
+      "node_modules/readable-stream/lib/internal/streams/async_iterator.js",
+      "node_modules/readable-stream/lib/internal/streams/buffer_list.js",
+      "node_modules/readable-stream/lib/internal/streams/end-of-stream.js",
+      "node_modules/readable-stream/lib/internal/streams/from-browser.js",
+      "node_modules/readable-stream/lib/internal/streams/from.js",
+      "node_modules/readable-stream/lib/internal/streams/pipeline.js",
+      "node_modules/readable-stream/lib/internal/streams/state.js",
+      "node_modules/semver/classes/comparator.js",
+      "node_modules/semver/classes/index.js",
+      "node_modules/semver/classes/range.js",
+      "node_modules/semver/classes/semver.js",
+      "node_modules/semver/functions/clean.js",
+      "node_modules/semver/functions/cmp.js",
+      "node_modules/semver/functions/coerce.js",
+      "node_modules/semver/functions/compare-build.js",
+      "node_modules/semver/functions/compare-loose.js",
+      "node_modules/semver/functions/compare.js",
+      "node_modules/semver/functions/diff.js",
+      "node_modules/semver/functions/eq.js",
+      "node_modules/semver/functions/gt.js",
+      "node_modules/semver/functions/gte.js",
+      "node_modules/semver/functions/inc.js",
+      "node_modules/semver/functions/lt.js",
+      "node_modules/semver/functions/lte.js",
+      "node_modules/semver/functions/major.js",
+      "node_modules/semver/functions/minor.js",
+      "node_modules/semver/functions/neq.js",
+      "node_modules/semver/functions/parse.js",
+      "node_modules/semver/functions/patch.js",
+      "node_modules/semver/functions/prerelease.js",
+      "node_modules/semver/functions/rcompare.js",
+      "node_modules/semver/functions/rsort.js",
+      "node_modules/semver/functions/satisfies.js",
+      "node_modules/semver/functions/sort.js",
+      "node_modules/semver/functions/truncate.js",
+      "node_modules/semver/functions/valid.js",
+      "node_modules/semver/index.js",
+      "node_modules/semver/internal/constants.js",
+      "node_modules/semver/internal/debug.js",
+      "node_modules/semver/internal/identifiers.js",
+      "node_modules/semver/internal/lrucache.js",
+      "node_modules/semver/internal/parse-options.js",
+      "node_modules/semver/internal/re.js",
+      "node_modules/semver/preload.js",
+      "node_modules/semver/ranges/gtr.js",
+      "node_modules/semver/ranges/intersects.js",
+      "node_modules/semver/ranges/ltr.js",
+      "node_modules/semver/ranges/max-satisfying.js",
+      "node_modules/semver/ranges/min-satisfying.js",
+      "node_modules/semver/ranges/min-version.js",
+      "node_modules/semver/ranges/outside.js",
+      "node_modules/semver/ranges/simplify.js",
+      "node_modules/semver/ranges/subset.js",
+      "node_modules/semver/ranges/to-comparators.js",
+      "node_modules/semver/ranges/valid.js"
+    ],
+    "links": []
+  },
+  "package_versions": [
+    {
+      "name": "@fal-ai/client",
+      "app": "1.10.1",
+      "current": "1.10.1"
+    },
+    {
+      "name": "@xyflow/react",
+      "app": "12.11.2",
+      "current": "12.11.2"
+    },
+    {
+      "name": "ffmpeg-static",
+      "app": "5.3.0",
+      "current": "5.3.0"
+    },
+    {
+      "name": "lucide-react",
+      "app": "0.536.0",
+      "current": "0.536.0"
+    },
+    {
+      "name": "react",
+      "app": "19.2.8",
+      "current": "19.2.8"
+    },
+    {
+      "name": "react-dom",
+      "app": "19.2.8",
+      "current": "19.2.8"
+    },
+    {
+      "name": "sharp",
+      "app": "0.35.3",
+      "current": "0.35.3"
+    },
+    {
+      "name": "simple-icons",
+      "app": "16.27.1",
+      "current": "16.27.1"
+    },
+    {
+      "name": "three",
+      "app": "0.185.1",
+      "current": "0.185.1"
+    }
+  ],
+  "app_package_json": {
+    "name": "prism-foundry",
+    "version": "0.1.0",
+    "description": "A local-first visual AI workflow studio for macOS",
+    "main": "out/main/index.js",
+    "author": "Cocombee",
+    "license": "UNLICENSED",
+    "private": true,
+    "dependencies": {
+      "@fal-ai/client": "^1.6.2",
+      "@xyflow/react": "^12.10.0",
+      "ffmpeg-static": "^5.3.0",
+      "lucide-react": "^0.536.0",
+      "react": "^19.1.1",
+      "react-dom": "^19.1.1",
+      "sharp": "^0.35.3",
+      "simple-icons": "^16.27.1",
+      "three": "^0.185.1"
+    }
+  },
+  "fresh_output_extra": [],
+  "resolved_dependencies": {
+    "identical_files": 9007,
+    "metadata_only_files": [
+      "node_modules/@derhuerst/http-basic/package.json",
+      "node_modules/@fal-ai/client/package.json",
+      "node_modules/@img/colour/package.json",
+      "node_modules/@msgpack/msgpack/package.json",
+      "node_modules/@types/d3-color/package.json",
+      "node_modules/@types/d3-drag/package.json",
+      "node_modules/@types/d3-interpolate/package.json",
+      "node_modules/@types/d3-selection/package.json",
+      "node_modules/@types/d3-transition/package.json",
+      "node_modules/@types/d3-zoom/package.json",
+      "node_modules/@types/node/package.json",
+      "node_modules/@xyflow/react/package.json",
+      "node_modules/@xyflow/system/package.json",
+      "node_modules/agent-base/package.json",
+      "node_modules/buffer-from/package.json",
+      "node_modules/caseless/package.json",
+      "node_modules/classcat/package.json",
+      "node_modules/concat-stream/package.json",
+      "node_modules/d3-color/package.json",
+      "node_modules/d3-dispatch/package.json",
+      "node_modules/d3-drag/package.json",
+      "node_modules/d3-ease/package.json",
+      "node_modules/d3-interpolate/package.json",
+      "node_modules/d3-selection/package.json",
+      "node_modules/d3-timer/package.json",
+      "node_modules/d3-transition/package.json",
+      "node_modules/d3-zoom/package.json",
+      "node_modules/debug/package.json",
+      "node_modules/detect-libc/package.json",
+      "node_modules/env-paths/package.json",
+      "node_modules/eventsource-parser/package.json",
+      "node_modules/ffmpeg-static/package.json",
+      "node_modules/http-response-object/package.json",
+      "node_modules/https-proxy-agent/package.json",
+      "node_modules/inherits/package.json",
+      "node_modules/lucide-react/package.json",
+      "node_modules/ms/package.json",
+      "node_modules/parse-cache-control/package.json",
+      "node_modules/progress/package.json",
+      "node_modules/react/package.json",
+      "node_modules/react-dom/package.json",
+      "node_modules/readable-stream/package.json",
+      "node_modules/robot3/package.json",
+      "node_modules/safe-buffer/package.json",
+      "node_modules/scheduler/package.json",
+      "node_modules/semver/package.json",
+      "node_modules/sharp/package.json",
+      "node_modules/simple-icons/package.json",
+      "node_modules/string_decoder/package.json",
+      "node_modules/three/package.json",
+      "node_modules/typedarray/package.json",
+      "node_modules/util-deprecate/package.json",
+      "node_modules/zustand/package.json"
+    ],
+    "different_files": [
+      {
+        "path": "node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node",
+        "current_candidates": [
+          "/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/work/node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node"
+        ]
+      },
+      {
+        "path": "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+        "current_candidates": [
+          "/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/work/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib"
+        ]
+      },
+      {
+        "path": "node_modules/ffmpeg-static/ffmpeg",
+        "current_candidates": [
+          "/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/work/node_modules/ffmpeg-static/ffmpeg"
+        ]
+      }
+    ],
+    "missing_files": [],
+    "package_count": 56
+  },
+  "native_binary_signature_comparison": [
+    {
+      "path": "node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node",
+      "signature_removal_on_temporary_copies": [
+        {
+          "copy": "native-app-0",
+          "exit_code": 0,
+          "output": ""
+        },
+        {
+          "copy": "native-source-0",
+          "exit_code": 0,
+          "output": ""
+        }
+      ],
+      "unsigned_app_sha256": "645017f020a98d3c9069691fcdaade9fe17f0f3f161214622c707b4aa4d6b95e",
+      "unsigned_source_sha256": "ee5f75900eefe2f3fb5eae3055241273e610dce13a7f365ac61e0b892b8320d0",
+      "identical_after_signature_removal": false
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+      "signature_removal_on_temporary_copies": [
+        {
+          "copy": "native-app-1",
+          "exit_code": 0,
+          "output": ""
+        },
+        {
+          "copy": "native-source-1",
+          "exit_code": 0,
+          "output": ""
+        }
+      ],
+      "unsigned_app_sha256": "f47fa49360d5186ed32d35eb438074a30da4e3c16d4095edeb050bc442300319",
+      "unsigned_source_sha256": "b4191c5eb606d78fdca51edc06f3cdf4598c6d6ebf0150298b444d08fb927d5b",
+      "identical_after_signature_removal": false
+    },
+    {
+      "path": "node_modules/ffmpeg-static/ffmpeg",
+      "signature_removal_on_temporary_copies": [
+        {
+          "copy": "native-app-2",
+          "exit_code": 0,
+          "output": ""
+        },
+        {
+          "copy": "native-source-2",
+          "exit_code": 0,
+          "output": ""
+        }
+      ],
+      "unsigned_app_sha256": "f1e92e34b6122d3cd725e58e01a8856f8fa9ef1f88148895d3b77fc8b00e0886",
+      "unsigned_source_sha256": "5cca59d5554b9a3eb4c5fe215008262d9e2a21c4b1dc5e7a7e2033b24b26ea17",
+      "identical_after_signature_removal": false
+    }
+  ],
+  "native_binary_sections": [
+    {
+      "path": "node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node",
+      "section_count": 14,
+      "different_sections": [],
+      "all_sections_identical": true,
+      "app_size_unsigned": 277936,
+      "source_size_unsigned": 277936,
+      "diff_ranges": [
+        [
+          1401,
+          1401
+        ]
+      ],
+      "header_difference": false,
+      "load_commands_identical": false,
+      "app_load_command_end": 2384,
+      "source_load_command_end": 2384,
+      "different_load_command_details": [
+        {
+          "command": "0x19",
+          "offset": 1368,
+          "changed_offsets_within_command": [
+            [
+              33,
+              33
+            ]
+          ],
+          "segment": "__LINKEDIT",
+          "app_vmsize": 81920,
+          "source_vmsize": 65536
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+      "section_count": 31,
+      "different_sections": [],
+      "all_sections_identical": true,
+      "app_size_unsigned": 17628120,
+      "source_size_unsigned": 17628120,
+      "diff_ranges": [
+        [
+          2761,
+          2762
+        ]
+      ],
+      "header_difference": false,
+      "load_commands_identical": false,
+      "app_load_command_end": 3976,
+      "source_load_command_end": 3976,
+      "different_load_command_details": [
+        {
+          "command": "0x19",
+          "offset": 2728,
+          "changed_offsets_within_command": [
+            [
+              33,
+              34
+            ]
+          ],
+          "segment": "__LINKEDIT",
+          "app_vmsize": 1261568,
+          "source_vmsize": 1343488
+        }
+      ]
+    },
+    {
+      "path": "node_modules/ffmpeg-static/ffmpeg",
+      "section_count": 31,
+      "different_sections": [],
+      "all_sections_identical": true,
+      "app_size_unsigned": 45214848,
+      "source_size_unsigned": 45214848,
+      "diff_ranges": [
+        [
+          2833,
+          2834
+        ]
+      ],
+      "header_difference": false,
+      "load_commands_identical": false,
+      "app_load_command_end": 5928,
+      "source_load_command_end": 5928,
+      "different_load_command_details": [
+        {
+          "command": "0x19",
+          "offset": 2800,
+          "changed_offsets_within_command": [
+            [
+              33,
+              34
+            ]
+          ],
+          "segment": "__LINKEDIT",
+          "app_vmsize": 1589248,
+          "source_vmsize": 1835008
+        }
+      ]
+    }
+  ],
+  "audit": {
+    "timestamp_local": "2026-09-30T06:06:40.430914",
+    "source_directory": "/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/work",
+    "method": "Fresh production compilation of an isolated snapshot of current Hermes source with its existing node_modules; SHA-256 comparison to the retained app, followed by dependency path/version mapping and native payload inspection. No application packaging or launch.",
+    "build_command": "node node_modules/electron-vite/dist/cli.js build --clearScreen false",
+    "build_exit_code": 0,
+    "source_input_files_checked": 430,
+    "changed_source_inputs": [],
+    "changed_saved_output": [],
+    "app_archive_unchanged": true,
+    "app_native_files_changed": [],
+    "runtime_visual_testing": "Not performed",
+    "main_application_source_parity": true,
+    "separate_camera_tester_included_in_main_app": false,
+    "camera_tester_config": "/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/work/electron.vite.camera.config.ts",
+    "whole_bundle_byte_identity": "Not claimed: packaging strips package metadata and changes native signatures and __LINKEDIT virtual memory sizes.",
+    "source_input_sha256": {
+      "src/renderer/index.html": "09ea2f5008d6da04b5f5e16cd059f0ef573e7609035e5604523f2355b6d23f25",
+      "src/renderer/env.d.ts": "939ba0672fe460507c7da3856b59b2f755fa0218cd38f03db9a003bf3b054345",
+      "src/renderer/index-next.html": "10adddf73066e7092b641d9a9442c14c6b1571f66daabd3aff9abaa84769dad5",
+      "src/renderer/public/style-thumbnails/cinematic-naturalism.jpg": "0ebcc25ff04c5b57f301cab4e6f2badc595d5cd5b1f839a803b08a54e268e782",
+      "src/renderer/public/style-thumbnails/painterly-martial-arts.jpg": "d7494a76ce2dc877f7f6d58c1d4e3bba144f282066c40cc038a2bbac8fe2db98",
+      "src/renderer/public/style-thumbnails/heroic-panel-comics.png": "5e51fdfc751d477d0f1940d59f804bda61b4b67334f33c324caa104eeb18a23f",
+      "src/renderer/public/style-thumbnails/dimensional-comic.jpg": "3311063b09907a7b04716c92cbfc54ef6597382790f013a36a7a6701389c257a",
+      "src/renderer/public/style-thumbnails/storybook-gouache.jpg": "46776fa74ed8b1225c30711646cf6d6f4d9e4f003ffebb7a549987b9014ef907",
+      "src/renderer/public/style-thumbnails/retro-35mm.jpg": "cfa96851604736469f45db4c05974cf2390107d71974ff98346e3175756c485b",
+      "src/renderer/public/style-thumbnails/film-noir.jpg": "71bde267989676095787977ab58687bd3469f9d7cd7185cc8e1b2d7e390aac97",
+      "src/renderer/src/rendererBehavior.ts": "0567535d539462ac955fad21988996a0c5d22e677b18b0fee0303cde30ce92ba",
+      "src/renderer/src/useHorizontalAssetSelector.ts": "9a4d77c4bc7769bf4200440fcab97c14c4e6d2596ef81e61351c8300fae4262f",
+      "src/renderer/src/semanticCreateHandle.electron.test.ts": "95c1f534194f3292b5775ff6eca72d78990385e00ed3344370e6126a61b16fe9",
+      "src/renderer/src/rendererBehavior.test.ts": "41a5cdef3cef03acb951fd66701c714cbabcaceb201ef0c58f77d47c6891d258",
+      "src/renderer/src/CanvasNavigationControls.tsx": "34bd84d7b8429ef3dc6a8c24e2b4a3995e821c489a66f0e812cfb9e82f7f20da",
+      "src/renderer/src/App.tsx": "7dbb9030d35cc86c78ef936719e502d30125a7fa1b0b510a355f7c8f9028a6e2",
+      "src/renderer/src/nodePalette.test.ts": "d31878879828dc1b9585c1325e12ad8e0bf0ef545091572c18539a33ba9a882b",
+      "src/renderer/src/controlGroupRenderer.contract.test.ts": "b29dd5c23e997c498c9017ffc313bdb82d6f5775946fb9d46942f06a12461853",
+      "src/renderer/src/saveToolbarControl.electron.test.ts": "1faacccbb6060d7d2478089f9832554ffdbc37fce0b7ac84d506c2976f53bd40",
+      "src/renderer/src/NodeCard.assetState.test.ts": "6ceb403c9ed30486bfc07b1d06a49d743af1b89bc87818a63a5b077b835e383e",
+      "src/renderer/src/main.tsx": "a415703bc91f4b9a93345e1735ac8e43a2bdf3e0a175478fa2c32803e76544a0",
+      "src/renderer/src/MediaOfflineState.test.tsx": "7e75fa8ad2737514b7715579073959934a4ebecde2bcd45765a27cdb832e398e",
+      "src/renderer/src/NodePort.test.ts": "2296e43fbb299545cb5e71b8608c64a0e652195bb409b5372314f827a443e91c",
+      "src/renderer/src/storyboardTextHistory.contract.test.ts": "eccac0a04655c33f0841e252a94a73a13ea0870dbd0ae2481398b73fe7031c0b",
+      "src/renderer/src/ProjectLibraryCard.tsx": "de3da13a8cf739409eec908cbcd56b198262c59b4cc735d09a906a81292f2fa5",
+      "src/renderer/src/runPresentation.ts": "f38c67385ea8957baf122c55a858425e7d1768fe03cbdefd374f1367e6d5a1ca",
+      "src/renderer/src/semanticPostGenerationOverlay.electron.test.ts": "8fa1b1c8bb9e8b5de3e22621680831af1882368627d286e93262dfb135e35706",
+      "src/renderer/src/controlGroupGeometry.electron.cjs": "d1cd710fb87fef58c432e021577484851556121679d4ffbdaaa7aad228e51b88",
+      "src/renderer/src/providerErrorRouting.test.ts": "6c4fdca1b1af16ceabac53f4ac20a2a0df34883b95e6623905cba6fdf8c33d92",
+      "src/renderer/src/controlGroupMounted.electron.test.ts": "6642ebf2377f7261d77dd0ea3fff9aff4214d612ef248fa3799adf087f80c90a",
+      "src/renderer/src/SemanticAssetSaveFeedback.tsx": "56ef7782eeaa3609cf12564122f23b55142a2037e9a7006f4fe45131df224ca0",
+      "src/renderer/src/styles.css": "d87fa24d031e5bca6fe6c2e60166bacfed8911e49cccf0cb15fe4d963d5a3c27",
+      "src/renderer/src/MediaOfflineState.tsx": "8e1585f66830e7b2e0e71b8087b6ff057a01327710d297da3f3f774e50db3e4a",
+      "src/renderer/src/SaveToolbarControl.tsx": "ea091305bfef2cd78856e0364acf5d4a6defa5db7937276326b222b21da548a4",
+      "src/renderer/src/canvasKeyboardOwnership.contract.test.ts": "8ae64c2d0649c728d2413100340a1d770567b38ee50d0c126fec38e16b043c83",
+      "src/renderer/src/nodePalette.ts": "cf266c58f17118e2d301a334e1531f8720c4af42ea3ecf47ee1df7b8fe08d315",
+      "src/renderer/src/iconSystem.ts": "65a150b38f39835df3cee0aa9cc11b983463636e5a2cafffdaa3eb2c3a0f4a5f",
+      "src/renderer/src/videoPromptOwnership.mounted.electron.test.ts": "19642e2dba2ff5682d34e727c0d73e2e95477e6045a265ac9baaf4cd305261d9",
+      "src/renderer/src/AppNext.tsx": "525eca828de35b0e378cab1318e8273075ae337358cd5c08c2a970c358646ff7",
+      "src/renderer/src/NodeCard.tsx": "2fc24d14cbd297ce6cbe32ef83b58ea86c75495d110382173cc775ab9fc41b79",
+      "src/renderer/src/controlGroupGeometry.fixture.json": "c4597a8fab4f0a23390653249f4ad161bb4d3ce1d65560f1a6a5feae5d6bf7eb",
+      "src/renderer/src/startupHydration.ts": "2b49223c3710f7aa8caf820f4e3f2513dfe9d453f578bd045a53e364136fa215",
+      "src/renderer/src/TaggedPromptTextarea.tsx": "5ffe68192656c7a70728071eeb4aac6796f95622e098faa010f8107c0fa3dcac",
+      "src/renderer/src/storyboardHoverCanvasGrab.contract.test.ts": "3dbbdac825708a71c653ff3130692c91f110c987fffce7a0fa14527fa54063db",
+      "src/renderer/src/NodePort.tsx": "c82c6894bdf626fda01188751aef261d5bfd6d9cc7e102f4916bb3dd7280bcef",
+      "src/renderer/src/main-next.tsx": "56c13fe4f2b796fd55ab585f0c9e484ea3dcb172b6e1c54e22b5047e234c2acf",
+      "src/renderer/src/NodeCardNext.tsx": "da4b924db22f44e2209abbcc303a713c1395bc5f2d003f897591844ecd37ef74",
+      "src/renderer/src/productSurface.test.ts": "63ab7956c8a4c7869f67daa2ddcdf23fbb0ae7d034bdb776358043cd9b46014d",
+      "src/renderer/src/canvasHandTool.electron.tsx": "2d2108e16dee4457c7fbdbe5ffbf5ac0ce19757590272f6b954f286ced0afbd9",
+      "src/renderer/src/semanticAssetImageControlsPreview.electron.test.ts": "69cd3dd2f6f56182fd39f50c237f61b20a6ce82645c5d7fc8940bf2104173fcb",
+      "src/renderer/src/selectorMenus.electron.test.ts": "59e7d2cb0833021ddb2b1efbc6fde67354d521fa1f4892f2b983f3e916180502",
+      "src/renderer/src/wardrobeSurface.test.ts": "c41569e68f0049d1958adb5971830d832086faaf57489aeee0e452f740c9fe0a",
+      "src/renderer/src/characterSemanticConnectEnd.test.ts": "704fdc751b44eaf593e0443b5992e957fcac97da76f0c1c31e82974a00b48e79",
+      "src/renderer/src/TaggedPromptTextarea.keyboardBoundary.test.ts": "799522cdda0a43b383db267f577ddd4024f1590c53261670c248dfa89b09a719",
+      "src/renderer/src/serviceProfilesRenderer.test.ts": "cd2317a202486fd0e5411789576b6b33b4c8e0a53427f13c41bd38805e4ecfcc",
+      "src/renderer/src/media-offline-state.css": "ac5e4482b3b81fac5956d8a0809218a159b3e9cd4b32aa17f95767c7eada6a5b",
+      "src/renderer/src/GeneratedMediaOverlay.tsx": "e96874e828520f2e6569b0bf38dab694ddfbbae8d04ff32d47ab3e920251870c",
+      "src/renderer/src/safeStateReversion.contract.test.ts": "6e5cad0056f007f4edc786618d884283b33850dd6b71e4452335b59bca428ba1",
+      "src/renderer/src/compactControlRules.contract.test.ts": "7462fa718622ecf6edaa71451594de0716b3f158ea4fbbb5433217c700468eae",
+      "src/renderer/src/modelBrand.test.ts": "98d211812e9bf7ff0779a44db372d383cb0b5778ee7bcaa7155e9446dde02252",
+      "src/renderer/src/startupHydration.test.ts": "f24f1016027f8065c9af49f1f5cc4f1cd5bf4629963889197349eb429583b9eb",
+      "src/renderer/src/sequenceContinuity.ts": "2ba8d6cf1cae0c2d4b6c1d678959c0846e3b8f2cdc8e44757ad2d3e0938c3079",
+      "src/renderer/src/imageSemanticGeometry.electron.test.ts": "c097a1b6bb2701b5754ba1765d908a76d198bef86452f3f262cdd6db0ec9f1ca",
+      "src/renderer/src/characterSemanticConnectEnd.ts": "344a479feef6d592e9a2ea39cfaab1ef24ff5b06dfb43461d1eb0bcbc4981489",
+      "src/renderer/src/selectorSearch.contract.test.ts": "2fb8b43010bb238689d35dec93280feed6f0795c56d1bb1a1e4ef1fa2f8f0c10",
+      "src/renderer/src/storyboardHoverCanvasGrab.electron.test.ts": "574d9ac0e37446d96f0df7ed6365ac81e74b0bf288f55dacbfb55933b76c2327",
+      "src/renderer/src/assetBatchSurface.test.ts": "11cdbf52c9f365b0c85d8e25221d8982ff7303199ebff3d16a6b2a3cc7284ebb",
+      "src/renderer/src/FluidControlGroup.tsx": "dd1d53f39103ed4324b4bb374d43df32a61f68cae57f7eb65a552a5ea820a023",
+      "src/renderer/src/storyboardCompilerOwnership.contract.test.ts": "7effc023fa44a17217cf696b41c8554e17e5b60fd0e4601488b9f82d34baac73",
+      "src/renderer/src/projectContextVisibility.contract.test.ts": "195b369bf4af4b3a0f79548e149036a1e4d436bc5f06a7201895a52cd0684237",
+      "src/renderer/src/semanticReusableOffline.electron.test.ts": "34e5b3c524edd096ae5430701af7c492b15db890a5966450e2da58e83be0f660",
+      "src/renderer/src/canvasHandTool.contract.test.ts": "2c8358750d15b1ad5f836ae22527f8404b2788391302049368d6a607fbfc5f5e",
+      "src/renderer/src/characterSheet.ts": "fb55f0d840a42f82ef2e387879c22003650d02b9d77e06cda44897a1cce95bda",
+      "src/renderer/src/shutterOutputFps.contract.test.ts": "4afa1a5a914157b402fbe741f898281dba5314ea4af6842de525af8dbf8bffaf",
+      "src/renderer/src/StoryboardSharedControls.tsx": "6754941f0012d4fdba7cede91550164fd7060f5e81b0e9ec91ef8b1a6a2dc239",
+      "src/renderer/src/semanticLibraryThumbnail.electron.test.ts": "c97fe0ac880a5ade3d351ee70868a23a2446734fb9b10860ba65d612e92c880f",
+      "src/renderer/src/successorSurface.test.ts": "67ee6948ded7386f73c388b55fe290b7a4a754cf29937729455f50b515d8763d",
+      "src/renderer/src/viewportRuntime.contract.test.ts": "5680621ab6ec4b23f07b5d5e3a4759fac2d98ec1441d1663b00da0e58ec51aac",
+      "src/renderer/src/storyboardDraftChain.keyboardBoundary.test.ts": "0285fbefcedd0bbf38ff85e861381387c322be60d04da9be4434edc6656843c8",
+      "src/renderer/src/project-library-card-controls.css": "28c7f06b9aad51e6c529d91e817392820f55d2d9c3767cd8b9be9c0511419735",
+      "src/renderer/src/ShutterSettings.test.tsx": "39012593d3759a387523c9663668fc9a9176bca1dbe97dd191a26693451f26c3",
+      "src/renderer/src/semanticEditControlMatrix.electron.test.ts": "46f65287df2bdcf4864fedfc8aefb978b51fe53f02b4e07dcd18578df7ea330c",
+      "src/renderer/src/storyboardVersionSurface.contract.test.ts": "64139edf6a75cc7952d8baa19c83e3d9a335761ab752c951c98b215a2d8939c2",
+      "src/renderer/src/sequenceContinuity.test.ts": "fb46c7ae2d1cbf74f9e746d6e88e0848a5547b9649fb55a7143ee9bfafff40d7",
+      "src/renderer/src/pureWhiteForeground.contract.test.ts": "8b36966d49a1266fd1b7b59f073af04caed9793435e6a15eb40125e17fa036bc",
+      "src/renderer/src/nodeNotification.contract.test.ts": "0b3b2d935fd4efe9b41e1240fb7046a1cb3a7532b92f3ebe422a964ba67fee53",
+      "src/renderer/src/characterControls.mounted.test.tsx": "db7a480b9b35fa3dca538938a0991f1e57d3f1516328114fff00044c79b83b9e",
+      "src/renderer/src/ShutterSettings.tsx": "5b8325c9b297bde0bd5f513215e794ff0296690898ae89d2500c6f53b31d6e6f",
+      "src/renderer/src/UtilityNodes.tsx": "0af3d0b1c64fced94b73c02c27658be2fb3bb65725053dbf68ed0b208cfcf67e",
+      "src/renderer/src/useHorizontalAssetSelector.test.ts": "f6ddf7514676d5e77cc037a2bf863a500a53f805d8a63a9febc9d161dd4103b9",
+      "src/renderer/src/ProviderPromptPreview.test.tsx": "a2e757dba20ada7bc01058cc775619579482acfcfcf81fb7c87d9149ef121160",
+      "src/renderer/src/characterControlsPersistence.test.ts": "2a74bdee62800fb41e90ce3918ad75e7e374d193e008ef4b78bb61389cb845da",
+      "src/renderer/src/iconSystem.test.ts": "a60bd61268b5369c67a791a0fdf5f0c88207531c427c2c81cabda73db65c2102",
+      "src/renderer/src/ProviderPromptPreview.tsx": "2fdbd63ff2f225ad1925540f3f8b48d500297b4b67f6ec3d891580836a551675",
+      "src/renderer/src/canvasHandTool.electron.cjs": "3459a9ffabc78e9c99d45642d9a39dcf2092da552d5071db83120a02be4b6b25",
+      "src/renderer/src/finalUserAcceptance.electron.test.ts": "1fbe652d342f674a734f5332671e5397bffe2227fe7442b439cdab016f5b6b7b",
+      "src/renderer/src/useContinuousAnchor.ts": "43f4d4e52ab7c16773ad6bf5742e35cb1972adb2c14e3acf95ef7a7263135eb0",
+      "src/renderer/src/runPresentation.test.ts": "e3438f14e1c05a9fe7269ec8722e919cfd75ba055e330cb14d4ab72c1476f206",
+      "src/renderer/src/styles-next.css": "9d67e27b308f1cc9d3a076087dbfa74cf921ff494a4f5443f8c23d518f375803",
+      "src/renderer/src/cameraSupportSelector.contract.test.ts": "a886da48b37e2f71fdff02c3ddd0d80770ebacc5b8a53cbca311690b61670ef7",
+      "src/renderer/src/actualComponentLayout.electron.test.ts": "15ba57e543b2bf66948e559668f90eb9b409aa1c26f3ceb63d6f702705416c6a",
+      "src/renderer/src/assets/character-framework/full-body.png": "2188eb8c72f4393890d1b8b9aeb302265309addb600e2437736c9746d07d0a37",
+      "src/renderer/src/assets/character-framework/back-body.png": "c1d1ec453e58435c2493d5f29d33cdde0c0e2146fcb1dd2cf3647d7a55d1e667",
+      "src/renderer/src/assets/character-framework/full-body-back.png": "b707464d3d8f9e64bc8281eb14b546eaddbf74eb6c4a76a63483b3d8fa4342d6",
+      "src/renderer/src/assets/character-framework/three-quarter.png": "93771147f2a0b4c1d0f2b37b3609f8608af0b9cdbd8dd4d26137a785fbb550bb",
+      "src/renderer/src/assets/character-framework/left-three-quarter.png": "62b40408bc79de38efeaf9ffa532a1967db609db5635d3f2dc96ac45693cc5b1",
+      "src/renderer/src/assets/character-framework/face.png": "283a68ec383ff45d155bf48a1ce19014746a50b26b8e777fd448dc61b8b4ba14",
+      "src/renderer/src/assets/character-framework/side-body.png": "5290a71c5f8bea3262dd7c3dd1cf50124cfceaa26042fa53ae696694093dfc97",
+      "src/renderer/src/assets/character-framework/human-framework-atlas-chroma.png": "72e887b26c76ca02919a4753be496562941574d1280579b3a70b662e2e5e6266",
+      "src/renderer/src/assets/character-framework/profile.png": "954e19134e9bcad3585dcc12067a2c823c80c8a934238581c6d9bde7b922030d",
+      "src/renderer/src/assets/character-framework/human-framework-atlas.png": "2ab0f4e8cd30ee8a9d3c971581e6c0f7b81a16029bb109b0b0b84859894be216",
+      "src/renderer/src/assets/character-framework/back.png": "82ed582a3f18f83b781b7419de5b934ddb1be71663aa95be0b88a39e33cc5c4d",
+      "src/renderer/src/assets/character-framework/smile.png": "1c9115574122a286c54062a59f09fcdaf9c291e40cfd6539daf0dafd1d93c98e",
+      "src/renderer/src/assets/element-framework/side.png": "8dbaed68e38cf7bdd5e2aa2cfd4cd61b5271ad5774e44e17c0f7e43d025ccdb1",
+      "src/renderer/src/assets/element-framework/three-quarter.png": "ad814a93914b7611d7beeb5c2c463f9e7320ce9c59f5f1f198df4ff6a110dee6",
+      "src/renderer/src/assets/element-framework/teapot-framework-atlas.png": "a275aeb0318f3af02d93c53273075838c361a5f7c7e68af06792dbcd18159f80",
+      "src/renderer/src/assets/element-framework/teapot-framework-atlas-chroma.png": "6e4853f562277a7f154ed0a7ee70a1539a6ccc98f9e0812de6b26d9f91e1ee6b",
+      "src/renderer/src/assets/element-framework/back.png": "94f761eaaf6a267dd85907d4913029dc97edb254339a0b3a98efa101e7943ce6",
+      "src/renderer/src/assets/element-framework/front.png": "fcc2acb2e8054124d4aa009a5738892752f1eb3308f5715dce15c865f138b046",
+      "src/camera-tester/renderer.tsx": "bee5be5ecdf0eda921c209a183009b0bf535770c4f7b8974e588c2c8ae29ae1f",
+      "src/camera-tester/renderIpcOwnership.test.ts": "497cc68e612c838e26975aaf2deae11799e47ebc1d12a539eb1b7c0a57752a57",
+      "src/camera-tester/productionRenderEngine.test.ts": "7177eb71018d0334eee4932ba724c24ea7440e70ea387a67130a5137188f2383",
+      "src/camera-tester/CameraTesterApp.tsx": "8c21a661e3cc93d6f496ff7d4f25ffa5701190d50d515e3fec7aab79fc4bb3b8",
+      "src/camera-tester/userDataPath.ts": "59f940f05674b54d14d19c8fb9a52be2d7211f427f33487dac88458634575c2a",
+      "src/camera-tester/userDataPath.test.ts": "06ddd54eae6950a7f769451bad77b352119a68594cf6af9f8ad50d9100c30f7e",
+      "src/camera-tester/renderIpc.ts": "e1cc49f963000b4bc6e1b46ead76641df230574f423c00659343e2d3b58a5e77",
+      "src/camera-tester/index.html": "415a4f5306e96a0a5ac20dc3310ff0dd1753cedd941c3904aa51a68c9eac0b58",
+      "src/camera-tester/main.ts": "5e29ad02bc8cb52c419b116da3e91245e331109dcca70248cb5982f3a9f5a93a",
+      "src/camera-tester/localRenderEngine.ts": "591745a0f2793112405f121d47f7ef568d3abd874c9c8e663adbe46a59c4c223",
+      "src/camera-tester/objectAssistantIpc.ts": "f13a093d0e3a7a9803167f117adad9e957035eacd5c2766ab2d1161bcf1682e8",
+      "src/camera-tester/nativeCameraKey.ts": "f9f51955aa0c898ca4f37534b1e76e4204e84940719e1aafb1f1006f7ca6f25a",
+      "src/camera-tester/cameraMediaLocator.test.ts": "003ffeec70f1cc81c8b57ece01dd9ceb9a3553dc0bdcbf893953daae8c0b28aa",
+      "src/camera-tester/nativeCameraKey.test.ts": "c7fbf6f801ffcb5c894b82feb0e60efab53f3b375cd3c523e42ad5638b996818",
+      "src/camera-tester/api.ts": "df573b7501d2883c14f87c65767d065aa6575bab8e223a855c0e7af285790d89",
+      "src/camera-tester/objectAssistantIpc.test.ts": "a9bf41b4171d11f7cc2fb962c42de59f327d5ae411ae09966feb01096e1e21d7",
+      "src/camera-tester/mediaLocator.ts": "c81c62c6df6a082a1ed3642ecaf0fdd32b594ac13e8105ede6e8fb89915d9e2f",
+      "src/camera-tester/mainLifecycle.test.ts": "03910b570bd9b5dd166cd7ae172f751fba35e641c8ddd77c85444c1cc7fe97c5",
+      "src/camera-tester/preload.ts": "99ca279e907a723254b831ec3e9758292e1954d0be1cf75d07bceaf2e3f27b13",
+      "src/camera-tester/cameraTesterStartup.electron.test.tsx": "f9ea0f67baf6b83721da603cf7d6ccb9aecdeefd8ffc59c2b5a7eddfae88c541",
+      "src/camera-tester/cameraMaterializationLifecycle.electron.test.tsx": "f04c775aa3ebbc2c14eae67c560edf3c69781e88ae0954e814cd0c304821ca03",
+      "src/camera3d/StructuredObjectCreatePanel.tsx": "1df785553b97787d97ba8935bcb79a761fb12447081d54d9d6cdffdf0ee6264a",
+      "src/camera3d/CameraObjectCreationOwner.tsx": "19000668bbfb8fa797a3ec557e20df49e4e434aadcd3b858466280ca15e0e5d3",
+      "src/camera3d/history.ts": "700c3bc8d851819893caf1baaba5123766ed4580440165a020203e146dc4d4b2",
+      "src/camera3d/cameraTimelineDuplication.test.ts": "50c4995e5be38426d3f23e2f9127a2dbda49e52cfe49fa05652fe6f6b2ce61d1",
+      "src/camera3d/localRenderClient.test.ts": "3b271926fd8b265b13ce95cfdb49c9d2ec38ea8d246e1eacb53ea5250647289c",
+      "src/camera3d/camera3dHorizontalGridMounted.electron.test.tsx": "6adce34650bf0f17c310541f8cc256b5ac1d89c1e648c10f028f30c053275fd6",
+      "src/camera3d/camera3dEmptyStateIntegration.electron.test.tsx": "508e56fbab7ee4cc41c436697b803df2376dc40e30d82b38a2c813be9a82767c",
+      "src/camera3d/camera3dNineteenthInteractionNumeric.test.tsx": "6c5c06db88b56d961b9cc4aab07155ff55fb8dc40b1d2e0b6f24b04e6d003915",
+      "src/camera3d/camera3dEighteenthObjectSurface.test.tsx": "396f3bc80cda5764e0dc0be022e62e99dc2931dabf466bf94390e19659988c31",
+      "src/camera3d/camera3dMergedContract.test.ts": "c4e4131638431af97ad5bbab8e81121d9b0d743c6101169e80c1310ad8fdb719",
+      "src/camera3d/structuredObject.ts": "24614954922873126b936bdd3457e45f4a5c28a96aa17733ae2d0f7f87bcbdc5",
+      "src/camera3d/camera3dApprovedContract.electron.test.tsx": "5cb713f983eeaf71188065a818d27a0e8a67412469dde3cb11ca267b48c58a7a",
+      "src/camera3d/camera3dCameraUnit.test.ts": "440d991bf9371877844f59467cf56972ffad4f078c86b643b9bb234685f88e21",
+      "src/camera3d/structuredObjectAssistant.ts": "fa1002dac0190c4f1150972a768b0cb9453d5c9fce297ceb941af0eac56c3bc9",
+      "src/camera3d/camera3dMeasuredContract.test.ts": "54b009218831a25ab04ea34b4ec6fea5a6b579b750503859708c495d559dbffc",
+      "src/camera3d/artifacts.ts": "ed8600bcb1502c16e280b52b010caf96a8822678b97b83c8baae1250451a21a9",
+      "src/camera3d/cameraPilotSyncV12.test.ts": "5f38994846bf07f64938a393b6db2c7f1f30bc341253514b421d771d489c2560",
+      "src/camera3d/cameraTimelineNativeSeek.electron.test.tsx": "7fb6918d51e181284b670c3b965d2f63562a70d93195d15999d3b9c9b49e978c",
+      "src/camera3d/cameraInspectorSettled.test.ts": "3b93023ff4a5231d7cc2ec36c9421031c07ea87b6ebdfce69dbe4379eb48e4a8",
+      "src/camera3d/camera3d.css": "53e6ba508b3f099ec710af58a2e814e2154f7b83baa57e2db97749507c87b022",
+      "src/camera3d/cameraLockMounted.electron.test.tsx": "e5e4db1cfb8a78d04282bf3d056322abb0c87d6e1550c3b9f300ead351fb3cb0",
+      "src/camera3d/v16LinkedSliderModifiersMounted.electron.test.tsx": "c736680a3b66bda3f30912e0d3ac8f25be2ce379f315a5ce11231f7b52492b8e",
+      "src/camera3d/v14HeldArrowMounted.electron.test.tsx": "823ddc71b73aa51a808b976cc90ad41753756a23f57dce672c0a4faf91b7ac24",
+      "src/camera3d/v14SmoothHeldArrows.test.ts": "f4ddac65ffb76516804ad43c4cfc79d9b38d562de8161559e67753f50133f771",
+      "src/camera3d/camera3dHierarchyMounted.test.tsx": "24cf7abe8ec312ee2ee46b81a6d961d55b5ce4becfccb6679b7a8a3963ba4be9",
+      "src/camera3d/model.ts": "04a1ce8fc7f572b4fe3a747b2f4301506c156301daa0764ec924c66db302bd8f",
+      "src/camera3d/cameraTimelineMounted.electron.test.tsx": "99d0e64937f91e2665da424b59edf42c0864587f03aba74157a1e799e2683b74",
+      "src/camera3d/cameraInspectorMounted.electron.test.tsx": "6a9aae926b47b2a19dd5648d38fc20d16532db0d248ba4cab0181c0fa342691f",
+      "src/camera3d/exactCanvasCamera.tsx": "24d2be39cc2cb00f27bf19345ad01b38e8894c04187ca01890a25d48920388af",
+      "src/camera3d/camera3dNineteenthInteraction.test.ts": "098b77b55bac3e3bc21faeda7c9e8a48bd1a22e062a01c241021c9381e0ac5a4",
+      "src/camera3d/camera3dShotSettingsMounted.electron.test.tsx": "5153b22380c6cd2b2cb8de57bb7580e218c975bafdc69cddd7cbc35154c599fb",
+      "src/camera3d/camera3dLoadRaceMounted.electron.test.tsx": "33c2a4b1ddf7df11d8358f24f67883d5523b81b69a1da81e1e0979527aeb59c9",
+      "src/camera3d/v17ContinuousModifierHoldMounted.electron.test.tsx": "1770d9c1a6599dbe8cacbd994b931aa9689153d215afc0cd5ca843ced55173fc",
+      "src/camera3d/CameraViewport.tsx": "26ed33d8fafc1c512b91d0f910f618234c715ff4ca4c8f7b18b1a3d2c52dda49",
+      "src/camera3d/cameraObjectCreationOwner.test.ts": "b264a40651129dd7b58f34d339d5ab1a5a2447843eaa321af3c66aff6c02e6fd",
+      "src/camera3d/camera3dEighteenthShotOwnedCamera.test.ts": "709a1a992eaaeac9696af7e47c884359a5223d4cb11f0b12bcfb8be1d656b80b",
+      "src/camera3d/camera3dEighteenthSurface.test.tsx": "029b23c7db0140e89b36f340bc956943c79d1cdb85543783e7639065fffdaf0c",
+      "src/camera3d/scopedLocks.test.ts": "a2eeceda05477298d64c6f76d51bae15c7c362ef9edd49eb2d1a028de2eab9ab",
+      "src/camera3d/camera3dEighteenthHierarchySurface.test.tsx": "73357962b94e91e38e22bfcbaf4e39be360fb25ffcfc69c6830c85d55922056c",
+      "src/camera3d/storyboardCatalogs.ts": "20fd4e95a279cc4d88e98abb9c8658fa62507a619a0079d4132bc1073985e090",
+      "src/camera3d/v18DirectPointerRemapMounted.electron.test.tsx": "edbd15fac9b8d0ef4585213d0626f5ffa1f7505609f489a5c3618029357398fd",
+      "src/camera3d/interaction.ts": "3c9d80214ba46203169ef1a9e49571f5e1056cefc449684a307ac0ebb65efcae",
+      "src/camera3d/cleanRenderer.ts": "ba6f027a150fda29807932c78080c7124d4d06a81529ec00a61f2023adfe3d7f",
+      "src/camera3d/Prism3DCameraNode.tsx": "fa56fc6266b18c2eb17352132cbbc4582f2d07c4efa3b69bad557612f9ec1a4d",
+      "src/camera3d/renderRange.ts": "9c5f69a13e91ef32309f8d050de2f077ea6972ca970282a298ed6b24ace9234a",
+      "src/camera3d/CameraSceneHierarchy.tsx": "cc8dff8d25e84b225622ffb3bd2fb1aa05eb0c85463e3e6d74a199bd7ffea56c",
+      "src/camera3d/cameraTargetReadOnlyMounted.electron.test.tsx": "6f9a809aa5d480758b9be6b2ccf1f22290822f0cf4f296835ee5c831e4c4386f",
+      "src/camera3d/cameraViewportAlignment.test.ts": "398c407a0bf040f3d9f41336189040aa1e4f1d7a1bd8d20cfef16fb94d7856ea",
+      "src/camera3d/sceneTree.ts": "5a340431d9157682ae600f5b93c488f9e28c74eadc21affe131a6973aa913fd5",
+      "src/camera3d/threeScene.ts": "988909d8c4a2cac06949aa9473dddcdb593d7b47b05d78ca53b04ec716b087d1",
+      "src/camera3d/camera3dNoShotTimelineMounted.test.tsx": "81f7ff45555113ca45ae31205c30463691cf257f916b71ab2feaa687fc93d370",
+      "src/camera3d/v13DirectSystem.test.ts": "14084b92edf90bbe0223f0461ab0ffdb135b3dfaba50a071c299ed68e9184848",
+      "src/camera3d/localRenderClient.ts": "420906519b83738bf077b83c412753b2bef98f8fc4016503f2f457a51bdccc53",
+      "src/camera3d/camera3dRotationMounted.electron.test.tsx": "70e1aac8a1d90b9842356ab6d3f12f86ab1b37f4cf60ee668b74915b3c2b618c",
+      "src/shared/shotSpec.test.ts": "23f635f9aed72eab6db5c1fe3fee0a9e692ac00a5e4d132e4efbf3807d091cf0",
+      "src/shared/importedAssetName.test.ts": "0bf3515ad1332931848ab48327aa5868b0a34a7b01e976d5e88c7251c5d5579c",
+      "src/shared/elementViews.ts": "ec95ac962ff701a8fb165ce2ce06024c2b078ec008b627883a1aba2995872bbd",
+      "src/shared/assetClassification.ts": "d92970966750dbb03f626981bd678f65824c546a79d5f85c699cc26662efaf7b",
+      "src/shared/canvasGrouping.ts": "8c8dc79dfbca6921421a3411a1c6070410428b8759c611845086c03d7a5181d8",
+      "src/shared/providerShutter.test.ts": "cdd57b240144de66b8ee93bf9a688d34e6c98bd1412ceef22c9dc71d992b7d52",
+      "src/shared/storyboardDurationBudget.test.ts": "598c0df2cf75f141a9f66a5524f724566f5bb847e6a8c62efa993bbb05baaea7",
+      "src/shared/keyboard.ts": "97f84b612ed735d96cfd1336519c27c29cc6e3fe3f8f4f5c18f711a05afaafd3",
+      "src/shared/generatedMedia.test.ts": "b04a7bd0314e4b98dd6389d32b51ee51d374e7b759b70cd131e3153891624257",
+      "src/shared/previewFocus.ts": "eb0e1a3018dd9a9d011399b712660c39349462af3941b38b9715400987cb19ec",
+      "src/shared/storyboardDurationMutation.ts": "8f2a9b8f53696a0cf85d51546df1ecc2112a33c3b7ec4848599f2b34eef958cd",
+      "src/shared/videoUpscaler.ts": "6c5a9eb6e44330bd4147dc83b67d65398d43a00dbf5b68c33ad6151410ed9d75",
+      "src/shared/assetCasingSurface.test.ts": "e550b4ad17e911687f1982329cf422f645753ff4e445bea146e648c539f46517",
+      "src/shared/generationPricing.test.ts": "6311bc4fe102fbd933993c049193aa9b49292575b18b68d28dbdad598b6bd498",
+      "src/shared/controlGroupLayout.test.ts": "882c77169e38800d0128c1845a3816244b2e4a71b6535142a7fb18cb06245af4",
+      "src/shared/imageReferencePrompt.test.ts": "5126cc6e38335796f8807785426dffee37854aca958cbaf530c1abcc59487b69",
+      "src/shared/naturalSkinRendering.test.ts": "428b9eb5f1a3bec172f8b89d5d6a065022a90395c88ea885ff02b5b1c0b19f6e",
+      "src/shared/semanticAssetAvailability.test.ts": "b70b1736ca776e21128c1ed275baa195003ee06889365b2835ffe70096882c78",
+      "src/shared/canvasInteractions.ts": "15c7a9af2b445021bad8b3a865a3f12541c5d9f09ab7b96a0231be7f5293a11a",
+      "src/shared/promptTags.test.ts": "a4a3f7267c0640213cd66436a13f2bf6ed38c5f571e14d646b2479ebe58175cb",
+      "src/shared/storyboardSequence.test.ts": "0dab1aeab406ee02361168bfdf9191d748302d5e59a4db885e86a928906ee708",
+      "src/shared/shotSpec.ts": "a73092dd07b910ff78be3b2f90fddac9e21f96b200bb7741823b727e319d7934",
+      "src/shared/previewFocus.test.ts": "696e928f14fefaa68e46e34168630c2752bd21c14efddecaedaacd2c17a26172",
+      "src/shared/byteplusAvailability.ts": "3def05d5706ebf622972e3fc37ca1799c9daab379b8e4d20abcf1959e4d4d51f",
+      "src/shared/assetBatch.ts": "d27015803a4f17f315864d319e0c602d64cb668759999d14d29b22ed9510fc69",
+      "src/shared/assetDeployment.ts": "6173ccade1a988cda553562c9232661407a6cc6065de2345bdabf4d6a119e0e6",
+      "src/shared/semanticAssetAvailability.ts": "a6ba238479de23a879e302da1368c891adc3459e3b9358386a6746d976e41d57",
+      "src/shared/assetBatch.test.ts": "9e564dbed5fa449d9e317b7acbf4afcd76eb7688ad64cc151b43bf3c01616792",
+      "src/shared/videoModels.ts": "c77f662416dea7e52e3427c9c2e4368e2c9682565254061a84963c4f2d9caa80",
+      "src/shared/generationTiming.ts": "2411ed3ed12ada7ec903773f415313d16d9b517d69563946147c7e0527ef6e25",
+      "src/shared/byteplusSeedance.ts": "d66b293b216e1007e49bdea150db814335872f6675d65e75f07918f0e2050e60",
+      "src/shared/shutter.ts": "a99a3d71049e7714826bfd795d76d76e5beb3d52500ba814f3916d084fb49f82",
+      "src/shared/nodeNotificationCategory.ts": "545a02cd39cb3653745d6f553f14bcc189781fa1a24d72070a0a273a2b9eaf5e",
+      "src/shared/assistantModels.test.ts": "cb769eb02e8eaacbe0c5dc5d079a21f6c248b4ba4b2e6398869835c8a6440f48",
+      "src/shared/imageModels.ts": "433f0b5b2d981cfc11391571724ee631a4938c402cc92cf7d40d6b3442f7215f",
+      "src/shared/semanticAssetCollections.ts": "ab0517ab367e6ca0d9d46ae9d9719c44a31a75007b706148a167a216bd1eadc0",
+      "src/shared/referenceVisualAuthority.ts": "3ed5b732c67c849690c77c5f88d900c2e42daf4afd951ca6dec1cb52462f36a9",
+      "src/shared/stylePresets.test.ts": "4428431a28cf98bfb9c4c617eec33f10df67eeab710fe03d107880581faff9fd",
+      "src/shared/storyboardRewrite.ts": "607218f29c86cc8c80b03dc3fec4233628949da45132a48eefd80f29dab73dca",
+      "src/shared/canvasLayout.ts": "5481d04a06cc2dc81775075c998f3e8f37385855a561400e09c7d449bcba81e4",
+      "src/shared/semanticAssetLifecycle.test.ts": "e6ebfcda8d53d787f699d1541bab7394eb19884b294703b7747ed184117a514f",
+      "src/shared/generationReadiness.ts": "c189df50353ecdaf9de42a7f104ac3e32da3d8b0c20d3de34a45e52deab10d61",
+      "src/shared/assistantModels.ts": "2dfd3f4b9eb1c5da29b194777cea4b97fe04f82c7455b0abef7ada5199b5d659",
+      "src/shared/generationServiceProvider.ts": "ad080c302c2a6bd77cf38cd941dbaf0b0bef3a2beba08afadd3473ec1ee86ca9",
+      "src/shared/videoPromptMode.test.ts": "6ac2f7b3d88c2dbfe2b3f91c341b210f9688915bd896a6358966ce2153fce962",
+      "src/shared/nodeConnections.ts": "d17a266ca1ddc8c60d036cb330bbed32c64e7d843bd2cc87a260c9750b971d82",
+      "src/shared/videoUpscaler.test.ts": "159ec9393cca315cd751c74c06caa62f021a98fcccf7d5a7323eca3a0c4cb9b6",
+      "src/shared/semanticAuthorityCompletion.test.ts": "718ea8ccece7dff3e25465033623130f48fb4813e6c644ca0a2451fdeabec87b",
+      "src/shared/minimapGeometry.ts": "72e77ce7e2df7d1ec87da734b6ea954a2fc178a46fc61d1eecaf94c8aa5aa75a",
+      "src/shared/referenceInstructions.ts": "4deb28e557fd9dc67bd1eb4f052f5bc5102394ef7d897562650dc0d3e55c8f8f",
+      "src/shared/savedGraphSecretPrompt.test.ts": "c4cb051a9a71103cdabf0b6970c73d7821c3a593184e2b8e8eef71ddd2695e7a",
+      "src/shared/textEditorSelection.test.ts": "9ad86e1bed4811f794e8f6c13a1d7d8d4dbfdd2a3021d8e8c11af498329ce94e",
+      "src/shared/requestPreview.test.ts": "7d556a3346e9a5af860210cff832226387a05f886ead517cae11943cc548b1ea",
+      "src/shared/resolvedAssetRequest.ts": "f77e68bf77c6b6bcef5c5f1f653b7654154fd929758f194b9164c1ca92eeca29",
+      "src/shared/storyboardPanels.ts": "bb38ffeb719d439eaa69bd2d20f5cc49cbf4985e7a180acce83abe141c0726d7",
+      "src/shared/requestPreview.ts": "d1a1069a395bf7c23b6874eca2ceca8afdc6b93faff7a69e686f77d4e1db0c1d",
+      "src/shared/wardrobeContracts.test.ts": "a35255bc4f386f06c8751ec1bf3e1ad604c20d0d9b747bb6bf7a4e895dc0e6e8",
+      "src/shared/assetInteraction.ts": "715e22caddf5e35002955979494b9f029f2422bdb9f5ee8f4cc5cfff5aefc3c1",
+      "src/shared/seedanceDirectorContract.ts": "793a4dc640af30b1ca7161556fb10b8b8afd8388e92267caab6c093b944d75e5",
+      "src/shared/controlledTextHistory.test.ts": "1a24c13d86a279a3ee0d98cb881ec1691304fd8a7086962b86f09a8c71f883e1",
+      "src/shared/storyboardDurationMutation.test.ts": "9ed181118e3a442e54ffbc0f7caf07112d77b8ae908d4f20283706fb6153ddb9",
+      "src/shared/assetInteraction.test.ts": "f2eea01ec7cf9c4487413d5368e4f569d4bcf7903505c0e3548125ad5629cb35",
+      "src/shared/reusableEditorDraft.test.ts": "3f75749b9b0626cc46d103510bab14d97508f2669aeac97e7e3eb831de66bf2f",
+      "src/shared/controlGroupLayout.ts": "921564e4ae50537353a2469fa3c01f4a54045e4075a25f458a4e4799b55a1652",
+      "src/shared/characterViews.test.ts": "6e97c34e341ae0911c9cedc062be5272312c5ca8da8acdb15a0d054e7aa6211b",
+      "src/shared/voiceLanguages.test.ts": "fb134b12cca6e9cb49cbd47c0b4cc7808ed1389f890dcdec43c4655b980b5c9f",
+      "src/shared/inputRules.ts": "ff6afceffd6bfb481e8f1359e8390f920b29932004cdd8eb39cbc64c6d8fb0a4",
+      "src/shared/assistantProviderSelection.test.ts": "16fac613c9ab80a021e74db68f9563a88131c62a766c6d2bf8c5e801e8713ef6",
+      "src/shared/cinematicDirection.test.ts": "30b0773d5542aae4d8f8f8228b04f3f1dceb0e906766d87a9445d42c2bf5fb03",
+      "src/shared/storyboardMenuInteraction.ts": "dc9138f137a04097b33c4c06c7355072f244ca9bba03277da6dd54ac1dec7f18",
+      "src/shared/filmicMotion.ts": "64d27428ef963acd06cb506272eef30ce6e1ea753504c495d47c17452295ea2a",
+      "src/shared/workflowResolver.test.ts": "6479b9c09c2742fc06eb297d7aad95f35b9c283812aa1c7ef4b6be9ced0d4424",
+      "src/shared/storyboardCameraBridge.ts": "6bbd047433619f1d90fa14142c33b573a5079a3dfb1d6babf8801b40cfb009ff",
+      "src/shared/seedanceDirectorValidation.ts": "0d06495ddd7ccd6fc34a73a712c516f5003f52c707e1fb403d0c8263a95a0fc9",
+      "src/shared/cameraSupportSemantics.test.ts": "54adef82b2b11654c3a86588075600fcb52cdc40c10e2d65f959b0f14a7426e4",
+      "src/shared/imageModels.test.ts": "633871c881eaaf5488afabd8533556584eb671f18401a04d3370d59506b12ba9",
+      "src/shared/providerErrors.ts": "f8ecd31638e2cdebaaffe12ef639278815616a3fe8d6858391f9c9729f5dcb64",
+      "src/shared/seedanceDirectorValidation.test.ts": "aa33f2f4426848116b28eb3d86dcc7b9902edb2ad2b04dfbb8d2b99d5432174f",
+      "src/shared/footerSaveLifecycle.test.ts": "fbcfcf22edb6edebeb0e0ae98adf7de5b4d14dd38edfdb7b0a28a6c0abdc867f",
+      "src/shared/falAccountStatus.ts": "5daffca762e776301a99dbab41e06adabe731287de985965ca08b7efa58a893f",
+      "src/shared/promptCompiler.test.ts": "d210992d7364f053c119ee93c0f02e1403de6a0a15c53d3b83b3d5c0ff23162c",
+      "src/shared/nodePorts.test.ts": "a67408b3f952f6019d2f2954513366d81d811b514a4df123caf4c8e6a2b6b0c2",
+      "src/shared/autosave.test.ts": "b2a2f76cdb82cefc4c80997a529efff37c9913619a09ebae67fc374e61838274",
+      "src/shared/semanticAssetLifecycleMigration.ts": "52b6ecb53b392a7d96644fce01c8cacfcee8d6107ae9b827adada196c5e01c51",
+      "src/shared/cameraSupportRevamp.test.ts": "254dfed64fc3a5a9b11f925cf9fb6a6c758e55c03217dd12ed527ca4fa09193b",
+      "src/shared/storyboardMigration.ts": "06903afc37147e0e30b428347d68f67ef8eb9683f7f47389ef86d57a809eb3ed",
+      "src/shared/providerShutter.ts": "7551eff419a479b859dfcbbc473cbad863b7b28855ee2d3741449e30761fb0e2",
+      "src/shared/semanticReadiness.ts": "2b5426d0db5162eb8a220ba4219479e2063fdecec5bd1fdb47237df649cb1e11",
+      "src/shared/shutter.test.ts": "2694cfd6f04997052735182960f082b57f661bcd63358a26c2b351efcd72fc99",
+      "src/shared/assistantProviderSelection.ts": "b3ef366b950aeed1cce4900bfe194308f2df94d3ea548ededae8630ae24d128d",
+      "src/shared/shotRecipes.test.ts": "5cc5d0be1ea381f6d22d0e70baf1915bf3e320256288f152a21099260115779f",
+      "src/shared/seedanceDirectorContract.test.ts": "13a7d9fe539ad0622e4875b030cc908aa97e902762972cb8556423e0884480f4",
+      "src/shared/videoPromptMode.ts": "0b33d27ea2de4750b22aedd3b1091214a0334a13c9093a54ae12d47f2fc15e80",
+      "src/shared/nodeDefaults.ts": "fdd5ff3832fe2a2d5c4af5a98c269e6f4d59e7310ca9625c37bd326d25df7d62",
+      "src/shared/videoModels.test.ts": "3ad7bdefd8ff0e81a444f3d05e4af2df63873d0d913782270479fab7eddd781f",
+      "src/shared/canvasLayout.test.ts": "4bcc4c5c01b172840c7ed0152a002374278ff1141055bd883453a93f7724108d",
+      "src/shared/serviceProfiles.test.ts": "ef67087cddf0639ea3aa68f7d6103d19385dc3f11f324c67498d20e2769b7033",
+      "src/shared/promptTags.ts": "9f3bb9b511235d2bec81ca5797e6191ac55fd83575b1cfe78f2db68fbfad66dd",
+      "src/shared/nodeNotificationCategory.test.ts": "75300cfc1d7d340227e39271cd2f5ffa25880d5c14a4b18646d987c9e40a2a30",
+      "src/shared/inputRules.test.ts": "1ed7a245e3813c62a565e04f0c6af79147d8f2491e3fda54fd988189fbafb880",
+      "src/shared/canvasHistoryRuntime.ts": "55ab264342ef3b77b40c966ae1e81f1548f89030d1b3cbed8ac4bc1fa74adb1a",
+      "src/shared/storyboardMenuInteraction.test.ts": "f6ea39e50d6f983c78f94b4dbe5b2a1db677691f38c2c936837aefb5272da3a4",
+      "src/shared/types.ts": "f07f78b64e94336ae29cb1252ab955eeb4b7f623891da35a96b93b7e1de18624",
+      "src/shared/voiceLanguages.ts": "d1076afe0c1990ad5b1132896e9b3070039550134547929db058470327a5a91f",
+      "src/shared/clarityUpscaler.ts": "a2b4b2d9c30d1c9db0d1325c7f0b1ee38e3a566090f0d591a794dab9305bd766",
+      "src/shared/storyboardPromptVersions.ts": "c49b0c324ba20e5aea05451a5d7fdc82123574587606be32302886daac635f15",
+      "src/shared/byteplusSeedance.test.ts": "3c86e58cc333e782db3378505803e81e350a687c09e694786536f5f12e83bf1e",
+      "src/shared/magneticGuides.test.ts": "beab637ca6f90ebcc6c1ff9cc4b327788989b9bbe6c09cc7f6c81eb9f9c11f31",
+      "src/shared/semanticAssetPromptBoundary.ts": "02b66c92bacc2430297c514b3271d9b6e5fd166e1f6f70b163c72651385e218b",
+      "src/shared/characterPersistence.ts": "7266735229475bdb44e56ba27f9df49ffcb8445d3276dd99da69b779bc85c624",
+      "src/shared/clarityUpscaler.test.ts": "5309c4b6fad2e6083d4ff852319606a5a74226f0de7942ae97015a05bb4869a8",
+      "src/shared/storyboardDurationBudget.ts": "d2bf856ee6cdf0e1e1bdbc2be30d29f2285f15ec40a0b925b644f26c829842b1",
+      "src/shared/selectorSearch.ts": "87cf19a74e7608cfaec061cb433c4c3c7f34c77a05b371704bc0544feb967743",
+      "src/shared/modelNames.test.ts": "943afeff4fb36ffd1d01fb2b6c7bac9f06c210d7e19e1bba5c7856082c5d7df7",
+      "src/shared/storyboardMigration.test.ts": "1c1ad59039ae03b418539ed279c2bd7dc5aa87ff8154d9bcae0ca1ab41264f11",
+      "src/shared/semanticAssetPromptBoundary.test.ts": "cbe9767ab665bc21485810bb38484463aa160cab641df752a896d0a133ddfaa3",
+      "src/shared/storyboardPanels.test.ts": "851adffe81a61c3e174f20ef9c071f2702dfe3c439999775f0026a2f6c697b96",
+      "src/shared/characterImageValidation.test.ts": "fb7243362ac8ad569f65b3ca421d81e3ec01627661a83431557bb6b0c35f0e23",
+      "src/shared/generationServiceProvider.test.ts": "2e494532d99fe792a8d7b543f9bdf58f07f7839fcfe8f9cbba7ac6b7d6a90ec3",
+      "src/shared/cameraAnchorContracts.test.ts": "e92d732f317dcd0a540c9e154f48d4523d9a389edd2d3eab9298105cac195cce",
+      "src/shared/shutterWorkflow.test.ts": "c7b3f68b139bb5f35fb2522c651f870b0848796874ac6fbf90e4d539f18b589e",
+      "src/shared/listBatch.test.ts": "b8ec72a24f26761440d01827dde64ad2c3dfa3cf0df27736934c1a334aadd329",
+      "src/shared/assetClassification.test.ts": "25e896e4d2baa11f9fabf0a48b066cf1bfb46470e294f023f444ac46d83b2607",
+      "src/shared/cinematicDirection.ts": "fbe7e98f92eb1cf4ce36c243753203632001bc7f24b519c71c0a527d8fada5cf",
+      "src/shared/elementViews.test.ts": "7b70f537c4ce0231b0933acafe69d5f72707d776021c9032d188b2044bfef035",
+      "src/shared/falAccountStatus.test.ts": "ba0d59c791978fc278a87d02620b840706b1d8fc1cd30822966436188c87103b",
+      "src/shared/providerOptions.ts": "829fb016cc2f20574ba9bd286c4a90986ffd48e6cff31e7bab2697c3f75d82bd",
+      "src/shared/semanticAssetGenerationRequest.test.ts": "c46f8e820f57edafcceec039ce5f5548c12c217d8a3d0c1c4decbd9c4bfa4959",
+      "src/shared/filmicMotion.test.ts": "14a9b981edad1b1e7be95ac22e9978bc5de40b7280813ff5616e77a90ea0d9d7",
+      "src/shared/completeBodyAuthority.test.ts": "605c3d9c7c50cf915ebeb881777ee3a90c1fd1167664b387a293e6cffc0b2862",
+      "src/shared/semanticAssetCollections.test.ts": "954bb15c318cbbb78698c9b6f1cc779af94a24eaac4ca19fdad17f66b56e4aea",
+      "src/shared/providerErrors.test.ts": "b3e8e2119f989d3e567373c6da241e30d1514a5cb7101bdd9c460b47f0c696ad",
+      "src/shared/characterPersistence.test.ts": "f53919027e0c12ccb31a97264ceeaadcb188d72ec243f816cd007e4e75f1e0e2",
+      "src/shared/generationReadiness.test.ts": "f0cebf48901d74f90c4e0517e4e67cb3e425866dcc6eb3bde3753fb829903aee",
+      "src/shared/omniRouteModels.test.ts": "49c6c88d7772377b5424ee2b1f4e31954308055e7c1b1564de10c65591430c47",
+      "src/shared/providerPromptBody.test.ts": "509677c6014ac0d4ecfd1781e502fb8f200c03cec3b3d1ce0609d56d03442c5e",
+      "src/shared/magneticGuides.ts": "f66c87dda82c805e1ab2fc917ebb3172c130344355fd357dc047dc9d80772154",
+      "src/shared/assetDeployment.test.ts": "a2c360885b22ed3b63ce85615277177208fdbbe18b87d31300dea7ab60a79395",
+      "src/shared/reusableEditorDraft.ts": "dcc6a5e7944f7cec41792f4d55ec29c638632f654bdcb987263ceec37825acae",
+      "src/shared/keyboard.test.ts": "497f3019f446e38fbb0225cc6c8e107d19604efbbaa59b2a377f3c83b3df9c7f",
+      "src/shared/autosave.ts": "06a9d695a7266ad527f5b17e0d2473dd84080c9d5e353318a26bf0b4a19761ba",
+      "src/shared/cameraSupportCompilation.test.ts": "8d5f01f8fe5104973f53cda5ac3814d308a03020b1af6483895be26345c7e6f6",
+      "src/shared/controlledTextHistory.ts": "a62b3b64af0342257f2944b66f30f2b6d8a47b4fb3c8e6cf47af0ef9751cd53c",
+      "src/shared/assetNaming.ts": "60fab61f10d9d1d7c85ccdd42e2b4ef770b1a80762986decf9f43a7d57dc0d44",
+      "src/shared/omniRouteModels.ts": "2efbf41507ddf01b113a4c651750d2622c392f894756490ff5bf4fcf634d3564",
+      "src/shared/generationTiming.test.ts": "7340e23e4f43136f02d97134a9e79d039c2028a9f6d28fe93af964169e41ba73",
+      "src/shared/serviceProfiles.ts": "1eafbc3c9ab9cf4a532eaf8f57179fd66d766e336b3f3e5535db593f7851fae2",
+      "src/shared/workflowRunRecovery.ts": "0cc507ea581a0199b9901d0fc9fc9aeb729237cfa557106175e564b1c330ae22",
+      "src/shared/nodePorts.ts": "2ebb80146a652c409bceb85716916d1adb96d9172f7a9e73163bea037ac75c59",
+      "src/shared/naturalSkinRendering.ts": "3d36a6f9ecfa7332a0de36f68e28c2ac817c7ec33c65ed3d73b0f54601fd0d9f",
+      "src/shared/semanticAssetLifecycleMigration.test.ts": "383e71674eaccce8bf15aa2bc2ea7c58362b5e4b2c12ac0078453435eee11bce",
+      "src/shared/seedanceDirectorCompletion.test.ts": "da1f9e960e03aed470a8cec30b801a5d0a979f55685349c6e443afe5495dcc09",
+      "src/shared/storyboardSequence.ts": "e872db825d82dc9dae33991b70910cc579a5960b1d8fdb5655d080cef78591fc",
+      "src/shared/falImageInputs.test.ts": "e7b9ea1096c5486486bb76ca56f82d77087ffe540d998bfd52a9102d7b7995a1",
+      "src/shared/assetNaming.test.ts": "c82d15acfaf16bd3bd3d2b75e0c1358b51aa706d61fc527a0e64b594e9e317d4",
+      "src/shared/storyboardVideoSync.ts": "b9508452b492ad1b60fe9b9b708703ef443d958e5c5eab92be93ce1ed5446190",
+      "src/shared/workflowRunRecovery.test.ts": "6a38b6dacdeb0e7784b03a7b0988b0f298269f2dec2e790ee8ace86b0c5e86f3",
+      "src/shared/characterViews.ts": "724a2d6778c6bb966df358c05735a084d8ca4580c02367f30ba45c8249d79b75",
+      "src/shared/endNodeAggregation.test.ts": "4c0d23b4695c880f1a393f3a97b7ba08fc614c56a7b8b305d04da0bc4784192f",
+      "src/shared/sameBodyAuthority.ts": "9df5b914f53404944c8da6c2c72e049ef22b91339a19bbbe99a273f89388edbc",
+      "src/shared/seedanceDirectorFutureOptions.test.ts": "e59ecbd3fd9a8adb4a2711c045a655a4db2ca003b753e5a1e4e9dc8eabe8ef0c",
+      "src/shared/cameraSupportSemantics.ts": "aaebddcd6da587cf3a120700b58634cdcc6e825683f5166b64088a9d8be8ac23",
+      "src/shared/storyboardPromptVersions.test.ts": "caeb3def36aa9499cccdf7add44ab59e0c9c73e39133d288fc230d7326fa3e4d",
+      "src/shared/byteplusAvailability.test.ts": "64a958aa90cd95ac08c4eed8886e9a0861cdace6570ffaad20d86d61ac3c30eb",
+      "src/shared/workflowResolver.ts": "ed332c19e6708b9fadb86c6c64dd6bea72f479fc598b3e0375098ea2ebe0cd10",
+      "src/shared/minimapGeometry.test.ts": "6e44ea70c705550d5c3653acde9c2f37854ca12bd09c850e213a7aff1dd8fc62",
+      "src/shared/selectorSearch.test.ts": "c2c8792a9178ab1044eba50a61b7f80dcc3077796c86508f11abe26a86fc7b06",
+      "src/shared/semanticReadiness.test.ts": "42c4962e773b959916344dbc0ef3c68973a4cf33e8f4fbf120d356464e494434",
+      "src/shared/canvasHistoryRuntime.test.ts": "f028590af389c2db5201fb225615164739a6d71399161a61481684aaf3d5f97c",
+      "src/shared/storyboardCameraBridge.test.ts": "a36d053f25fb548e105b785f640a9bcd6d8d34478bac76ebe4343d699baeb3d4",
+      "src/shared/semanticAssetLifecycle.ts": "22ef55fb09496cfcf41141c25f9b440cdcec37b41f1cbbd90569a369e9eb392c",
+      "src/shared/resolvedAssetRequest.test.ts": "8c7dd3d142cd2460fc9095a2c3ad2b9aa7b0149bac7c136214f014d898161c25",
+      "src/shared/storyboardRewrite.test.ts": "ec1f707b9fa425da5eeb8621f51062becec71268bd2bcbae02441bd8f56670b3",
+      "src/shared/storyboardGeneration.test.ts": "c18f88b1be77f63444243f611263726c64f4b7bffa1c9667fc00bb3782d18976",
+      "src/shared/shutterPromptContract.test.ts": "37eaab4bdf3bd24b504ea317438062cb998d40eda4cd1afeb47a08309587240e",
+      "src/shared/generationPricing.ts": "ddb1059950036c19663f216146ad510beb0a8a1ba001ead7d65619ecb57b1cce",
+      "src/shared/canvasInteractions.test.ts": "cf324124950c51b75b17f7d8fc2a02cc04705265a9f4de06a3f11ce97fc98f17",
+      "src/shared/characterImageValidation.ts": "90d981583c011e828d057ef20c77b5034592bfe0b28047a3c55184ff882a3bab",
+      "src/shared/providerOptions.test.ts": "671ff310f723ce2ae887525e66c454711c701fee9112402bfe52c22df1113cf0",
+      "src/shared/documentationRouter.test.ts": "3dcb216a4e2526f3247d4db4188740a73a63580b7a5873b277b0b9a2237af27a",
+      "src/shared/shotRecipes.ts": "0a08cd116dad2696d9684118dda58eef03a70144610e39c1093347fa3ec0db32",
+      "src/shared/semanticAuthorityCompletion.ts": "ac60c5b0081245d77a407d4010bf235fce9a32eb56e53f81f8a294dee220d3ab",
+      "src/shared/storyboardVideoSync.test.ts": "2b7d3b58e5305a084ee6d3a623acd141cb1013244b5ecc7025cbb70105c49c4e",
+      "src/shared/textEditorSelection.ts": "362f5f60f5d4912521fc37fe723b292047de8fa14654d5c84b1557f6bd22c205",
+      "src/shared/canvasGrouping.test.ts": "61df3ddf2605dec741a24e44c0850835f3f91413d7ce5e7948bf7540ee78f638",
+      "src/shared/propScaleAuthority.ts": "2c9e688aab5340fe4639fda96d847d1d50d64c5aaf3e2cd3e73d786752614779",
+      "src/shared/footerSaveLifecycle.ts": "cb528c589fc2ac2e421c5505e996270932931b6ee85d2dfe74a9fe2fa2514ac3",
+      "src/shared/nodeConnections.test.ts": "a3085603619b9228995566ab489dd415d3d39a801112cbe65be7ba3d0c416a97",
+      "src/shared/storyboardGeneration.ts": "86d5da3f77b8984782136c882603bd4f9fde30f2f88925f7d9d65fcbc0f461f7",
+      "src/shared/stylePresets.ts": "95362a090efc931d9eda510783ebbad01c8f1c4e148e8103c38cc94d0221e640",
+      "src/shared/modelNames.ts": "2148460a8ec581373ae474cca9ac8d47a5a36095a592f9056ae94a7cdb11eecc",
+      "src/shared/propScaleAuthority.test.ts": "e0fdfc5ac92c606f4bf61131c0bae1fe7a34e784956380d87ec5e935fdfd1309",
+      "src/shared/persistedWorkflowRegression.test.ts": "e8250beaea23494fa9ff68ce747be03dc26412c1bdc1cdb28f5a6a8a3abd7ccb",
+      "src/shared/falImageInputs.ts": "172cada07e38675c00e5dcf3d130c4dc67660a73d51ba116041e37d65b6102a2",
+      "src/shared/listBatch.ts": "9a81a726b4c9d1dfe95480b30763946e88fe341ee4d4e370af328c0a310958f0",
+      "src/shared/generatedMedia.ts": "cc1d666fe14181db9c8e4aa2ef74f593a36a88e868e1277168532934643039a7",
+      "src/shared/byteplusActivationSurface.test.ts": "3e109f93450716b0c8230b5914e1d36d212a1a1212bcfad1c901727f25ed044a",
+      "src/shared/productSkillContract.test.ts": "755145aeffc5f98e6a71cd451fb07528cb47c34d07b82cc4759f9cd76c54dbf0",
+      "src/shared/nodeDefaults.test.ts": "def9f29c1175e00abb90584baedef5cf01ffcf8b7d0e2b8948bd2c9c58f35393",
+      "src/shared/seedanceDirectorFutureOptions.ts": "ad01e5e41aaf66d2817e3fbe0becaae8b05d34997dffee56e94ea11cad65a291",
+      "src/main/assetRecovery.ts": "4bc0eb4d71118c20ca358ea0c4789270c3692ce33505b20c7bcb7b671f196e9d",
+      "src/main/assetBatchInspection.ts": "33a5c7b07291355f63f95194773718ba323efc3b3b0d790af12e57957b430752",
+      "src/main/semanticAssetSaveIpc.ts": "ece0c177d3d16d97e01ca7ed7a945b616f461abbc895be0e28bfb4f3bc4b636b",
+      "src/main/assetCollectionRename.ts": "4c94d0c0f69f3e6b581e2e1d61eb03746373ce8a899ba6ae02c0292e218adb7d",
+      "src/main/serviceProfilesSurface.test.ts": "2caefa5807dbf4517055d046f20c2c985ecbf38b7095c290d63f64f3d8309e1b",
+      "src/main/semanticAssetRecoveryWiring.test.ts": "b246d26b41be5566d2f1f05d0ced38aff5e445ad8308b607efc38977b4b4e541",
+      "src/main/serviceProfileStore.ts": "841deeb051f7fd50c2859952cb0e80bf8c6a93167030d0a0abc8a2492202e2b3",
+      "src/main/assetCollectionRename.test.ts": "0ca2cf63f32d909e94373cb68ada20f5a36aa172dc1a6bb5e6e339ad83cb6c15",
+      "src/main/semanticAssetSaveTransaction.ts": "67a33114a4a791105a08e758e292ea8e00395aced38287173d2c57404a14d849",
+      "src/main/byteplusTaskRunner.test.ts": "a0847450910c48315cb496ca901e12d0af50f00593ace218c346373020efe8b5",
+      "src/main/artworkComposite.test.ts": "ae04c68052c5a94fcabe67df5c6e508a5a5ecbe725148a1d869635ef0bdee586",
+      "src/main/characterCollectionTransaction.test.ts": "be68e608e57a0eb10ade3485329a42190b29b589cd49968506b672901eed92ac",
+      "src/main/workflowMediaAssets.test.ts": "09dbba9ba40839ae0cfd35ab9ea9ba0fefcf913919d03342920d6be49ed7f46d",
+      "src/main/assetBatchInspection.test.ts": "cb08a73a7ada32a027e26e00e73550b3147a5eb1e9ddfd6a87000fcbe15130cd",
+      "src/main/mainSafety.test.ts": "bdddb7f2d2b772fcf64b1bc09cc4baeb3d8253df8609636c86a9c4762ae0d5d7",
+      "src/main/byteplusIntegration.contract.test.ts": "590fc86d4146decf04678465523cacb50ff6e26f29d0b7e9cc9cca045271dc18",
+      "src/main/mainSafety.ts": "3607aa6b8ab9aa023152a1a4f7f81110ca1c6372efd136c0d906a060e4d50d92",
+      "src/main/characterImageValidationSurface.test.ts": "875530f4188eadb4ddacc1f5a949fa2771d4f8d8ade85d9a1d2e024b9829138e",
+      "src/main/artworkComposite.ts": "7bfe209912f830b303db3322ea28c57e25c4cbdc8151ea168f52c6a70cb0e1dc",
+      "src/main/byteplusTaskRunner.ts": "dd561dcc5bd69aa25451eacb2efbc9e3927a67d5e3d2f7a0f8b91b2514710747",
+      "src/main/serviceProfileStore.test.ts": "fa80d51fcf26ad65a3ddacec0c63a5ce60d9eb1cf0bc3668b928efc70ac1391d",
+      "src/main/byteplusGeneration.test.ts": "60744d1b3451d1ab07b6e58d6786d4222bdd657413460de850deb95a3e402f73",
+      "src/main/semanticAssetSaveTransaction.test.ts": "1664a22d08fbd636df5f0eb8312e6ea6c049b4c0619e41037cd32e8d038904f1",
+      "src/main/semanticAssetSaveIpc.test.ts": "3e09d57336bd5e5e3200ae0e56ee0cecc3b394a09522e54bfd4aa29fdd4e6597",
+      "src/main/index.ts": "209d47ad9679e7bae659e6325c4b119427f7b961b7c23a7fb88db5f512e8f752",
+      "src/main/byteplusGeneration.ts": "eee29a781ac112f6a9f71286215e21ac1ad16c61df687ef4a9069099442f84e6",
+      "src/main/workflowMediaAssets.ts": "d77b29bf050fe27abeeda117fdb5a4839c45a3302ac3e518727a37a9cca44419",
+      "src/main/characterImageValidation.ts": "252922f8afd3b40252474592df84c8de3913d7175c6d6d2dbf4ed71b885e8a8a",
+      "src/main/assetRecovery.test.ts": "d88f08bb05ad48749932b709e25daba4dbbc600a9603d052a64fc7d3d74ecedb",
+      "src/main/generationSubmissionReadiness.contract.test.ts": "80e9976a77db7fb92e58a7d616050089100a1474da9284e5f03a9629e44babbf",
+      "src/preload/semanticAssetSavePreload.electron.test.ts": "04771129c32424d8e50f40a584df05adace41eb1b5ff46990ebdd7378e48fced",
+      "src/preload/index.ts": "80d17f5dbf2a4123bdfd1b43d3ad666e03cfe2372e17459afc8b1162dbca364e",
+      "electron.vite.config.ts": "2c7fe7bbcf0cf8a348ca59b09a87a7aaab7efb41bed1afd78ee31261cbd36573",
+      "package.json": "14b6432ebaae53ecb4ac1e7a7e76f26fcd3acc19ae5b53bc7c739b1c439a8201",
+      "package-lock.json": "6d764f5052ba511b99f76ac202fab6be6f2ad3f2f03b7f7e4d0b0fd0a49af15d",
+      "tsconfig.json": "af49629d0afe66d927f2b27d9c6d344efeae63d038e697d55ad9950f6bb4b39a"
+    },
+    "temporary_compilation_cleaned_up": true
+  }
+}
