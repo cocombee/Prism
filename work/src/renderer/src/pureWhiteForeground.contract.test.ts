@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const activeCss = [
   new URL('./styles-next.css', import.meta.url),
-  new URL('../../camera3d/camera3d.css', import.meta.url),
 ]
 
 function pureWhiteForegroundDeclarations(source: string) {
@@ -11,7 +10,7 @@ function pureWhiteForegroundDeclarations(source: string) {
 }
 
 describe('active successor foreground contract', () => {
-  it('contains no pure-white foreground declaration in either complete active stylesheet', () => {
+  it('contains no pure-white foreground declaration in the complete active app stylesheet', () => {
     const findings = activeCss.flatMap((url) => {
       const source = readFileSync(url, 'utf8')
       return pureWhiteForegroundDeclarations(source).map((declaration) => `${url.pathname}: ${declaration}`)

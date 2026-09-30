@@ -34,7 +34,6 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `MIGRATION-CLAUSE-MAP.md`
 - `README.md`
 - `SKILL-SECTION-MAP.md`
-- `change-impact-3d-camera-isolated-tester-20260829.md`
 
 ## API branch
 

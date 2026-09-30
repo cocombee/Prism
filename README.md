@@ -22,7 +22,7 @@ npm run typecheck
 npm test
 ```
 
-The main app uses `electron.vite.config.ts`. The separate 3D camera flight tester uses `electron.vite.camera.config.ts`; its newest experiments are not integrated into the main app.
+The main app uses `electron.vite.config.ts`.
 
 Dependencies, generated builds, installed apps, local credentials, caches, and historical binary backups are excluded from Git. Configure provider credentials locally through the application.
 
