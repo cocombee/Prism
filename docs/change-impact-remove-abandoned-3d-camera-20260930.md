@@ -20,3 +20,15 @@ Rollback: Restore only this change's tracked files from the checkpoint commit; t
 - Six focused test files passed, 24 tests total, including the remaining foreground rule and main camera-support semantics.
 - One isolated production compilation passed; all 25 application-owned outputs still match the retained app, with no missing, changed, or additional files. The temporary compilation was removed.
 - No current app bundle, user project, media, or credential was changed. No new handoff was created.
+
+## Repository scope follow-up
+
+Checkpoint: `f79571431ad57cb6bac0934539f180548429e312`; GitHub advertises only `main`, with no separate experiment branch or tag.
+
+Scope: remove the abandoned experiment's 75 source-hash entries and obsolete tester configuration fields from the published comparison manifest. Preserve the original comparison timestamp, total input count, main-app output hashes, and dependency/native-payload evidence. Add ignore rules for the removed experiment's source, configurations, scripts, and local abandonment status. State the main application's repository scope in README.
+
+Allowed files: this record, `.gitignore`, `README.md`, and `docs/operations/Source And App Comparison.json`. Protect every implementation file, dependency lockfile, saved project/media/credential, main app, and existing Git history. No compilation, packaging, app launch, or handoff is required for repository metadata changes.
+
+Verification: validate JSON; compare all retained manifest hashes and production-output evidence with the checkpoint; scan the tracked tree for dedicated source/configuration/script/dependency remnants; prove ignore rules cover every removed project file; confirm normal Storyboard camera files remain tracked and all implementation files are unchanged; push and verify GitHub's `main` SHA. Rollback restores only these four metadata files from the checkpoint.
+
+Follow-up verification passed: only the four allowed metadata files changed; all implementation and lockfiles remained unchanged. The tracked main tree contains no dedicated experiment source, tester, configuration, scripts, or dependencies. All 105 previously removed paths match the new ignore rules, while normal Storyboard camera files remain tracked and unignored. The comparison JSON retains the same 355 main-app input hashes and all 25 production-output records. Git whitespace validation passed. No redundant build or runtime test was run for this metadata-only change.

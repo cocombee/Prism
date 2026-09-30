@@ -39,3 +39,14 @@ api-keys.json
 # Generated camera tester copies at the implementation root
 /work/main.js
 /work/index.html
+
+# Abandoned standalone 3D Camera project; keep it outside this repository
+/work/src/camera3d/
+/work/src/camera-tester/
+/work/electron.vite.camera.config.ts
+/work/electron-builder.camera*.json
+/work/scripts/camera-package-smoke.sh
+/work/scripts/camera-seventeenth-baseline.py
+/work/CHANGE-IMPACT-*3d-camera*.md
+/docs/change-impact-3d-camera-*.md
+/status/Prism 3D Camera Abandoned.md
