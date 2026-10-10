@@ -32,7 +32,7 @@ describe('local deterministic Seedance Director completion', () => {
     const body = providerPromptPreviewCompilation(request).text
     expect(body).toContain('TWO SHOTS, ONE HARD CUT, 5s TOTAL')
     expect(body).toContain(`SHOT 1 · 0.0–3.0s\nPURPOSE / ACTION · ${first}`)
-    expect(body).toContain('REFERENCES · @maya; @station; @case; @maya is the sole authority for maya as one complete physical body and one cast member, wearing the appearance governed by @maya-coat on that same body.')
+    expect(body).toContain('REFERENCES · @maya; @station; @case; Use @maya as maya.; Use @maya-coat for @maya\'s wardrobe.')
     expect(body).toContain(`SHOT 2 · 3.0–5.0s\nPURPOSE / ACTION · ${second}`)
     expect(body.match(/^HARD CUT\.$/gm)).toHaveLength(1)
     expect(body.trim().endsWith('excessive motion smear')).toBe(true)
@@ -95,7 +95,7 @@ describe('local deterministic Seedance Director completion', () => {
       storyboardShots: [{ prompt: authored, duration: 4, shotSize: 'close-up', camera: 'static' }],
     })).text
     expect(body.match(/@maya is sad and crying quietly, gaze lowered; tears remain visible as she steadies her breath\./g)).toHaveLength(1)
-    expect(body).toContain('ENDPOINT / REACTION · Complete the authored consequence, keep the reaction readable, decelerate when moving, and hold the selected final composition.')
+    expect(body).toContain('ENDPOINT / REACTION · Keep the authored consequence and reaction readable within this interval; follow authored motion through its boundary, and settle or hold only where authored.')
     expect(body).not.toContain('CONTINUITY · Preserve authored incoming state')
     expect(body).not.toContain('BOUNDARY ')
     expect(body).not.toMatch(/more sad|less sad|intensify|\btranslate\b|weep|sobbing|6 m\/s|12°\/s|10%\/s|settle for 0\.5 s/i)

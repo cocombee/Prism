@@ -1,6 +1,7 @@
+import { assertStoryboardPhysicalCast } from './storyboardPhysicalCast'
 import type { Edge } from '@xyflow/react'
 import type { StoryboardPanel, StudioNode } from './types'
-import { normalizedStoryboardTransition } from './storyboardSequence'
+import { normalizedStoryboardTransition, storyboardTransitionConflicts } from './storyboardSequence'
 import { planStoryboardCameraBridges } from './storyboardCameraBridge'
 import { activeMediaName } from './generatedMedia'
 import { normalizeLogicalAssetName } from './assetNaming'
@@ -154,10 +155,14 @@ function promptContainsAlias(prompt: string, alias: string): boolean {
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`, 'iu').test(prompt)
 }
 
-export function buildStoryboardConnectedContextManifest(storyboardId: string, nodes: StudioNode[], edges: Edge[], authoredPrompt: string, scope?: Pick<StoryboardPanel, 'id' | 'activeCharacterTags' | 'excludedCharacterTags'>): StoryboardConnectedContextManifest {
+export function buildStoryboardConnectedContextManifest(storyboardId: string, nodes: StudioNode[], edges: Edge[], authoredPrompt: string, scope?: Pick<StoryboardPanel, 'id'> & Partial<StoryboardPanel>): StoryboardConnectedContextManifest {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const seenSources = new Set<string>()
-  const activeCharacterTags = new Set(scope?.activeCharacterTags || [])
+  const sourcePanels = byId.get(storyboardId)?.data.storyboardPanels || []
+  const scopedPanels = scope ? sourcePanels.some(panel => panel.id === scope.id) ? sourcePanels.map(panel => panel.id === scope.id ? { ...panel, ...scope } : panel) : [scope] : []
+  const resolvedCast = assertStoryboardPhysicalCast(scopedPanels)
+  const effectiveCast = scope ? resolvedCast[scopedPanels.findIndex(panel => panel.id === scope.id)] : undefined
+  const activeCharacterTags = new Set(effectiveCast?.tags || [])
   const excludedCharacterTags = new Set(scope?.excludedCharacterTags || [])
   const directEdges = edges.filter((edge) => edge.target === storyboardId)
   const directSourceIds = new Set(directEdges.map((edge) => edge.source))
@@ -180,8 +185,9 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
       activeResultIndex: undefined,
     }, 'asset')) : undefined
     const tag = explicitTag || derivedTag
-    if (role === 'Character' && tag && (excludedCharacterTags.has(tag) || activeCharacterTags.size > 0 && !activeCharacterTags.has(tag))) return []
+    if (role === 'Character' && (tag && excludedCharacterTags.has(tag) || effectiveCast?.known && (!tag || !activeCharacterTags.has(tag)))) return []
     const owner = source.data.appearanceOwnerCharacterTag || (role === 'Appearance' ? safeCanvasTag(byId.get(edge.target)?.data.referenceTag) : undefined)
+    if (role === 'Appearance' && owner && (excludedCharacterTags.has(owner) || effectiveCast?.known && !activeCharacterTags.has(owner))) return []
     const referenceExclusive = Boolean(tag && role !== 'Style' && hasConnectedVisualMedia(source))
     return [{
       role,
@@ -280,13 +286,15 @@ export function storyboardBridgeConstraintManifest(panels: StoryboardPanel[], mo
 }
 
 export function storyboardTypedContinuityManifest(panels: StoryboardPanel[]): string {
+  const physicalCast = assertStoryboardPhysicalCast(panels)
   const records = panels.map((panel, index) => {
-    const active = new Set(panel.activeCharacterTags || [])
+    const active = new Set(physicalCast[index].tags)
     const excluded = new Set(panel.excludedCharacterTags || [])
-    const inScope = (characterTag: string) => !excluded.has(characterTag) && (!active.size || active.has(characterTag))
+    const inScope = (characterTag: string) => !excluded.has(characterTag) && active.has(characterTag)
     return {
       panelId: panel.id, order: index + 1, continuityGroupId: panel.continuityGroupId,
       activeCharacterTags: panel.activeCharacterTags,
+      effectivePhysicalCast: physicalCast[index].known ? physicalCast[index].tags : undefined,
       exclusionPolicy: panel.excludedCharacterTags?.length ? 'Characters outside the active cast are excluded from this target.' : undefined,
       characterStates: panel.characterStates?.filter((state) => inScope(state.characterTag)),
       characterStateDeltas: panel.characterStateDeltas?.filter((state) => inScope(state.characterTag)),
@@ -358,6 +366,8 @@ This is the sole camera path. Do not expand it with around, past, across, wrappi
 }
 
 export function storyboardRewriteInstruction(panels: StoryboardPanel[], panelId: string, connectedContext = ''): string {
+  const conflicts = storyboardTransitionConflicts(panels)
+  if (conflicts.length) throw new Error(conflicts[0])
   const panelIndex = panels.findIndex((panel) => panel.id === panelId)
   const currentNumber = panelIndex >= 0 ? panelIndex + 1 : 1
   const sequence = panels.map((panel, index) => {
@@ -365,7 +375,7 @@ export function storyboardRewriteInstruction(panels: StoryboardPanel[], panelId:
     const shotSize = panelSetting(panel.shotSize, 'wide')
     const camera = panelSetting(panel.camera, 'static')
     const transition = normalizedStoryboardTransition(panel.transitionToNext, index, panels.length)
-    const transitionLabel = transition === 'continue' ? 'TRANSITION AFTER: CONTINUE IN SAME UNBROKEN TAKE' : transition === 'hard-cut' ? 'TRANSITION AFTER: HARD CUT' : 'FINAL PANEL'
+    const transitionLabel = transition === 'continue' ? index === panels.length - 1 ? 'FINAL PANEL · OUTGOING CONTINUE HOOK; DO NOT INVENT THE NEXT PANEL' : 'TRANSITION AFTER: CONTINUE IN SAME UNBROKEN TAKE' : transition === 'hard-cut' ? 'TRANSITION AFTER: HARD CUT' : 'FINAL PANEL'
     return `SHOT ${index + 1} · ${duration}s · ${shotSize} · ${camera}${panel.locked ? ' · LOCKED' : ''} · ${transitionLabel}\n${panel.prompt.trim() || '[empty]'}`
   }).join('\n\n')
   const connectedContextBlock = connectedContext.trim() ? `\n\n${connectedContext.trim()}` : ''
@@ -459,7 +469,7 @@ export interface StoryboardBatchContextPanel {
   camera: string
   locked: boolean
   editable: boolean
-  boundary: 'continue' | 'hard-cut' | 'final'
+  boundary: 'continue' | 'hard-cut' | 'final' | 'final-continue'
 }
 
 export interface StoryboardBatchTargets {
@@ -468,6 +478,8 @@ export interface StoryboardBatchTargets {
 }
 
 export function storyboardBatchTargets(panels: StoryboardPanel[]): StoryboardBatchTargets {
+  const conflicts = storyboardTransitionConflicts(panels)
+  if (conflicts.length) throw new Error(conflicts[0])
   const targetIds = new Set(storyboardRewriteTargets(panels).map((panel) => panel.id))
   return {
     targets: panels.filter((panel) => targetIds.has(panel.id)),
@@ -479,7 +491,7 @@ export function storyboardBatchTargets(panels: StoryboardPanel[]): StoryboardBat
       camera: panelSetting(panel.camera, 'static'),
       locked: Boolean(panel.locked),
       editable: targetIds.has(panel.id),
-      boundary: index === panels.length - 1 ? 'final' : normalizedStoryboardTransition(panel.transitionToNext, index, panels.length) || 'hard-cut',
+      boundary: index === panels.length - 1 ? normalizedStoryboardTransition(panel.transitionToNext, index, panels.length) === 'continue' ? 'final-continue' : 'final' : normalizedStoryboardTransition(panel.transitionToNext, index, panels.length) || 'hard-cut',
     })),
   }
 }
@@ -489,7 +501,7 @@ export function storyboardBatchRewriteInstruction(panels: StoryboardPanel[], con
   const targetOrder = batch.targets.map((panel) => panel.id)
   const responseExample = `{ "panels": [${targetOrder.map((id) => `{ "id": "${id}", "prompt": "..." }`).join(', ')}] }`
   const sequence = batch.context.map((panel) => {
-    const transition = panel.boundary === 'continue' ? 'TRANSITION AFTER: CONTINUE IN SAME UNBROKEN TAKE' : panel.boundary === 'hard-cut' ? 'TRANSITION AFTER: HARD CUT' : 'FINAL PANEL'
+    const transition = panel.boundary === 'final-continue' ? 'FINAL PANEL · OUTGOING CONTINUE HOOK; DO NOT INVENT THE NEXT PANEL' : panel.boundary === 'continue' ? 'TRANSITION AFTER: CONTINUE IN SAME UNBROKEN TAKE' : panel.boundary === 'hard-cut' ? 'TRANSITION AFTER: HARD CUT' : 'FINAL PANEL'
     const context = contexts.get(panel.id)?.text.trim()
     return `PANEL ID: ${panel.id} · ${panel.editable ? 'EDITABLE' : 'READ-ONLY'} · ${panel.duration}s · ${panel.shotSize} · ${panel.camera}${panel.locked ? ' · LOCKED' : ''} · ${transition}\n${panel.prompt.trim() || '[empty]'}${context ? `\n${context}` : ''}`
   }).join('\n\n')

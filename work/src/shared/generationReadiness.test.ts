@@ -5,6 +5,12 @@ import { assertGenerationRequirements, formatRequirementList, generationRequirem
 const request = (kind: GenerationRequest['kind'], patch: Partial<GenerationRequest> = {}): GenerationRequest => ({ nodeId: 'test', kind, ...patch })
 
 describe('node-specific Play readiness', () => {
+  it('blocks an unsupported saved video model before main can dispatch a different route', () => {
+    const unsupported = request('video-generator', { prompt: 'Follow this motion.', videoEngine: 'higgsfield/genjutsu/motion-transfer/v1.0' })
+    expect(generationReadinessTooltip(unsupported).disabled).toBe(true)
+    expect(() => assertGenerationRequirements(unsupported)).toThrow(/supported video model/i)
+  })
+
   it('lists every missing Image Editor requirement instead of a generic failure', () => {
     expect(generationRequirementFailures(request('image-editor'))).toEqual([
       'add an edit instruction',
@@ -44,7 +50,7 @@ describe('node-specific Play readiness', () => {
   it('blocks provider submission for every blank Storyboard panel with exact readiness', () => {
     const draft = request('video-generator', {
       prompt: 'Structured draft remains previewable.',
-      videoEngine: 'fal-ai/bytedance/seedance/v2/text-to-video',
+      videoEngine: 'bytedance/seedance-2.0/text-to-video',
       storyboardIncompletePanels: [1, 3],
     })
     expect(generationRequirementFailures(draft)).toEqual([

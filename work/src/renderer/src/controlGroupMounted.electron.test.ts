@@ -51,6 +51,46 @@ describe('mounted fluid control catalog and capability stability', () => {
     }
   }, 50_000)
 
+  it('pins selected company icons at the established painted left inset and name gap after selection, including narrow and zoomed controls', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'prism-selected-icon-insets-'))
+    temporaryDirectories.push(directory)
+    const entry = join(directory, 'renderer.tsx')
+    const html = join(directory, 'index.html')
+    const main = join(directory, 'main.cjs')
+    writeFileSync(entry, `
+      import React, { useState } from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { FluidControlGroup, GroupedMenuSelect } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/NodeCardNext.tsx'))}
+      const companies=['fal','byteplus','omniroute','openai','google','anthropic','deepseek','moonshot','meta','black-forest-labs','alibaba','bytedance','kuaishou','elevenlabs','fish']
+      function Case({company,index}){const [value,setValue]=useState('first');const zoom=index%2?.8:1;return <section className="studio-node" data-company-case={company} data-zoom={zoom} style={{width:index%2?180:300,transform:'scale('+zoom+')',transformOrigin:'top left'}}><FluidControlGroup ariaLabel={company} gap={7} controls={[{id:'model',kind:'selector',intrinsicWidth:100,defaultLabel:'Selected Model',node:<GroupedMenuSelect value={value} ariaLabel={company} defaultLabel="Selected Model" fillTrack groups={[{label:'Models',options:[{value:'first',label:'Initial Model',provider:'openai'},{value:'final',label:'Selected Model',provider:company}]}]} onChange={setValue}/>},{id:'sibling',kind:'selector',intrinsicWidth:52,defaultLabel:'16:9',node:<GroupedMenuSelect value="ratio" ariaLabel="Sibling Ratio" defaultLabel="16:9" fillTrack groups={[{label:'Ratios',options:[{value:'ratio',label:'16:9'},{value:'other',label:'2.35:1'}]}]} onChange={()=>{}}/>}]}/></section>}
+      window.__errors=[];window.addEventListener('error',event=>window.__errors.push(event.message))
+      const frame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))
+      window.__selectAll=async()=>{for(const section of document.querySelectorAll('[data-company-case]')){section.querySelector('button.grouped-menu-select:not([aria-label="Sibling Ratio"])').click();await frame();const option=document.querySelector('.grouped-menu-select-menu button[role="option"][id$="-final"]');if(!option)throw Error('Missing final option');option.click();await frame()}}
+      window.__measureSelected=()=>(()=>{const r=e=>e.getBoundingClientRect();return [...document.querySelectorAll('[data-company-case]')].map(section=>{const button=section.querySelector('button.grouped-menu-select'),mark=button.querySelector('[data-company]'),label=button.querySelector('.selected-label-full'),svg=mark.querySelector('svg'),zoom=Number(section.dataset.zoom);let left,right;if(svg){const b=svg.getBBox(),m=svg.getScreenCTM();left=new DOMPoint(b.x,b.y).matrixTransform(m).x;right=new DOMPoint(b.x+b.width,b.y).matrixTransform(m).x;}else{const style=getComputedStyle(mark),ctx=document.createElement('canvas').getContext('2d');ctx.font=style.font;ctx.letterSpacing=style.letterSpacing;const ink=ctx.measureText(mark.textContent);const range=document.createRange();range.selectNodeContents(mark);const x=r(range).left;left=x-ink.actualBoundingBoxLeft*zoom;right=x+ink.actualBoundingBoxRight*zoom;}const style=getComputedStyle(button);return {company:section.dataset.companyCase,selected:label.textContent,leftGap:(left-r(button).left)/zoom-parseFloat(style.borderLeftWidth),nameGap:(r(label).left-right)/zoom,expected:parseFloat(style.paddingLeft),expectedName:parseFloat(style.getPropertyValue('--selector-icon-label-gap')),fixedIcon:getComputedStyle(button.querySelector('.selector-leading-icon')).flexGrow==='0',siblings:section.querySelectorAll('button.grouped-menu-select').length};})})()
+      createRoot(document.getElementById('root')).render(<main style={{display:'grid',gridTemplateColumns:'repeat(3,300px)',gap:12,padding:12}}>{companies.map((company,index)=><Case key={company} company={company} index={index}/>)}</main>)
+    `)
+    buildSync({ entryPoints:[entry], outfile:join(directory,'renderer.js'), bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader:{'.png':'dataurl'}, logLevel:'silent' })
+    const styles=resolve(process.cwd(),'src/renderer/src/styles-next.css')
+    writeFileSync(html, `<html><head><link rel="stylesheet" href="file://${styles}"></head><body><div id="root"></div><script src="renderer.js"></script></body></html>`)
+    writeFileSync(main, `const {app,BrowserWindow}=require('electron');const path=require('node:path');const finish=(value,code=0)=>{process.stdout.write('SELECTED_ICONS_RESULT:'+JSON.stringify(value)+'\\n');app.exit(code)};app.setPath('userData',path.join(${JSON.stringify(directory)},'user-data'));app.whenReady().then(async()=>{const w=new BrowserWindow({show:false,width:1100,height:1000,webPreferences:{contextIsolation:false,sandbox:false}});await w.loadFile(${JSON.stringify(html)});await w.webContents.executeJavaScript('document.fonts.ready');await new Promise(r=>setTimeout(r,250));await w.webContents.executeJavaScript('window.__selectAll()');finish({results:await w.webContents.executeJavaScript('window.__measureSelected()'),errors:await w.webContents.executeJavaScript('window.__errors')})}).catch(e=>finish({error:e.stack||String(e)},1));`)
+    const syntax=spawnSync(process.execPath,['--check',main],{encoding:'utf8'})
+    expect(syntax.status,syntax.stderr).toBe(0)
+    const run=spawnSync(electronPath,[main],{cwd:directory,encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:undefined},timeout:40_000})
+    expect(run.status,run.stdout+'\n'+run.stderr).toBe(0)
+    const marker=run.stdout.split('\n').find(line=>line.startsWith('SELECTED_ICONS_RESULT:'))
+    expect(marker,run.stdout).toBeDefined()
+    const result=JSON.parse(marker!.slice('SELECTED_ICONS_RESULT:'.length))
+    expect(result.errors).toEqual([])
+    expect(result.results).toHaveLength(15)
+    for(const item of result.results){
+      expect(item.selected,item.company).toBe('Selected Model')
+      expect(item.fixedIcon,item.company).toBe(true)
+      expect(item.siblings,item.company).toBe(2)
+      expect(Math.abs(item.leftGap-item.expected),item.company).toBeLessThanOrEqual(.2)
+      expect(Math.abs(item.nameGap-item.expectedName),item.company).toBeLessThanOrEqual(.2)
+    }
+  }, 50_000)
+
   it('coalesces async Storyboard Claude allocation and survives 50 service/model/capability cycles', () => {
     const directory = mkdtempSync(join(tmpdir(), 'prism-control-catalog-'))
     temporaryDirectories.push(directory)
@@ -108,7 +148,7 @@ describe('mounted fluid control catalog and capability stability', () => {
       }
       window.__mounted = {
         storyboardStyleMutations:0,
-        snapshot:() => { const group=document.querySelector('[aria-label="Mounted Storyboard Footer Controls"]'); const model=group?.querySelector('[data-fluid-control-id="assistant-model"] button'); window.__mounted.selectorIdentity ||= model; const budget=group?.querySelector('[data-fluid-control-id="budget"]'); return { modelText:model?.querySelector('.selected-label-full')?.textContent?.trim(), modelVisible:getComputedStyle(model?.querySelector('.selected-label-full')).display!=='none', selectorStable:window.__mounted.selectorIdentity===model, budgetWidth:budget?.getBoundingClientRect().width, ids:Array.from(group?.querySelectorAll('[data-fluid-control-id]')||[]).map(x=>x.dataset.fluidControlId), allocationCount:Number(group?.dataset.allocationCommitCount||0), rowKey:group?.querySelector('.fluid-control-group-row')?.dataset.observed, mutations:window.__mounted.storyboardStyleMutations } },
+        snapshot:() => { const group=document.querySelector('[aria-label="Mounted Storyboard Footer Controls"]'); const model=group?.querySelector('[data-fluid-control-id="assistant-model"] button'); const visibleLabel=[...model.querySelectorAll('.selected-label > span')].find(span=>getComputedStyle(span).display!=='none'&&span.getBoundingClientRect().width>0); window.__mounted.selectorIdentity ||= model; const budget=group?.querySelector('[data-fluid-control-id="budget"]'); return { modelText:visibleLabel?.textContent?.trim(), modelVisible:!!visibleLabel, selectorStable:window.__mounted.selectorIdentity===model, budgetWidth:budget?.getBoundingClientRect().width, ids:Array.from(group?.querySelectorAll('[data-fluid-control-id]')||[]).map(x=>x.dataset.fluidControlId), allocationCount:Number(group?.dataset.allocationCommitCount||0), rowKey:group?.querySelector('.fluid-control-group-row')?.dataset.observed, mutations:window.__mounted.storyboardStyleMutations } },
         cycleSnapshot:() => { const group=document.querySelector('[aria-label="Mounted Video Capability Controls"]'); const ids=Array.from(group?.querySelectorAll('[data-fluid-control-id]')||[]).map(x=>x.dataset.fluidControlId); const text=group?.querySelector('[data-fluid-control-id="model"] .selected-label')?.textContent?.trim()||''; return {ids,text,ratioVisible:ids.includes('ratio'),cycle:Number(document.querySelector('[data-cycle-root]')?.textContent?.length>=0)} },
       }
       createRoot(document.getElementById('root')).render(<Harness />)
@@ -174,7 +214,7 @@ describe('mounted fluid control catalog and capability stability', () => {
         <Video name="prior-veo" label="Veo 3.1 Fast" sound={true}/>
         <Video name="prior-seedance-capability" label="Seedance 2.5 Image" sound={false} ratio={false}/>
       </main>}
-      window.__geometry=()=>Array.from(document.querySelectorAll('[data-case]')).map(section=>{const name=section.dataset.case;const group=section.querySelector('.equalized-control-group');const style=getComputedStyle(group);const rect=group.getBoundingClientRect();const left=rect.left+(parseFloat(style.paddingLeft)||0);const right=rect.right-(parseFloat(style.paddingRight)||0);const rows=Array.from(group.querySelectorAll(':scope > .fluid-control-group-row')).map(row=>{const boxes=Array.from(row.children).map(wrapper=>{const painted=wrapper.querySelector('[data-equalized-default],.quantity-stepper,.storyboard-budget,.compact-toggle,.play-tooltip-anchor,:scope > button,:scope > label')||wrapper;const box=painted.getBoundingClientRect();return{id:wrapper.dataset.fluidControlId,left:box.left,right:box.right,width:box.width}});return{boxes,gaps:boxes.slice(1).map((box,index)=>box.left-boxes[index].right),full:boxes.length>0&&Math.abs(boxes[0].left-left)<=1&&Math.abs(boxes.at(-1).right-right)<=1,contained:boxes.every(box=>box.left>=left-1&&box.right<=right+1)}});const boxes=rows.flatMap(row=>row.boxes);const gaps=rows.flatMap(row=>row.gaps);const model=boxes.find(box=>box.id==='model'||box.id==='assistant-model');const resolution=boxes.find(box=>box.id==='resolution');const fullLabel=group.querySelector('[data-fluid-control-id="assistant-model"] .selected-label-full');return{name,rowCount:rows.length,full:rows.every(row=>row.full),contained:rows.every(row=>row.contained),noOverlap:gaps.every(gap=>gap>=-1),sharedGap:gaps.length<2||Math.max(...gaps)-Math.min(...gaps)<=1,modelWidth:model?.width,resolutionWidth:resolution?.width,storyboardFull:!fullLabel||getComputedStyle(fullLabel).display!=='none',lastIds:rows.at(-1)?.boxes.slice(-2).map(box=>box.id)}})
+      window.__geometry=()=>Array.from(document.querySelectorAll('[data-case]')).map(section=>{const name=section.dataset.case;const group=section.querySelector('.equalized-control-group');const style=getComputedStyle(group);const rect=group.getBoundingClientRect();const left=rect.left+(parseFloat(style.paddingLeft)||0);const right=rect.right-(parseFloat(style.paddingRight)||0);const rows=Array.from(group.querySelectorAll(':scope > .fluid-control-group-row')).map(row=>{const boxes=Array.from(row.children).map(wrapper=>{const painted=wrapper.querySelector('[data-equalized-default],.quantity-stepper,.storyboard-budget,.compact-toggle,.play-tooltip-anchor,:scope > button,:scope > label')||wrapper;const box=painted.getBoundingClientRect();return{id:wrapper.dataset.fluidControlId,left:box.left,right:box.right,width:box.width}});return{boxes,gaps:boxes.slice(1).map((box,index)=>box.left-boxes[index].right),full:boxes.length>0&&Math.abs(boxes[0].left-left)<=1&&Math.abs(boxes.at(-1).right-right)<=1,contained:boxes.every(box=>box.left>=left-1&&box.right<=right+1)}});const boxes=rows.flatMap(row=>row.boxes);const gaps=rows.flatMap(row=>row.gaps);const model=boxes.find(box=>box.id==='model'||box.id==='assistant-model');const resolution=boxes.find(box=>box.id==='resolution');const fullLabel=[...group.querySelectorAll('[data-fluid-control-id="assistant-model"] .selected-label > span')].find(span=>getComputedStyle(span).display!=='none'&&span.getBoundingClientRect().width>0);return{name,rowCount:rows.length,full:rows.every(row=>row.full),contained:rows.every(row=>row.contained),noOverlap:gaps.every(gap=>gap>=-1),sharedGap:gaps.length<2||Math.max(...gaps)-Math.min(...gaps)<=1,modelWidth:model?.width,resolutionWidth:resolution?.width,storyboardNameVisible:!group.querySelector('[data-fluid-control-id="assistant-model"]')||fullLabel?.textContent==='Claude Opus 5',lastIds:rows.at(-1)?.boxes.slice(-2).map(box=>box.id)}})
       createRoot(document.getElementById('root')).render(<App/>)
     `)
     buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader:{'.png':'dataurl'}, logLevel:'silent' })
@@ -199,7 +239,7 @@ describe('mounted fluid control catalog and capability stability', () => {
       expect(result.lastIds, name).toEqual(['settings','run'])
       expect(result.resolutionWidth, name).toBeLessThan(result.modelWidth)
     }
-    expect(results.find((entry: any) => entry.name === 'regression-storyboard').storyboardFull).toBe(true)
+    expect(results.find((entry: any) => entry.name === 'regression-storyboard').storyboardNameVisible).toBe(true)
   }, 50_000)
 })
 

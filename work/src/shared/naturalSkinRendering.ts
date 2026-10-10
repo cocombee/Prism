@@ -1,4 +1,5 @@
 import type { GenerationRequest } from './types'
+import { isReferenceExclusive } from './referenceVisualAuthority'
 
 export type NaturalSkinQualificationReason =
   | 'qualified-explicit-photographed-organic-human'
@@ -96,28 +97,35 @@ export interface NaturalSkinProviderPromptCompilation {
   addedNegativeTerms: readonly string[]
 }
 
-export function compileNaturalSkinProviderPrompt(request: GenerationRequest, providerOwnedText: string): NaturalSkinProviderPromptCompilation {
+/** Additions are computed from the visible body before budgeting, never at submission. */
+export function naturalSkinPromptAdditions(request: GenerationRequest, providerOwnedText: string): Omit<NaturalSkinProviderPromptCompilation, 'text'> {
   const qualification = naturalSkinQualification(request)
-  if (!qualification.qualified) return { text: providerOwnedText, qualification, addedPositiveClauses: [], addedNegativeTerms: [] }
+  if (!qualification.qualified || request.providerPromptOverride !== undefined) return { qualification, addedPositiveClauses: [], addedNegativeTerms: [] }
 
   const addedPositiveClauses = NATURAL_SKIN_POSITIVE_CLAUSES.filter((clause) => !includesCaseInsensitive(providerOwnedText, clause))
   const addedNegativeTerms = NATURAL_SKIN_NEGATIVE_TERMS.filter((term) => !includesCaseInsensitive(providerOwnedText, term))
-  const additions = [
-    addedPositiveClauses.length ? `NATURAL SKIN TEXTURE\n${addedPositiveClauses.join('\n\n')}` : '',
-    addedNegativeTerms.length ? `NEGATIVE PROMPT\n${addedNegativeTerms.join(', ')}` : '',
-  ].filter(Boolean)
+  return { qualification, addedPositiveClauses, addedNegativeTerms }
+}
+
+export function compileNaturalSkinProviderPrompt(request: GenerationRequest, providerOwnedText: string): NaturalSkinProviderPromptCompilation {
+  const additions = naturalSkinPromptAdditions(request, providerOwnedText)
+  if (!additions.addedPositiveClauses.length && !additions.addedNegativeTerms.length) return { ...additions, text: providerOwnedText }
+  const negative = /(?:^|\n)(?=NEGATIVE PROMPT\s*(?:\r?\n|:))/im.exec(providerOwnedText)
+  const split = negative ? negative.index + (providerOwnedText[negative.index] === '\n' ? 1 : 0) : providerOwnedText.length
+  const positiveBody = providerOwnedText.slice(0, split)
+  const negativeBody = providerOwnedText.slice(split)
+  const positiveAddition = additions.addedPositiveClauses.length ? `NATURAL SKIN TEXTURE\n${additions.addedPositiveClauses.join('\n\n')}` : ''
+  const negativeAddition = additions.addedNegativeTerms.join(', ')
   return {
-    text: additions.length ? `${providerOwnedText}\n\n${additions.join('\n\n')}` : providerOwnedText,
-    qualification,
-    addedPositiveClauses,
-    addedNegativeTerms,
+    ...additions,
+    text: [positiveBody, positiveAddition, negativeBody || (negativeAddition ? 'NEGATIVE PROMPT' : ''), negativeAddition].filter(Boolean).join('\n\n'),
   }
 }
 
 export function naturalSkinQualification(request: GenerationRequest): NaturalSkinQualification {
   const authored = positiveAuthoredText(request)
   const characterText = (request.references || [])
-    .filter((reference) => reference.role === 'character')
+    .filter((reference) => reference.role === 'character' && !isReferenceExclusive(reference))
     .map((reference) => reference.description || '')
     .join('\n')
   const selectedStyle = request.stylePrompt || ''

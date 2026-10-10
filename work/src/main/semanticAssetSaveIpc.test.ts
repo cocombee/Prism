@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerSemanticAssetSaveIpc } from './semanticAssetSaveIpc'
+import { ProjectCommandQueue } from './projectCommandQueue'
+import { JsonMutationQueue } from './mainSafety'
 
 const roots: string[] = []
 async function exists(path: string) { try { await stat(path); return true } catch { return false } }
@@ -24,6 +26,40 @@ async function fixture() {
 }
 
 describe('actual semantic asset main/preload IPC boundary', () => {
+  it('reads portable metadata after a queued profile change rather than replacing its new override', async () => {
+    const f = await fixture(); const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const commands = new ProjectCommandQueue(); const documents = new JsonMutationQueue()
+    let release!: () => void; let entered!: () => void
+    const gate = new Promise<void>((yes) => { release = yes }); const started = new Promise<void>((yes) => { entered = yes })
+    const profileChange = commands.run(() => documents.run(f.projectDocumentPath, async () => {
+      entered(); await gate
+      const project = JSON.parse(await readFile(f.projectDocumentPath, 'utf8'))
+      project.project.serviceProfileOverrides = { fal: 'new-profile' }
+      await writeFile(f.projectDocumentPath, JSON.stringify(project))
+    }))
+    await started
+    registerSemanticAssetSaveIpc({ handle: (channel, handler) => handlers.set(channel, handler) }, {
+      currentProject: () => f,
+      runWithDocumentOwner: (context, action) => commands.run(() => documents.run(context.projectDocumentPath!, action)),
+    })
+    const saved = handlers.get('assets:commit-semantic-result')!({}, { nodeId: 'character-node', selectedResultId: 'one', intent: { mode: 'replace-existing', targetAssetId: 'saved', token: 'edit-token' } })
+    release(); await profileChange; await saved
+    const portable = JSON.parse(await readFile(f.projectDocumentPath, 'utf8'))
+    expect(portable.project.serviceProfileOverrides).toEqual({ fal: 'new-profile' })
+    expect(portable.workflow.nodes[0].data.semanticAssetLifecycle.status).toBe('SAVED_VIEW')
+  })
+
+  it('rejects an obsolete semantic-save project owner before any generated files move', async () => {
+    const f = await fixture(); const handlers = new Map<string, (...args: unknown[]) => unknown>(); let owner = 'B'
+    const commands = new ProjectCommandQueue()
+    registerSemanticAssetSaveIpc({ handle: (channel, handler) => handlers.set(channel, handler) }, {
+      currentProject: () => f,
+      runWithDocumentOwner: (_context, action) => commands.runForOwner('A', () => owner, action),
+    })
+    await expect(handlers.get('assets:commit-semantic-result')!({}, { nodeId: 'character-node', selectedResultId: 'one', intent: { mode: 'replace-existing', targetAssetId: 'saved', token: 'edit-token' } })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(await readFile(f.one, 'utf8')).toBe('ONE')
+    expect(await readFile(f.old, 'utf8')).toBe('OLD')
+  })
   it('registers and invokes a main-derived transaction with exactly one canonical asset across index, workflow, and project document', async () => {
     const f = await fixture(); const handlers = new Map<string, (...args: unknown[]) => unknown>()
     registerSemanticAssetSaveIpc({ handle: (channel, handler) => handlers.set(channel, handler) }, { currentProject: () => ({ rootPath: f.rootPath, workflowPath: f.workflowPath, assetsPath: f.assetsPath, projectDocumentPath: f.projectDocumentPath }) })

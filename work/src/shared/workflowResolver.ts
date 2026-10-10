@@ -1,7 +1,17 @@
+import { requiresGeneratedDialogueAudio } from './videoDialogueAudio'
+import { higgsfieldModel, planHiggsfieldInput, planHiggsfieldNativeInput, type HiggsfieldMediaSource } from './higgsfieldNative'
+import { describeHiggsfieldInputContract, type HiggsfieldMediaBinding } from './higgsfieldInputContract'
+import { higgsfieldSeedanceSchema } from './higgsfieldSeedanceInput'
+import { compileHiggsfieldSeedancePrompt, type HiggsfieldPromptSlot } from './higgsfieldSeedancePrompt'
+import { higgsfieldStoryboardTimingFailures } from './higgsfieldVideoTiming'
+import { assertStoryboardPhysicalCast } from './storyboardPhysicalCast'
+import { falVideoSeconds, authoredTimelineSeconds, assertFalTimelineTiming } from './videoTiming'
+import { isElevenDialogue, dialoguePromptText } from './elevenDialogue'
 import type { Edge } from '@xyflow/react'
+import { directElevenLanguage, isDirectElevenAudio } from './elevenLabsAudio'
 import type { GenerationRequest, StoryboardPanel, StudioNode } from './types'
-import { normalizedMotionCadence, resolvedVideoRatio, resolveVideoModel } from './videoModels'
-import { inputCardinalityError, nodeConnectionError } from './nodeConnections'
+import { findVideoModel, normalizedMotionCadence, resolvedVideoRatio, resolveVideoModel } from './videoModels'
+import { inputCardinalityError, nodeConnectionError, outputSignalFor } from './nodeConnections'
 import { nodeInputPorts } from './nodePorts'
 import { connectedInputRule, resolveAutoConnectedInputRule, workflowTag } from './inputRules'
 import type { InputFidelity } from './inputRules'
@@ -9,7 +19,7 @@ import { normalizedElevenV3LanguageCode } from './voiceLanguages'
 import { shotRecipe, shotRecipeDetails } from './shotRecipes'
 import { resolveBuiltInStylePreset } from './stylePresets'
 import { activeGeneratedResult, activeMediaName } from './generatedMedia'
-import { groupStoryboardSequence, normalizedStoryboardTransition } from './storyboardSequence'
+import { groupStoryboardSequence, normalizedStoryboardTransition, storyboardTransitionConflicts, STORYBOARD_OUTGOING_CONTINUATION } from './storyboardSequence'
 import { selectedStoryboardPrompt } from './storyboardPromptVersions'
 import { storyboardDurationReadinessError } from './storyboardDurationBudget'
 import { planStoryboardCameraBridges, storyboardCameraBridgeReadiness, type StoryboardCameraBridgePlan } from './storyboardCameraBridge'
@@ -18,6 +28,17 @@ import { cameraSupportConflict } from './cameraSupportSemantics'
 import { applyResolvedAssetRequest, semanticModelCapability } from './resolvedAssetRequest'
 import { isSemanticAssetKind, semanticAssetAvailability } from './semanticAssetAvailability'
 import { semanticAssetAuthorityText } from './semanticAssetPromptBoundary'
+import { buildKlingNativeMultiPrompt } from './klingNativeStoryboard'
+import { falNativeFlowForKind, type FalNativeMediaSource } from './falNativeExecution'
+import { compileNativeProviderPrompt, type PromptFamily } from './referenceInstructions'
+import { providerVisibleReferences, sameBodyAuthorityReadinessFailures } from './sameBodyAuthority'
+import { propScaleReadinessFailures } from './propScaleAuthority'
+
+// Only existing verified video adapters define duration in seconds. New endpoints
+// keep their typed provider value without guessing its unit or coercing its payload.
+function nativeVideoSeconds(data: StudioNode['data']): number | undefined {
+  return data.falNative ? falVideoSeconds(data.falNative.timing, data.falNative.values) : undefined
+}
 
 export interface ResolvedStoryboardShot {
   panelId: string
@@ -63,6 +84,12 @@ export interface ResolvedWorkflowInput {
   offlineSemanticSources: NonNullable<GenerationRequest['offlineSemanticSources']>
 }
 
+function joinSpeech(...parts: Array<string | undefined>): string | undefined {
+  return parts.filter((part): part is string => typeof part === 'string' && Boolean(part.trim())).join('\n\n') || undefined
+}
+function preservesSpeech(data: StudioNode['data']): boolean {
+  return !data.falNative && (isDirectElevenAudio(data) || data.kind === 'voiceover' && data.voiceEngine === 'fish-audio')
+}
 function joinPrompt(...parts: Array<string | undefined>): string | undefined {
   // Deduplicate at block level, not part level. One Style or Location asset feeding
   // both a Storyboard and the end node arrives as two separate accumulations, so
@@ -83,6 +110,8 @@ function mediaTypeFor(node: StudioNode): 'image' | 'video' | 'audio' {
 
 function formattedStoryboard(panels: StoryboardPanel[], duration: number): { preamble: string; rawPrompt: string; shots: ResolvedStoryboardShot[]; incompletePanels: number[] } {
   const activePanels = panels.map((panel) => ({ ...panel, prompt: selectedStoryboardPrompt(panel) }))
+  const transitionErrors = storyboardTransitionConflicts(activePanels)
+  if (transitionErrors.length) throw new Error(transitionErrors[0])
   const durationError = storyboardDurationReadinessError(activePanels, duration)
   if (durationError) throw new Error(durationError)
   for (const panel of activePanels) {
@@ -122,7 +151,7 @@ function formattedStoryboard(panels: StoryboardPanel[], duration: number): { pre
   }})
   const grouped = groupStoryboardSequence(shots)
   const preamble = `Storyboard plan: ${activePanels.length} panels grouped into ${grouped.shots.length} shot${grouped.shots.length === 1 ? '' : 's'} by authored Cut/Continue boundaries, target duration ${duration}s. Preserve character, wardrobe, location, prop, lighting, screen-direction, and action continuity within every continuous shot.`
-  const rawPrompt = [preamble, ...shots.map((shot, index) => `Shot ${index + 1} — Duration: ${shot.duration}s; Shot Size: ${shot.shotSize}; Camera Movement: ${shot.camera}${shot.audioCue ? `; Audio Cue: ${shot.audioCue}` : ''}.${shot.prompt ? ` ${shot.prompt}` : ` [STORYBOARD PANEL ${shot.panelNumber} INCOMPLETE — no action authored.]`}`)].join('\n')
+  const rawPrompt = [preamble, ...shots.map((shot, index) => `Shot ${index + 1} — Duration: ${shot.duration}s; Shot Size: ${shot.shotSize}; Camera Movement: ${shot.camera}${shot.audioCue ? `; Audio Cue: ${shot.audioCue}` : ''}.${shot.prompt ? ` ${shot.prompt}` : ` [STORYBOARD PANEL ${shot.panelNumber} INCOMPLETE — no action authored.]`}`), ...(shots.at(-1)?.transitionToNext === 'continue' ? [STORYBOARD_OUTGOING_CONTINUATION] : [])].join('\n')
   return { preamble, rawPrompt, shots, incompletePanels }
 }
 
@@ -168,10 +197,12 @@ function compiledStoryboardPrompt(preamble: string | undefined, shots: ResolvedS
     })
     if (shotIndex < sequence.shots.length - 1) lines.push('HARD CUT.')
   })
+  if (shots.at(-1)?.transitionToNext === 'continue') lines.push(STORYBOARD_OUTGOING_CONTINUATION)
   return lines.join('\n')
 }
 
 export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges: Edge[], ignoredRootTargetHandles = new Set<string>()): ResolvedWorkflowInput {
+  const combinePrompt = preservesSpeech(nodes.find(node => node.id === nodeId)?.data || { kind: 'prompt', title: '' }) ? joinSpeech : joinPrompt
   const byId = new Map(nodes.map((node) => [node.id, node]))
 
   const walk = (targetId: string, ancestors = new Set<string>(), ignoredTargetHandles = new Set<string>()): ResolvedWorkflowInput => {
@@ -205,7 +236,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         // role instead of degrading required media into a generic reference.
         const expectedType = edge.targetHandle === 'video-in' ? 'video' : edge.targetHandle === 'image-in' ? 'image' : undefined
         const requiresStartingImage = target?.data.kind === 'video-generator'
-          && ['image', 'first-last'].includes(resolveVideoModel(target.data.videoEngine).mode)
+          && (target.data.falNative ? target.data.falNative.media.some(binding => !binding.retired && binding.portId === edge.targetHandle && binding.role === 'start-frame') : ['image', 'first-last'].includes(resolveVideoModel(target.data.videoEngine).mode))
         const isPrimaryRoutedImage = expectedType === 'image'
           && (inputFidelity === 'lock' || requiresStartingImage || target?.data.kind === 'upscaler' || target?.data.kind === 'image-editor')
         const isPrimaryRoutedVideo = expectedType === 'video'
@@ -225,13 +256,18 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
             result.inputRole = inputRole
           }
         }
-        result.prompt = joinPrompt(result.prompt, nested.prompt)
-        result.authoredPrompt = joinPrompt(result.authoredPrompt, nested.authoredPrompt)
-        result.stylePrompt = joinPrompt(result.stylePrompt, nested.stylePrompt)
+        result.prompt = combinePrompt(result.prompt, nested.prompt)
+        result.authoredPrompt = combinePrompt(result.authoredPrompt, nested.authoredPrompt)
+        result.stylePrompt = combinePrompt(result.stylePrompt, nested.stylePrompt)
         result.builtInStylePrompts = [...(result.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])]
         result.inputPath ||= nested.inputPath
         result.inputUrl ||= nested.inputUrl
-        result.references.push(...nested.references)
+        result.references.push(...nested.references.map((reference) => {
+          if (reference.role !== 'reference') return reference
+          if (edge.targetHandle === 'video-reference-in' && reference.mediaType === 'video') return { ...reference, authority: 'motion-camera' as const }
+          if (['audio-reference-in', 'audio-in'].includes(edge.targetHandle || '') && reference.mediaType === 'audio') return { ...reference, authority: 'audio-timing' as const }
+          return reference
+        }))
         result.offlineSemanticSources.push(...nested.offlineSemanticSources)
         result.connectionRules.push(...nested.connectionRules)
         result.storyboardShots ||= nested.storyboardShots
@@ -248,8 +284,8 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         // A legacy Assistant keeps its rewritten text in assistantOutput until the
         // canvas migration folds it into a Prompt node. Read both so the end node
         // never loses authored text mid-migration.
-        result.prompt = joinPrompt(result.prompt, source.data.assistantOutput || source.data.prompt)
-        result.authoredPrompt = joinPrompt(result.authoredPrompt, source.data.assistantOutput || source.data.prompt)
+        result.prompt = combinePrompt(result.prompt, source.data.assistantOutput || source.data.prompt)
+        result.authoredPrompt = combinePrompt(result.authoredPrompt, source.data.assistantOutput || source.data.prompt)
         continue
       }
 
@@ -323,7 +359,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
       if (target?.data.kind === 'storyboard-asset' && edge.targetHandle === 'storyboard-in' && ['storyboard', 'storyboard-asset'].includes(source.data.kind)) {
         const hasDirectStyle = incoming.some((candidate) => candidate.targetHandle === 'style-in')
         const lineage = walk(source.id, path, hasDirectStyle ? new Set(['style-in']) : new Set())
-        result.prompt = joinPrompt(result.prompt, lineage.prompt)
+        result.prompt = combinePrompt(result.prompt, lineage.prompt)
         result.references.push(...lineage.references)
         result.offlineSemanticSources.push(...lineage.offlineSemanticSources)
         result.connectionRules.push(...lineage.connectionRules)
@@ -332,15 +368,15 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
 
       if (source.data.kind === 'storyboard' || source.data.kind === 'storyboard-asset') {
         const duration = target?.data.kind === 'video-generator' && edge.targetHandle === 'storyboard-in'
-          ? Math.max(0.5, target.data.duration || 5)
+          ? Math.max(0.5, target.data.higgsfieldNative ? typeof target.data.higgsfieldNative.values.duration === 'number' ? target.data.higgsfieldNative.values.duration : source.data.storyboardDuration ?? 5 : target.data.falNative ? nativeVideoSeconds(target.data) ?? source.data.storyboardDuration ?? 5 : target.data.duration || 5)
           : Math.max(0.5, source.data.storyboardPanels?.reduce((sum, panel) => sum + (panel.duration === 'auto' ? 1 : Number(panel.duration) || 0), 0) || 15)
         const panels = source.data.storyboardPanels || []
         const storyboard = formattedStoryboard(panels, duration)
         const nested = walk(source.id, path)
         const hasConnectedStyle = edges.some((candidate) => candidate.target === source.id && candidate.targetHandle === 'style-in')
         const legacyStyleFallback = !hasConnectedStyle && source.data.stylePrompt ? `Style Direction:\n${source.data.stylePrompt}` : undefined
-        result.prompt = joinPrompt(result.prompt, storyboard.rawPrompt, legacyStyleFallback, nested.prompt)
-        result.stylePrompt = joinPrompt(result.stylePrompt, legacyStyleFallback ? source.data.stylePrompt : undefined, nested.stylePrompt)
+        result.prompt = combinePrompt(result.prompt, storyboard.rawPrompt, legacyStyleFallback, nested.prompt)
+        result.stylePrompt = combinePrompt(result.stylePrompt, legacyStyleFallback ? source.data.stylePrompt : undefined, nested.stylePrompt)
         result.builtInStylePrompts = [...(result.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])]
         result.storyboardShots = storyboard.shots
         result.storyboardIncompletePanels = storyboard.incompletePanels
@@ -348,7 +384,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         result.storyboardRawPrompt = storyboard.rawPrompt
         result.storyboardDuration = duration
 
-        result.storyboardContext = joinPrompt(result.storyboardContext, legacyStyleFallback, nested.prompt)
+        result.storyboardContext = combinePrompt(result.storyboardContext, legacyStyleFallback, nested.prompt)
         result.references.push(...nested.references)
         result.offlineSemanticSources.push(...nested.offlineSemanticSources)
         result.connectionRules.push(...nested.connectionRules)
@@ -371,15 +407,15 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         const semanticLabel = source.data.referenceTag || `@${source.data.title.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase()}`
         const builtInPreset = role === 'style' && !source.data.styleSavedAt ? resolveBuiltInStylePreset(source.data) : undefined
         const sourcePrompt = (builtInPreset?.prompt || semanticAssetAuthorityText(source.data)).trim()
-        if (role === 'style') result.stylePrompt = joinPrompt(result.stylePrompt, sourcePrompt)
+        if (role === 'style') result.stylePrompt = combinePrompt(result.stylePrompt, sourcePrompt)
         if (builtInPreset && sourcePrompt) result.builtInStylePrompts = [...(result.builtInStylePrompts || []), sourcePrompt]
         const semanticPrompt = sourcePrompt
           ? role === 'style'
             ? `Style Direction ${semanticLabel}:\n${sourcePrompt}`
             : `${role.charAt(0).toUpperCase() + role.slice(1)} ${semanticLabel}: ${sourcePrompt}`
           : undefined
-        result.prompt = joinPrompt(result.prompt, semanticPrompt, nested.prompt)
-        result.stylePrompt = joinPrompt(result.stylePrompt, nested.stylePrompt)
+        result.prompt = combinePrompt(result.prompt, semanticPrompt, nested.prompt)
+        result.stylePrompt = combinePrompt(result.stylePrompt, nested.stylePrompt)
         result.builtInStylePrompts = [...(result.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])]
         result.references.push(...nested.references)
         result.offlineSemanticSources.push(...nested.offlineSemanticSources)
@@ -422,7 +458,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
           })
         } else for (const asset of source.data.referenceAssets || []) result.references.push({
             role, path: asset.path, url: asset.url, name: role === 'character' ? source.data.title : asset.name, tag: source.data.referenceTag,
-            boundCharacterTag: source.data.appearanceOwnerCharacterTag || (role === 'wardrobe' && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
+            boundCharacterTag: source.data.appearanceOwnerCharacterTag || (['wardrobe', 'element'].includes(role) && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
             characterAuthorityMode: role === 'character' ? source.data.characterAuthorityMode : undefined,
             approvedIdentityDescription: role === 'character' ? asset.metadata?.identityDescription : undefined,
             appearanceScope: source.data.appearanceScope,
@@ -438,7 +474,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
       }
 
       const activeResult = activeGeneratedResult(source.data)
-      if (activeResult?.path || source.data.outputPath || source.data.assetPath) {
+      if (activeResult?.path || source.data.outputPath || source.data.assetPath || activeResult?.url || source.data.outputUrl || source.data.assetUrl) {
         const mediaType = mediaTypeFor(source)
         const target = byId.get(targetId)
         const slot = edge.targetHandle === 'end-image' && inputFidelity !== 'guide'
@@ -501,7 +537,220 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
   return walk(nodeId, new Set<string>(), ignoredRootTargetHandles)
 }
 
+function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  const state = node.data.falNative!
+  if (falNativeFlowForKind(node.data.kind) !== state.flow || !state.fingerprint) throw new Error('Load the selected model contract before generating.')
+  if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON field edits before generating.')
+  if (state.repairs?.length) throw new Error(state.repairs.join(' '))
+  const manual = node.data.kind === 'video-generator' && node.data.promptMode === 'manual'
+  const upstream = resolveWorkflowInput(node.id, nodes, edges, manual ? new Set(['storyboard-in']) : new Set())
+  if (manual) for (const edge of edges.filter(candidate => candidate.target === node.id && candidate.targetHandle === 'storyboard-in')) {
+    const nested = resolveWorkflowInput(edge.source, nodes, edges)
+    upstream.references.push(...nested.references)
+    upstream.connectionRules.push(...nested.connectionRules.filter(rule => !/^(?:Storyboard|Prompt|Text List)$/i.test(rule.label)))
+    upstream.offlineSemanticSources.push(...nested.offlineSemanticSources)
+    upstream.stylePrompt = joinPrompt(upstream.stylePrompt, nested.stylePrompt)
+    upstream.builtInStylePrompts = [...(upstream.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])]
+  }
+  const local = manual ? node.data.manualPromptDraft ?? node.data.prompt : node.data.prompt
+  const family: PromptFamily = findVideoModel(state.endpointId)?.family || 'generic'
+  const joinAuthored = (...parts: Array<string | undefined>) => parts.filter((part): part is string => Boolean(part?.trim())).join('\n\n') || undefined
+  const raw = joinAuthored(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, family), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
+  const request: GenerationRequest = { nodeId: node.id, kind: node.data.kind, prompt: raw, authoredPrompt: joinAuthored(local, upstream.authoredPrompt), stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
+    videoEngine: node.data.kind === 'video-generator' ? state.endpointId : undefined,
+    imageProvider: ['image-generator', 'image-editor'].includes(node.data.kind) ? 'fal' : undefined,
+    imageModelId: ['image-generator', 'image-editor'].includes(node.data.kind) ? state.endpointId : undefined,
+    storyboardShots: upstream.storyboardShots, storyboardShotCount: upstream.storyboardShots?.length, storyboardIncompletePanels: upstream.storyboardIncompletePanels,
+    duration: upstream.storyboardDuration ?? nativeVideoSeconds(node.data), aspectRatio: typeof state.values.aspect_ratio === 'string' ? state.values.aspect_ratio : undefined, resolution: typeof state.values.resolution === 'string' ? state.values.resolution as GenerationRequest['resolution'] : undefined, generateAudio: typeof state.values.generate_audio === 'boolean' ? state.values.generate_audio : undefined, directionLayer: node.data.directionLayer, shotLocks: node.data.shotLocks,
+    inputPath: upstream.inputPath, inputUrl: upstream.inputUrl, inputTag: upstream.inputTag, inputRole: upstream.inputRole,
+    references: upstream.references, connectionRules: upstream.connectionRules, offlineSemanticSources: upstream.offlineSemanticSources }
+  const physical = providerVisibleReferences(request).filter(reference => (reference.path || reference.url) && !(reference.path?.toLowerCase().endsWith('.prismstyle')))
+  const identity = (source: { path?: string; url?: string; mediaType?: string }) => JSON.stringify([source.path || source.url, source.mediaType || 'image'])
+  const unique = (references: NonNullable<GenerationRequest['references']>) => [...new Map(references.map(reference => [JSON.stringify([identity(reference), reference.tag, reference.role, reference.slot]), reference])).values()]
+  const media: Record<string, FalNativeMediaSource[]> = {}
+  const bound = new Set<string>()
+  const orderedReferences: NonNullable<GenerationRequest['references']> = []
+  for (const field of state.media.filter(binding => !binding.retired)) {
+    const fieldEdges = edges.filter(edge => edge.target !== node.id || edge.targetHandle === field.portId)
+    const fieldInput = resolveWorkflowInput(node.id, nodes, fieldEdges)
+    let references = providerVisibleReferences({ ...request, references: fieldInput.references })
+    if ((fieldInput.inputPath || fieldInput.inputUrl) && !references.some(reference => identity(reference) === identity({ path: fieldInput.inputPath, url: fieldInput.inputUrl, mediaType: field.type }))) references.unshift({ path: fieldInput.inputPath, url: fieldInput.inputUrl, name: fieldInput.inputName, tag: fieldInput.inputTag, mediaType: field.type, role: 'reference', slot: field.role === 'start-frame' ? 'start' : field.role === 'end-frame' ? 'end' : undefined })
+    if (field.role === 'reference-image') references = [...references, ...physical.filter(reference => (reference.mediaType || 'image') === 'image')]
+    if (field.role === 'reference-video') references = [...references, ...physical.filter(reference => reference.mediaType === 'video')]
+    if (field.role === 'reference-audio') references = [...references, ...physical.filter(reference => reference.mediaType === 'audio')]
+    const selected = unique(references.filter(reference => (reference.path || reference.url) && !(reference.path?.toLowerCase().endsWith('.prismstyle'))))
+    if (selected.some(reference => (reference.mediaType || 'image') !== field.type)) throw new Error(`${field.label} accepts ${field.type} media only.`)
+    if (!field.multiple && selected.length > 1 || field.maximum !== undefined && selected.length > field.maximum) throw new Error(`${field.label} exceeds its declared media capacity.`)
+    if (selected.length) media[field.key] = selected.map(reference => {
+      bound.add(identity(reference))
+      orderedReferences.push(reference)
+      return { ...(reference.path ? { path: reference.path } : { url: reference.url! }), mediaType: field.type }
+    })
+  }
+  const unbound = physical.filter(reference => !bound.has(identity(reference)))
+  if (unbound.length) throw new Error('Connected media are not bound to an input of the selected model. Review the preserved connections.')
+  request.references = orderedReferences
+  const timelineSeconds = authoredTimelineSeconds(request)
+  assertFalTimelineTiming(state.timing, timelineSeconds, state.values)
+  let finalPrompt: string | undefined
+  if (state.promptField) {
+    if (manual) finalPrompt = local ?? ''
+    else if (['voiceover', 'sound-effects'].includes(node.data.kind)) finalPrompt = local ?? (typeof state.values[state.promptField] === 'string' ? state.values[state.promptField] as string : '')
+    else {
+      const compiled = compileNativeProviderPrompt(request, family)
+      if (compiled.promptBudgetDiagnostic?.blocking) throw new Error(compiled.promptBudgetDiagnostic.blockingReason)
+      finalPrompt = compiled.text
+    }
+  } else if (raw?.trim()) throw new Error('Choose the model field that receives the final prompt.')
+  request.prompt = finalPrompt
+  request.providerPromptOverride = finalPrompt
+  request.providerPromptOwnership = manual ? 'authored' : 'compiled'
+  request.falNative = { promptOwnership: request.providerPromptOwnership, requiresGeneratedSpeech: requiresGeneratedDialogueAudio(request), ...(timelineSeconds !== undefined ? { timelineSeconds } : {}), endpointId: state.endpointId, flow: state.flow, fingerprint: state.fingerprint, promptField: state.promptField || undefined, values: { ...state.values, ...(state.promptField ? { [state.promptField]: finalPrompt! } : {}) }, media }
+  return request
+}
+
+function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  const state = node.data.higgsfieldNative!
+  if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON input edits before generating.')
+  if (state.repairs?.length) throw new Error(state.repairs.join(' '))
+  const contract = describeHiggsfieldInputContract(state.endpointId, higgsfieldSeedanceSchema(state.endpointId), '')
+  const bindings: Array<HiggsfieldMediaBinding & { retired?: boolean }> = state.media || contract.media
+  const byId = new Map(nodes.map(source => [source.id, source])), visiting = new Set<string>(), visited = new Set<string>()
+  const verifyGraph = (id: string) => {
+    if (visiting.has(id)) throw new Error('The connected Higgsfield input graph has a cyclic route.')
+    if (visited.has(id)) return
+    if (!byId.has(id)) throw new Error('A connected Higgsfield source is missing. Preserve and relink its connection.')
+    visiting.add(id)
+    for (const edge of edges.filter(edge => edge.target === id)) verifyGraph(edge.source)
+    visiting.delete(id); visited.add(id)
+  }
+  verifyGraph(node.id)
+  const manual = activeVideoPromptMode(node.data, edges.some(edge => edge.target === node.id && edge.targetHandle === 'storyboard-in')) === 'manual'
+  const upstream = resolveWorkflowInput(node.id, nodes, edges, manual ? new Set(['storyboard-in']) : new Set())
+  if (manual) for (const edge of edges.filter(edge => edge.target === node.id && edge.targetHandle === 'storyboard-in')) {
+    const nested = resolveWorkflowInput(edge.source, nodes, edges)
+    upstream.references.push(...nested.references)
+    upstream.connectionRules.push(...nested.connectionRules.filter(rule => !/^(?:Storyboard|Prompt|Text List)$/i.test(rule.label)))
+    upstream.offlineSemanticSources.push(...nested.offlineSemanticSources)
+    upstream.stylePrompt = joinPrompt(upstream.stylePrompt, nested.stylePrompt)
+    upstream.builtInStylePrompts = [...new Set([...(upstream.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])])]
+  }
+  const local = manual ? node.data.manualPromptDraft ?? node.data.prompt ?? '' : node.data.prompt
+  const raw = manual ? local : joinPrompt(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, 'seedance'), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
+  const request: GenerationRequest = {
+    nodeId: node.id, kind: 'video-generator', videoEngine: state.endpointId, prompt: raw,
+    authoredPrompt: manual ? local : joinSpeech(local, upstream.authoredPrompt),
+    stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
+    storyboardShots: upstream.storyboardShots, storyboardShotCount: upstream.storyboardShots?.length, storyboardIncompletePanels: upstream.storyboardIncompletePanels,
+    storyboardContext: withoutStyleBlocks(upstream.storyboardContext, upstream.stylePrompt),
+    duration: typeof state.values.duration === 'number' ? state.values.duration : undefined,
+    aspectRatio: typeof state.values.aspect_ratio === 'string' ? state.values.aspect_ratio : undefined,
+    resolution: typeof state.values.resolution === 'string' ? state.values.resolution as GenerationRequest['resolution'] : undefined,
+    generateAudio: typeof state.values.generate_audio === 'boolean' ? state.values.generate_audio : undefined,
+    directionLayer: node.data.directionLayer, shotLocks: node.data.shotLocks,
+    references: [], connectionRules: upstream.connectionRules, offlineSemanticSources: upstream.offlineSemanticSources,
+  }
+  const media: Record<string, HiggsfieldMediaSource[]> = {}, slots: HiggsfieldPromptSlot[] = []
+  const referenceAuthorityFailures = [...sameBodyAuthorityReadinessFailures({...request,references:upstream.references}), ...propScaleReadinessFailures({...request,references:upstream.references})]
+  if (referenceAuthorityFailures.length) throw new Error(referenceAuthorityFailures.join(' '))
+  const referenceImage = bindings.find(binding => binding.role === 'reference-image' && !binding.retired)
+  // Resolve each root edge separately so an intentional duplicate assignment remains a physical input slot.
+  for (const edge of edges.filter(edge => edge.target === node.id && edge.targetHandle !== 'text-in')) {
+    const direct = bindings.find(binding => !binding.retired && binding.portId === edge.targetHandle)
+    const field = manual && edge.targetHandle === 'storyboard-in' ? resolveWorkflowInput(edge.source,nodes,edges) : resolveWorkflowInput(node.id, nodes, edges.filter(candidate => candidate.target !== node.id || candidate.id === edge.id))
+    if (field.offlineSemanticSources.length) continue // Readiness reports exact offline assets; never substitute another input.
+    const physical = providerVisibleReferences({ ...request, references: field.references }).filter(reference => (reference.path || reference.url) && !reference.path?.toLowerCase().endsWith('.prismstyle'))
+    if ((field.inputPath || field.inputUrl) && !physical.some(reference => field.inputPath ? reference.path === field.inputPath : reference.url === field.inputUrl)) physical.unshift({ role: 'reference', path: field.inputPath, url: field.inputUrl, tag: field.inputTag, name: field.inputName, mediaType: direct?.type })
+    if (direct && !physical.length) throw new Error(`The connected ${direct.label} has no available media. Preserve and relink its source.`)
+    for (const reference of physical) {
+      const binding = direct || referenceImage
+      if (!binding) throw new Error('Connected media are not accepted by this Higgsfield mode. Preserve them and choose a compatible input or model.')
+      if ((reference.mediaType || 'image') !== binding.type) throw new Error(`${binding.label} accepts ${binding.type} media only.`)
+      const entries = media[binding.key] ||= []
+      if (!binding.multiple && entries.length || binding.maximum !== undefined && entries.length >= binding.maximum) throw new Error(`${binding.label} exceeds its declared media capacity across connected sources.`)
+      const bound = { ...reference,
+        slot: binding.role === 'start-frame' ? 'start' as const : binding.role === 'end-frame' ? 'end' as const : reference.slot,
+        authority: binding.role === 'reference-video' ? 'motion-camera' as const : binding.role === 'reference-audio' ? 'audio-timing' as const : reference.authority,
+      }
+      slots.push({binding,index:entries.length,reference:bound})
+      if (binding.role === 'source-video' && state.endpointId.endsWith('/video-extend')) {
+        request.inputRole = 'source-video'; request.inputTag = bound.tag; request.inputName = bound.name
+      }
+      entries.push({ ...(reference.path ? {path:reference.path} : {url:reference.url!}), mediaType:binding.type })
+      request.references!.push(bound)
+    }
+  }
+  // Provider field order and per-field graph order agree with the input planner and the written map.
+  slots.sort((left,right) => bindings.findIndex(binding => binding.key === left.binding.key) - bindings.findIndex(binding => binding.key === right.binding.key) || left.index - right.index)
+  request.references = slots.map(slot => slot.reference)
+  request.higgsfieldNative = {endpointId:state.endpointId,contractRevision:state.contractRevision,...(state.fingerprint!==undefined?{fingerprint:state.fingerprint}:{}),values:{...state.values},media:Object.fromEntries(bindings.filter(binding => Object.hasOwn(media,binding.key)).map(binding => [binding.key,media[binding.key]]))}
+  if (upstream.offlineSemanticSources.length) throw new Error(upstream.offlineSemanticSources.map(source => `relink ${source.title} (Media Offline)`).join('; '))
+  if (!manual) assertStoryboardPhysicalCast(request.storyboardShots || [])
+  let finalPrompt: string
+  if (manual) finalPrompt = local ?? ''
+  else {
+    const compiled = compileHiggsfieldSeedancePrompt(request, slots)
+    if (compiled.promptBudgetDiagnostic?.blocking) throw new Error(compiled.promptBudgetDiagnostic.blockingReason)
+    finalPrompt = compiled.text
+  }
+  request.prompt = finalPrompt; request.providerPromptOverride = finalPrompt; request.providerPromptOwnership = manual ? 'authored' : 'compiled'
+  if (finalPrompt !== '') request.higgsfieldNative.values.prompt = finalPrompt
+  else delete request.higgsfieldNative.values.prompt // Optional empty prompt is omitted; required prompts fail their native schema.
+  const timing = higgsfieldStoryboardTimingFailures(request)
+  if (timing.length) throw new Error(timing.join(' '))
+  if (!upstream.offlineSemanticSources.length) planHiggsfieldNativeInput(request.higgsfieldNative)
+  return request
+}
+
+function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  const state = node.data.higgsfieldNative!
+  if (node.data.kind !== 'video-generator' || node.data.falNative) throw new Error('Choose one Higgsfield video binding.')
+  const model = higgsfieldModel(state.endpointId)
+  if(model.kind==='seedance')return buildHiggsfieldSeedanceGraphRequest(node,nodes,edges)
+  const references: NonNullable<GenerationRequest['references']> = []
+  const offline: NonNullable<GenerationRequest['offlineSemanticSources']> = []
+  const videos: HiggsfieldMediaSource[] = [], images: HiggsfieldMediaSource[] = []
+  // Each graph edge owns its position. Upload deduplication never removes reference slots.
+  for (const edge of edges.filter(edge => edge.target === node.id && edge.targetHandle !== 'text-in')) {
+    const field = resolveWorkflowInput(node.id, nodes, edges.filter(candidate => candidate.target !== node.id || candidate.id === edge.id))
+    offline.push(...field.offlineSemanticSources)
+    const selected = [...field.references]
+    if ((field.inputPath || field.inputUrl) && !selected.some(reference => field.inputPath ? reference.path === field.inputPath : reference.url === field.inputUrl)) selected.unshift({ role: 'reference', path: field.inputPath, url: field.inputUrl, mediaType: edge.targetHandle === 'video-in' ? 'video' : 'image' })
+    if (!selected.length && !field.offlineSemanticSources.length) throw new Error('A connected Higgsfield source has no available media. Preserve it and relink the source.')
+    const type = edge.targetHandle === 'video-in' ? 'video' : 'image'
+    for (const reference of selected) {
+      if (!reference.path && !reference.url || (reference.mediaType || 'image') !== type || reference.path?.toLowerCase().endsWith('.prismstyle')) throw new Error(`Genjutsu needs physical ${type} media in this socket.`)
+      references.push(reference)
+      ;(type === 'video' ? videos : images).push({ ...(reference.path ? { path: reference.path } : { url: reference.url! }), mediaType: type })
+    }
+  }
+  const byId = new Map(nodes.map(source => [source.id, source]))
+  const textFrom = (sourceId: string, ancestors = new Set<string>()): string[] => {
+    if (ancestors.has(sourceId)) throw new Error('The connected prompt has a cyclic route.')
+    const source = byId.get(sourceId)
+    if (!source) throw new Error('The connected prompt source is unavailable.')
+    if (source.data.kind === 'prompt' || source.data.kind === 'assistant') return [source.data.assistantOutput ?? source.data.prompt ?? '']
+    if (source.data.kind === 'router') {
+      const path = new Set(ancestors); path.add(sourceId)
+      return edges.filter(edge => edge.target === sourceId).flatMap(edge => textFrom(edge.source, path))
+    }
+    throw new Error('Genjutsu needs an authored Prompt or typed text Router in its prompt socket.')
+  }
+  const connectedText = edges.filter(edge => edge.target === node.id && edge.targetHandle === 'text-in').flatMap(edge => textFrom(edge.source))
+  const local = node.data.promptMode === 'manual' ? node.data.manualPromptDraft ?? node.data.prompt ?? '' : node.data.prompt ?? ''
+  const prompt = [local, ...connectedText].filter((value): value is string => value !== undefined && value !== '').join('\n\n')
+  const request: GenerationRequest = { nodeId: node.id, kind: node.data.kind, videoEngine: state.endpointId, prompt, authoredPrompt: prompt, providerPromptOverride: prompt, references, offlineSemanticSources: offline,
+    higgsfieldNative: { endpointId: state.endpointId, contractRevision: state.contractRevision, values: { ...state.values, prompt }, media: { video_url: videos, image_urls: images }, allowSourceTrimming: state.allowSourceTrimming } }
+  // Provider contract owns aggregate capacity across all sockets and expanded List/Router media.
+  if (!offline.length) planHiggsfieldInput(request.higgsfieldNative!)
+  if (images.length > model.maxImages) throw new Error(`Genjutsu accepts at most ${model.maxImages} images across all reference sockets.`)
+  return request
+}
+
 export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  if (!node.data.falNative && !node.data.higgsfieldNative && node.data.kind === 'video-generator' && !findVideoModel(node.data.videoEngine)) {
+    throw new Error(`Choose a supported video model; the saved selection “${node.data.videoEngine}” is unavailable.`)
+  }
   const byId = new Map(nodes.map((candidate) => [candidate.id, candidate]))
   const validated = new Set<string>()
   const validateUpstream = (targetId: string) => {
@@ -518,12 +767,18 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
       const source = byId.get(edge.source)
       if (!source) continue
       if (declaredPorts.size && (!edge.targetHandle || !declaredPorts.has(edge.targetHandle))) throw new Error(`${target.data.title || target.data.kind} does not have a compatible ${edge.targetHandle || 'input'} socket.`)
+      if (target.data.kind === 'router' && target.data.routeSignal && target.data.routeSignal !== 'mixed') {
+        const sourceSignal = outputSignalFor(source.data, edge.sourceHandle)
+        if (sourceSignal !== target.data.routeSignal) throw new Error(`Router ${target.data.title || target.id} has a saved ${target.data.routeSignal} route incompatible with its ${sourceSignal} input. Refresh the connected route before generating.`)
+      }
       const compatibilityError = nodeConnectionError(source.id, target.id, source.data, target.data, edge.sourceHandle, edge.targetHandle)
       if (compatibilityError) throw new Error(compatibilityError)
       validateUpstream(source.id)
     }
   }
   validateUpstream(node.id)
+  if (node.data.higgsfieldNative) return buildHiggsfieldGraphRequest(node, nodes, edges)
+  if (node.data.falNative) return buildFalNativeGraphRequest(node, nodes, edges)
   const storyboardConnected = edges.some((edge) => edge.target === node.id && edge.targetHandle === 'storyboard-in')
   const promptMode = node.data.kind === 'video-generator' ? activeVideoPromptMode(node.data, storyboardConnected) : 'manual'
   if (node.data.kind === 'video-generator' && promptMode === 'manual' && !(node.data.manualPromptDraft ?? node.data.prompt ?? '').trim()) throw new Error('Write a User prompt before running.')
@@ -557,12 +812,12 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     ? promptMode === 'manual' ? node.data.manualPromptDraft ?? node.data.prompt : undefined
     : semanticAssetKind ? node.data.assetGenerationPrompt ?? node.data.prompt
     : node.data.prompt
-  const prompt = joinPrompt(activeLocalPrompt, compiledStoryboard, upstreamPrompt, cadenceInstruction)
+  const prompt = (preservesSpeech(node.data) ? joinSpeech : joinPrompt)(activeLocalPrompt, compiledStoryboard, upstreamPrompt, cadenceInstruction)
   const authoredPrompt = joinPrompt(activeLocalPrompt, upstream.authoredPrompt)
   const storyboardDuration = upstream.storyboardDuration
 
   const multiPrompt = videoModel.family === 'kling' && upstream.storyboardShots?.length
-    ? upstream.storyboardShots.map((shot) => ({ prompt: joinPrompt(`Shot Size: ${shotRecipe('shot-size', shot.shotSize, videoModel.family)}; Camera Movement: ${shotRecipe('camera', shot.camera, videoModel.family)}${shot.audioCue ? `; Audio Cue: ${shot.audioCue}` : ''}. ${shot.prompt}`, cadenceInstruction) || '', duration: String(shot.duration) }))
+    ? buildKlingNativeMultiPrompt(upstream.storyboardShots, cadenceInstruction)
     : undefined
 
   const resolvedConnectionRules = upstream.connectionRules.map((rule) => resolveAutoConnectedInputRule(rule, authoredPrompt))
@@ -572,14 +827,16 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
   const request: GenerationRequest = {
     nodeId: node.id,
     kind: semanticAssetKind ? 'image-generator' : node.data.kind,
-    prompt,
+    semanticAssetCreation: semanticAssetKind ? { kind: semanticAssetKind, tag: workflowTag(node.data, semanticAssetKind) } : undefined,
+    prompt: preservesSpeech(node.data) && !compiledStoryboard?.trim() && !upstreamPrompt?.trim() ? activeLocalPrompt : prompt,
+    providerPromptOwnership: node.data.kind === 'video-generator' && node.data.promptMode === 'manual' && node.data.manualPromptSeeded ? 'authored' : undefined,
     providerPromptOverride: node.data.kind === 'video-generator' && node.data.promptMode === 'manual' && node.data.manualPromptSeeded ? activeLocalPrompt : undefined,
     authoredPrompt,
     stylePrompt: upstream.stylePrompt,
     builtInStylePrompts: upstream.builtInStylePrompts,
     multiPrompt,
     storyboardContext: withoutStyleBlocks(upstream.storyboardContext, upstream.stylePrompt),
-    storyboardShotCount: upstream.storyboardShots?.length,
+    storyboardShotCount: videoModel.family === 'kling' && upstream.storyboardShots?.length ? groupStoryboardSequence(upstream.storyboardShots).shots.length : upstream.storyboardShots?.length,
     storyboardShots: upstream.storyboardShots,
     storyboardIncompletePanels: upstream.storyboardIncompletePanels,
 
@@ -634,6 +891,11 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     shift: node.data.shift,
     voice: node.data.voice,
     voiceEngine: node.data.voiceEngine,
+    voiceModelId: node.data.voiceModelId,
+    elevenSpeechMode: node.data.elevenSpeechMode,
+    elevenDialogueTurns: node.data.elevenDialogueTurns,
+    audioProvider: node.data.audioProvider,
+    voiceStyle: node.data.voiceStyle,
     fishModel: node.data.fishModel,
     fishReferenceId: node.data.fishReferenceId,
     fishTemperature: node.data.fishTemperature,
@@ -650,7 +912,7 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     stability: node.data.stability,
     similarityBoost: node.data.similarityBoost,
     speed: node.data.speed,
-    languageCode: node.data.voiceEngine === 'fish-audio' ? undefined : normalizedElevenV3LanguageCode(node.data.languageCode) || 'eng',
+    languageCode: node.data.voiceEngine === 'fish-audio' ? undefined : node.data.voiceEngine === 'elevenlabs-direct' ? directElevenLanguage(node.data.languageCode) : normalizedElevenV3LanguageCode(node.data.languageCode) || 'eng',
     textNormalization: node.data.textNormalization,
     audioOutputFormat: node.data.audioOutputFormat,
     previousText: node.data.previousText,
@@ -661,6 +923,7 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     references: upstream.references.map((reference) => exactArtworkTags.has(reference.tag || '') ? { ...reference, fidelity: 'lock' as const } : reference),
     offlineSemanticSources: upstream.offlineSemanticSources,
   }
+  if (isElevenDialogue(request)) request.prompt = dialoguePromptText(request.elevenDialogueTurns)
   if (!semanticAssetKind) return request
   const imageProvider = node.data.imageProvider || 'fal'
   const imageModelId = node.data.imageModelId || (imageProvider === 'openai' ? 'gpt-image-2' : imageProvider === 'google' ? 'gemini-3.1-flash-image' : 'fal-ai/flux/schnell')

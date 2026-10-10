@@ -13,7 +13,7 @@ function sliceBetween(start: string, end: string) {
 
 describe('active next-gen Canvas Hand tool renderer contract', () => {
   it('always renders adjacent persistent Select and Hand buttons without icon swapping', () => {
-    const rail = sliceBetween('<aside className="tool-rail">', '<div className="tool-cluster">')
+    const rail = sliceBetween('<aside className="tool-rail">', '</aside>')
     const select = rail.indexOf('aria-label="Select"')
     const hand = rail.indexOf('aria-label="Hand"')
     expect(select).toBeGreaterThanOrEqual(0)
@@ -25,7 +25,7 @@ describe('active next-gen Canvas Hand tool renderer contract', () => {
   })
 
   it('marks Select persistently and Hand persistently or temporarily active', () => {
-    const rail = sliceBetween('<aside className="tool-rail">', '<div className="tool-cluster">')
+    const rail = sliceBetween('<aside className="tool-rail">', '</aside>')
     expect(rail).toContain("activeTool === 'select' ? 'is-active' : ''")
     expect(rail).toContain("activeTool === 'hand' || spacePanning ? 'is-active' : ''")
     expect(rail).toContain("onClick={() => setActiveTool('select')}")

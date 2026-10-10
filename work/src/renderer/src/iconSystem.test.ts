@@ -12,7 +12,6 @@ import {
   ImagePlus,
   Images,
   LayoutDashboard,
-  Library,
   Link2,
   MessageCircle,
   MessageSquareText,
@@ -34,7 +33,7 @@ describe('semantic icon system', () => {
     expect(APP_ICONS.project).toBe(Folder)
     expect(APP_ICONS.projectDocument).toBe(FileInput)
     expect(APP_ICONS.canvas).toBe(LayoutDashboard)
-    expect(APP_ICONS.assets).toBe(Library)
+    expect(APP_ICONS.assets).toBe(Images)
   })
 
   it('does not recycle adjacent node concepts for legacy and utility nodes', () => {

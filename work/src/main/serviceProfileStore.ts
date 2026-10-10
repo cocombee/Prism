@@ -30,6 +30,10 @@ function nextAccountName(registry: ServiceProfileRegistry, provider: ServiceProv
 
 function profileName(profile: ServiceProfile): string { return profile.displayName || profile.accountIdentifier }
 
+function markProfileManaged(registry: ServiceProfileRegistry, provider: ServiceProvider): ServiceProfileRegistry {
+  return { ...registry, profileManagedProviders: [...new Set([...(registry.profileManagedProviders || []), provider])] }
+}
+
 export class ServiceProfileStore {
   private readonly options: ServiceProfileStoreOptions
   private mutation = Promise.resolve()
@@ -41,8 +45,9 @@ export class ServiceProfileStore {
   async listProfiles(provider: ServiceProvider, refresh: boolean): Promise<ServiceProfileRegistry> {
     return this.exclusive(async () => {
       let registry = await this.readRegistry()
-      if (refresh && !registry.profiles.some((profile) => profile.provider === provider) && await this.exists(this.legacyCredentialPath(provider))) {
-        registry = await this.migrateLegacyCredential(registry, provider)
+      if (refresh && !registry.profiles.some((profile) => profile.provider === provider) && !registry.profileManagedProviders?.includes(provider)) {
+        const legacyPath = await this.legacyCredentialPath(provider)
+        if (legacyPath) registry = await this.migrateLegacyCredential(registry, provider, legacyPath)
       }
       return registry
     })
@@ -66,7 +71,7 @@ export class ServiceProfileStore {
         createdAt: requested?.createdAt || now,
         updatedAt: now,
       }
-      registry = upsertServiceProfile(registry, incoming)
+      registry = markProfileManaged(upsertServiceProfile(registry, incoming), provider)
       await this.writeCredential(provider, profileId, key)
       if (!registry.defaults[provider]) registry = setDefaultServiceProfile(registry, provider, profileId)
       await this.writeRegistry(registry)
@@ -80,7 +85,7 @@ export class ServiceProfileStore {
       const profile = registry.profiles.find((candidate) => candidate.id === profileId)
       if (!profile) throw new Error('That account profile no longer exists.')
       if (transition === 'reconnect') this.options.decryptString(await readFile(this.profileCredentialPath(profile.provider, profile.id)))
-      registry = transitionServiceProfile(registry, profileId, transition, this.now())
+      registry = markProfileManaged(transitionServiceProfile(registry, profileId, transition, this.now()), profile.provider)
       await this.writeRegistry(registry)
       if (transition === 'sign-out' || transition === 'delete') await unlink(this.profileCredentialPath(profile.provider, profile.id)).catch(() => undefined)
       return registry
@@ -109,13 +114,25 @@ export class ServiceProfileStore {
     })
   }
 
+  async isConnectedForProject(provider: ServiceProvider, overrides?: Partial<Record<ServiceProvider, string>>): Promise<boolean> {
+    return this.exclusive(async () => {
+      const registry = await this.readRegistry()
+      const selection = projectServiceProfileSelection(registry, { serviceProfileOverrides: overrides }, provider)
+      if (selection.profile) return selection.available && await this.exists(this.profileCredentialPath(provider, selection.profile.id))
+      if (selection.source !== 'none' || registry.profiles.some((profile) => profile.provider === provider) || registry.profileManagedProviders?.includes(provider)) return false
+      // Status does not decrypt keys, migrate files or select between old accounts.
+      return (await this.legacyCredentialCandidates(provider)).length === 1
+    })
+  }
+
   async loadCredentialForProject(provider: ServiceProvider, overrides?: Partial<Record<ServiceProvider, string>>): Promise<string> {
     return this.exclusive(async () => {
       const registry = await this.readRegistry()
-      if (!registry.profiles.some((profile) => profile.provider === provider) && await this.exists(this.legacyCredentialPath(provider))) {
-        return this.options.decryptString(await readFile(this.legacyCredentialPath(provider)))
-      }
       const selection = projectServiceProfileSelection(registry, { serviceProfileOverrides: overrides }, provider)
+      if (selection.source === 'none' && !registry.profiles.some((profile) => profile.provider === provider) && !registry.profileManagedProviders?.includes(provider)) {
+        const legacyPath = await this.legacyCredentialPath(provider)
+        if (legacyPath) return this.options.decryptString(await readFile(legacyPath))
+      }
       if (!selection.profile) {
         if (selection.source === 'project') throw new Error('The account selected for this project no longer exists. Choose another account in Connections.')
         throw new Error(`Choose a ${provider === 'fal' ? 'fal.ai' : provider} account in Connections before running.`)
@@ -132,8 +149,7 @@ export class ServiceProfileStore {
     })
   }
 
-  private async migrateLegacyCredential(registry: ServiceProfileRegistry, provider: ServiceProvider): Promise<ServiceProfileRegistry> {
-    const legacyPath = this.legacyCredentialPath(provider)
+  private async migrateLegacyCredential(registry: ServiceProfileRegistry, provider: ServiceProvider, legacyPath: string): Promise<ServiceProfileRegistry> {
     const key = this.options.decryptString(await readFile(legacyPath))
     const now = this.now()
     const profile: ServiceProfile = {
@@ -146,7 +162,7 @@ export class ServiceProfileStore {
       updatedAt: now,
     }
     profile.accountIdentifier = profile.id
-    let next = upsertServiceProfile(registry, profile)
+    let next = markProfileManaged(upsertServiceProfile(registry, profile), provider)
     next = setDefaultServiceProfile(next, provider, profile.id)
     await this.writeCredential(provider, profile.id, key)
     await this.writeRegistry(next)
@@ -156,8 +172,17 @@ export class ServiceProfileStore {
 
   private registryPath(): string { return join(this.options.dataRoot, 'service-profiles.json') }
   private profilesRoot(): string { return join(this.options.dataRoot, 'service-profiles') }
-  private legacyCredentialPath(provider: ServiceProvider): string {
-    return provider === 'fal' ? join(this.options.dataRoot, 'credential.enc') : join(this.options.dataRoot, 'service-credentials', `${provider}.enc`)
+  private async legacyCredentialCandidates(provider: ServiceProvider): Promise<string[]> {
+    const paths = provider === 'fal' ? [join(this.options.dataRoot, 'credential.enc')]
+      : [join(this.options.dataRoot, 'service-credentials', `${provider}.enc`), join(this.options.dataRoot, `${provider}-credential.enc`)]
+    const existing = await Promise.all(paths.map(async (path) => await this.exists(path) ? path : undefined))
+    return existing.filter((path): path is string => Boolean(path))
+  }
+
+  private async legacyCredentialPath(provider: ServiceProvider): Promise<string | undefined> {
+    const candidates = await this.legacyCredentialCandidates(provider)
+    if (candidates.length > 1) throw new Error('Multiple legacy credentials exist for this service. Sign in to an explicit account in Connections; the old files are preserved.')
+    return candidates[0]
   }
 
   private profileCredentialPath(provider: ServiceProvider, profileId: string): string {
@@ -176,7 +201,7 @@ export class ServiceProfileStore {
   private async readRegistry(): Promise<ServiceProfileRegistry> {
     try {
       const parsed = JSON.parse(await readFile(this.registryPath(), 'utf8')) as ServiceProfileRegistry
-      if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.profiles) || !parsed.defaults || typeof parsed.defaults !== 'object') throw new Error('Invalid service profile registry.')
+      if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.profiles) || !parsed.defaults || typeof parsed.defaults !== 'object' || (parsed.profileManagedProviders !== undefined && !Array.isArray(parsed.profileManagedProviders))) throw new Error('Invalid service profile registry.')
       const resetToLocalNames = parsed.localNamingVersion !== 1
       const providerCounts = new Map<ServiceProvider, number>()
       return {
@@ -208,7 +233,7 @@ export class ServiceProfileStore {
   }
 
   private async exists(path: string): Promise<boolean> {
-    try { await stat(path); return true } catch { return false }
+    try { return (await stat(path)).isFile() } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error }
   }
 
   private now(): string { return this.options.now?.() || new Date().toISOString() }

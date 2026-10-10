@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { curatedAssistantModels } from './assistantModels'
+import { curatedAssistantModels, isTextAssistantModelEligible, latestModelReleases } from './assistantModels'
 
 describe('latest direct prompt-model catalogs', () => {
+  it('does not offer image-output GPT Image models as text assistants while retaining vision language models', () => {
+    expect(isTextAssistantModelEligible({ id: 'gpt-image-2', label: 'GPT Image 2' })).toBe(false)
+    expect(isTextAssistantModelEligible({ id: 'openai/gpt-image-2.5-sunburst', label: 'GPT Image 2.5 Sunburst' })).toBe(false)
+    expect(isTextAssistantModelEligible({ id: 'gpt-5.5-vision', label: 'GPT 5.5 Vision' })).toBe(true)
+  })
+
+  it('deduplicates ISO-dated snapshots and ranks the newest snapshot without changing model IDs', () => {
+    const models = [
+      { id: 'gpt-5.5-2026-04-01', label: 'GPT 5.5' },
+      { id: 'gpt-5.5-2026-05-01', label: 'GPT 5.5' },
+      { id: 'gpt-5.5', label: 'GPT 5.5' },
+      { id: 'gpt-5.4', label: 'GPT 5.4' },
+      { id: 'gpt-5.3', label: 'GPT 5.3' },
+    ]
+    expect(latestModelReleases(models).map((model) => model.id)).toEqual(['gpt-5.5-2026-05-01', 'gpt-5.4', 'gpt-5.3'])
+  })
   it('keeps only the newest three OpenAI models from the live catalog', () => {
     const live = [
       { id: 'gpt-5.4', label: 'GPT 5.4' },

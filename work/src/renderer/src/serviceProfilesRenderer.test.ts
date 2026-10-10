@@ -20,7 +20,10 @@ describe('service account profile product surface', () => {
     expect(app).toContain('Sign Out')
     expect(app).toContain('Sign In')
     expect(app).toContain('Add Account')
-    expect(app).toContain('Connect Account')
+    expect(app).toContain("signInProfileId === 'new' ? 'Connect' : 'Save'")
+    expect(app).toContain('service-key-input')
+    expect(app).toContain('service-key-cancel')
+    expect(app).toContain('service-key-connect')
     expect(styles).toMatch(/\.service-card\.is-expanded\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/s)
   })
 

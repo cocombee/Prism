@@ -40,11 +40,13 @@ describe('saved graph secret Seedance prompt', () => {
     for (const tag of boundTags) expect(preview.text).toContain(tag)
     expect(preview.text).toContain('No action or Character performance is inferred from connected references')
     expect(preview.text).not.toMatch(/restrained, specific performance|breath|micro-hesitation/i)
-    expect(preview.text).toContain('@actor-c is the sole authority for actor-c as one complete physical body and one cast member, wearing the appearance governed by @video-05-scene-01-kawan-malay-f on that same body.')
-    expect(preview.text).toContain('@actor-d is the sole authority for actor-d as one complete physical body and one cast member, wearing the appearance governed by @video-05-scene-01-birthday-boy-chinese-c on that same body.')
+    expect(preview.text).toContain('Use @actor-c as actor-c.')
+    expect(preview.text).toContain('Use @video-05-scene-01-kawan-malay-f for @actor-c\'s wardrobe.')
+    expect(preview.text).toContain('Use @actor-d as actor-d.')
+    expect(preview.text).toContain('Use @video-05-scene-01-birthday-boy-chinese-c for @actor-d\'s wardrobe.')
     expect(preview.text).not.toContain('remains worn only by')
     expect(preview.text).not.toMatch(/@(Image|Video|Audio)\d+/)
-    expect(preview.text).toContain('cinematic-naturalism is the Style visual authority')
+    expect(preview.text).toContain('Use cinematic-naturalism for the visual style.')
     expect(preview.text).not.toContain('@cinematic-naturalism')
     const scene = preview.blocks.find((block) => block.label === 'SCENE, VEHICLE, AND ENVIRONMENT CONTINUITY')!.text
     expect(scene).toContain('@video-01-scene-01-harga-kedai-living-room')
@@ -54,8 +56,10 @@ describe('saved graph secret Seedance prompt', () => {
     expect(preview.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
 
     const payload = providerSeedancePayloadCompilation(request)
-    expect(payload.text).toContain('[Image2] is the sole authority for actor-c as one complete physical body and one cast member, wearing the appearance governed by [Image1] on that same body.')
-    expect(payload.text).toContain('[Image4] is the sole authority for actor-d as one complete physical body and one cast member, wearing the appearance governed by [Image3] on that same body.')
+    expect(payload.text).toContain('Use [Image2] as actor-c.')
+    expect(payload.text).toContain('Use [Image1] for [Image2]\'s wardrobe.')
+    expect(payload.text).toContain('Use [Image4] as actor-d.')
+    expect(payload.text).toContain('Use [Image3] for [Image4]\'s wardrobe.')
     expect(payload.text).not.toContain('remains worn only by')
     expect(payload.text).not.toMatch(/@actor-[cd]\b/)
     expect(payload.text).not.toMatch(/@video-0[15]-scene-/)
@@ -76,12 +80,12 @@ describe('saved graph secret Seedance prompt', () => {
       connectionRules: [{ tag: '@actor-c', label: 'Character Identity', rule: 'HARD RULE · identity' }],
     }
     const preview = providerPromptPreviewCompilation(request)
-    expect(preview.text).toContain('@actor-c is the sole visual authority for character')
+    expect(preview.text).toContain('Use @actor-c as actor-c.')
     expect(preview.text).toContain('@actor-c retains the exact connected Character identity')
     expect(preview.text).not.toMatch(/@Image\d+/)
     const payload = providerSeedancePayloadCompilation(request)
     expect(payload.text).toContain('[Image1] + [Image2]')
-    expect(payload.text).toContain('[Image1] + [Image2] is the sole visual authority for character')
+    expect(payload.text).toContain('Use [Image1] + [Image2] as actor-c.')
     expect(payload.text).toContain('[Image1] + [Image2] retains the exact connected Character identity')
     expect(payload.text).not.toContain('@actor-c')
   })
@@ -97,7 +101,7 @@ describe('saved graph secret Seedance prompt', () => {
       connectionRules: [{ tag: '@cinematic-naturalism', label: 'Style', rule: 'HARD RULE · style' }],
     }
     const preview = providerPromptPreviewCompilation(request)
-    expect(preview.text).toContain('cinematic-naturalism is the Style visual authority')
+    expect(preview.text).toContain('Use cinematic-naturalism for the visual style.')
     expect(preview.text).not.toContain('@cinematic-naturalism')
     expect(preview.text).not.toMatch(/@Image\d+/)
     expect(providerSeedancePayloadCompilation(request).text).not.toMatch(/@Image\d+/)

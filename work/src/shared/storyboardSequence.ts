@@ -24,7 +24,8 @@ export function normalizedStoryboardTransition(
   count: number,
   ..._legacyIgnored: unknown[]
 ): StoryboardTransition | undefined {
-  if (index >= count - 1) return undefined
+  if (transition !== undefined && transition !== 'continue' && transition !== 'hard-cut') return undefined
+  if (index >= count - 1) return transition === 'continue' ? 'continue' : undefined
   return transition === 'continue' ? 'continue' : 'hard-cut'
 }
 
@@ -32,6 +33,8 @@ export function groupStoryboardSequence<T extends StoryboardSequenceBeat>(
   beats: T[],
   ..._legacyIgnored: unknown[]
 ): StoryboardSequence<T> {
+  const conflicts = storyboardTransitionConflicts(beats)
+  if (conflicts.length) throw new Error(conflicts[0])
   const shots: Array<StoryboardShotGroup<T>> = []
   let currentBeats: T[] = []
   let currentDuration = 0
@@ -57,10 +60,13 @@ export function groupStoryboardSequence<T extends StoryboardSequenceBeat>(
   }
 }
 
-export function storyboardTransitionConflicts<T extends StoryboardSequenceBeat>(beats: T[]): string[] {
-  return beats.flatMap((beat, index) => index < beats.length - 1
-    && beat.transitionToNext === 'continue'
-    && /\bHARD\s+CUT\b/i.test(beat.prompt)
-    ? [`Continue after Storyboard panel ${index + 1} conflicts with its authored HARD CUT.`]
-    : [])
+export const STORYBOARD_OUTGOING_CONTINUATION = 'CONTINUE · OUTGOING CONTINUATION HOOK · Preserve the authored final camera endpoint and performance state for a future beat; no next beat, cut or extra duration is specified.'
+
+export function storyboardTransitionConflicts<T extends Pick<StoryboardSequenceBeat, 'prompt' | 'transitionToNext'>>(beats: T[]): string[] {
+  return beats.flatMap((beat, index) => {
+    if (beat.transitionToNext !== undefined && beat.transitionToNext !== 'continue' && beat.transitionToNext !== 'hard-cut') return [`Storyboard panel ${index + 1} has an unsupported saved transition. Review its preserved transition; it was not converted to a hard cut.`]
+    return beat.transitionToNext === 'continue' && /\bHARD\s+CUT\b/i.test(beat.prompt)
+      ? [`Continue after Storyboard panel ${index + 1} conflicts with its authored HARD CUT.`]
+      : []
+  })
 }

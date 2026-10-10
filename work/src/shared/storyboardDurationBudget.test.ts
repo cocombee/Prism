@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import type { StoryboardPanel } from './types'
-import { reconcileStoryboardDurationBudget, storyboardDurationReadinessError, STORYBOARD_DURATION_FALLBACK_OPTIONS } from './storyboardDurationBudget'
+import { reconcileStoryboardDurationBudget, storyboardDurationReadinessError, normalizedStoryboardDurationOptions, STORYBOARD_DURATION_FALLBACK_OPTIONS } from './storyboardDurationBudget'
 
 const panel = (id: string, duration: number | 'auto', locked = false): StoryboardPanel => ({ id, prompt: `${id} prompt`, duration, locked, shotSize: 'wide', camera: 'static' })
 
 describe('Storyboard observational duration budget', () => {
+  it('keeps beat minimum1s separate from model clip minimum4s and never fills missing time', () => {
+    const panels = [panel('one', 1), panel('two', 1)]
+    const result = reconcileStoryboardDurationBudget({ panels, mode:'single', targetDuration:4, modelDurationOptions:[4,6,8], modelMinimumSeconds:4 })
+    expect(result.panels).toBe(panels)
+    expect(result.totalDuration).toBe(2)
+    expect(result.budgets[0].options[0]).toMatchObject({value:1,disabled:false})
+    expect(result.helper).toMatchObject({kind:'underflow',text:expect.stringContaining('at least 4.0s total')})
+    expect(reconcileStoryboardDurationBudget({panels:[panel('one',1.5),panel('two',2.5)],mode:'single',targetDuration:4,modelDurationOptions:[4,6,8],modelMinimumSeconds:4}).helper).toBeUndefined()
+    expect(normalizedStoryboardDurationOptions([0.75])).toEqual([])
+  })
+  it('preserves saved below-minimum values for review and uses exact authored total', () => {
+    const panels = [panel('one',0.5),panel('two',1.5)]
+    const result = reconcileStoryboardDurationBudget({panels,mode:'single',targetDuration:4,modelDurationOptions:[4,6,8]})
+    expect(result.panels).toBe(panels);expect(result.totalDuration).toBe(2)
+    expect(storyboardDurationReadinessError(panels)).toContain('minimum 1.0s')
+    expect(result.budgets[0].options.some(option=>option.value===0.5)).toBe(false)
+  })
   it('preserves every authored panel value when the connected Generator budget is reduced', () => {
     const panels = [panel('one', 8), panel('two', 7), panel('three', 2)]
     const result = reconcileStoryboardDurationBudget({ panels, mode: 'single', targetDuration: 10, modelDurationOptions: [0.5, 1, 1.5, 2, 5, 10] })
@@ -29,20 +46,20 @@ describe('Storyboard observational duration budget', () => {
     expect(result.budgets[1].options.find((option) => option.value === 3.5)?.disabled).toBe(true)
   })
 
-  it('keeps a disconnected Storyboard on independent 0.5s planning values through 30.0s', () => {
+  it('keeps a disconnected Storyboard on independent half-step planning values starting at1.0s through 30.0s', () => {
     const panels = [panel('one', 20), panel('two', 15)]
     const result = reconcileStoryboardDurationBudget({ panels, mode: 'separate', modelDurationOptions: [...STORYBOARD_DURATION_FALLBACK_OPTIONS] })
     expect(result.targetDuration).toBeUndefined()
     expect(result.overBudget).toBeFalsy()
     expect(result.helper).toBeUndefined()
-    expect(result.budgets[1].options).toHaveLength(60)
-    expect(result.budgets[1].options.slice(0, 4).map((option) => option.value)).toEqual([0.5, 1, 1.5, 2])
+    expect(result.budgets[1].options).toHaveLength(59)
+    expect(result.budgets[1].options.slice(0, 4).map((option) => option.value)).toEqual([1, 1.5, 2, 2.5])
     expect(result.budgets[1].options.at(-1)).toMatchObject({ value: 30, label: '30.0s', disabled: false })
   })
 
   it('uses independent half-step panel choices when the Generator has sparse native choices', () => {
     const result = reconcileStoryboardDurationBudget({ panels: [panel('one', 2), panel('two', 1)], mode: 'single', targetDuration: 6, modelDurationOptions: [4, 6, 8] })
-    expect(result.targetOptions.slice(0, 6)).toEqual([0.5, 1, 1.5, 2, 2.5, 3])
+    expect(result.targetOptions.slice(0, 6)).toEqual([1, 1.5, 2, 2.5, 3, 3.5])
     expect(result.targetOptions.at(-1)).toBe(8)
     expect(result.budgets[1].choiceMax).toBe(4)
     expect(result.budgets[1].options.find((option) => option.value === 3.5)?.disabled).toBe(false)
@@ -50,20 +67,19 @@ describe('Storyboard observational duration budget', () => {
   })
 
   it('keeps half-second options visible and disables unavailable positive options', () => {
-    const result = reconcileStoryboardDurationBudget({ panels: [panel('one', 9.5), panel('two', 0.5)], mode: 'single', targetDuration: 10, modelDurationOptions: [0.5, 1, 1.5, 2] })
+    const result = reconcileStoryboardDurationBudget({ panels: [panel('one', 9.5), panel('two', 1)], mode: 'single', targetDuration: 10, modelDurationOptions: [0.5, 1, 1.5, 2] })
     expect(result.budgets[1].choiceMax).toBe(0.5)
     expect(result.budgets[1].options).toEqual([
-      expect.objectContaining({ value: 0.5, label: '0.5s', disabled: false }),
       expect.objectContaining({ value: 1, label: '1.0s', disabled: true }),
       expect.objectContaining({ value: 1.5, label: '1.5s', disabled: true }),
       expect.objectContaining({ value: 2, label: '2.0s', disabled: true }),
     ])
   })
 
-  it('blocks overflow and any duration below the exact 0.5s minimum, then clears when timing fits', () => {
+  it('blocks overflow and any duration below the exact 1.0s minimum, then clears when timing fits', () => {
     expect(storyboardDurationReadinessError([panel('one', 6), panel('two', 5)], 10)).toContain('11.0s exceeds')
     expect(storyboardDurationReadinessError([panel('one', 6), panel('two', 4)], 10)).toBeUndefined()
-    expect(storyboardDurationReadinessError([panel('one', 6), panel('two', 0)], 10)).toContain('minimum 0.5s')
-    expect(storyboardDurationReadinessError([panel('one', 6), panel('two', 0.25)], 10)).toContain('minimum 0.5s')
+    expect(storyboardDurationReadinessError([panel('one', 6), panel('two', 0)], 10)).toContain('minimum 1.0s')
+    expect(storyboardDurationReadinessError([panel('one', 6), panel('two', 0.25)], 10)).toContain('minimum 1.0s')
   })
 })

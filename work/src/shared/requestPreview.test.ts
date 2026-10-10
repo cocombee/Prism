@@ -28,7 +28,7 @@ describe('provider-effective request preview', () => {
   it('X-rays every selectable provider-effective control for every runnable node family', () => {
     expect(providerEffectiveRequestControls({
       nodeId: 'image', kind: 'image-generator', quantity: 3, aspectRatio: '4:3', outputFormat: 'webp', imageResolution: '4K', imageProvider: 'google', imageModelId: 'gemini-image', safetyTolerance: 5, enableWebSearch: true, inferenceSteps: 8, guidanceScale: 4.5, acceleration: 'high', seed: 42,
-    })).toEqual({ quantity: 3, aspectRatio: '4:3', outputFormat: 'webp', imageResolution: '4K', imageProvider: 'google', imageModelId: 'gemini-image', safetyTolerance: 5, enableWebSearch: true, inferenceSteps: 8, guidanceScale: 4.5, acceleration: 'high', seed: 42 })
+    })).toEqual({ model: 'gemini-image', response_format: { type: 'image', mime_type: 'image/webp', aspect_ratio: '4:3', image_size: '4K' } })
 
     expect(providerEffectiveRequestControls({
       nodeId: 'editor', kind: 'image-editor', outputFormat: 'jpeg', imageResolution: '2K', imageProvider: 'fal', imageModelId: 'fal-ai/nano-banana-pro/edit', safetyTolerance: 3, enableWebSearch: true, guidanceScale: 6, seed: 43,
@@ -43,8 +43,8 @@ describe('provider-effective request preview', () => {
     })).toEqual({ quantity: 4, videoEngine: 'wan-controlled', aspectRatio: '16:9', duration: 5, frameRate: 24, motionCadence: 16, generateAudio: false, resolution: '580p', bitrateMode: 'high', videoQuality: 'maximum', videoWriteMode: 'small', negativePrompt: 'text', safetyTolerance: 2, autoFix: true, inferenceSteps: 64, guidanceScale: 1.2, acceleration: 'regular', interpolatorModel: 'rife', numInterpolatedFrames: 3, adjustFpsForInterpolation: false, enablePromptExpansion: true, enableInputSafety: false, enableOutputSafety: false, shift: 6, seed: 45 })
 
     expect(providerEffectiveRequestControls({
-      nodeId: 'voice', kind: 'voiceover', voice: 'Rachel', voiceEngine: 'fish-audio', fishModel: 's2-pro', fishReferenceId: 'voice-ref', fishTemperature: 0.65, fishTopP: 0.75, fishVolume: 2, fishNormalizeLoudness: false, fishNormalize: true, fishChunkLength: 220, fishFormat: 'opus', fishSampleRate: 48000, fishOpusBitrate: 64, fishLatency: 'low', speed: 1.1,
-    })).toEqual({ voice: 'Rachel', voiceEngine: 'fish-audio', fishModel: 's2-pro', fishReferenceId: 'voice-ref', fishTemperature: 0.65, fishTopP: 0.75, fishVolume: 2, fishNormalizeLoudness: false, fishNormalize: true, fishChunkLength: 220, fishFormat: 'opus', fishSampleRate: 48000, fishOpusBitrate: 64, fishLatency: 'low', speed: 1.1 })
+      nodeId: 'voice', kind: 'voiceover', prompt: 'Exact voice text.', voice: 'Rachel', voiceEngine: 'fish-audio', fishModel: 's2-pro', fishReferenceId: 'voice-ref', fishTemperature: 0.65, fishTopP: 0.75, fishVolume: 2, fishNormalizeLoudness: false, fishNormalize: true, fishChunkLength: 220, fishFormat: 'opus', fishSampleRate: 48000, fishOpusBitrate: 64, fishLatency: 'low', speed: 1.1,
+    })).toEqual({ model: 's2-pro', reference_id: 'voice-ref', temperature: 0.65, top_p: 0.75, prosody: { speed: 1.1, volume: 2, normalize_loudness: false }, normalize: true, chunk_length: 220, format: 'opus', sample_rate: 48000, opus_bitrate: 64000, latency: 'low' })
 
     expect(providerEffectiveRequestControls({ nodeId: 'sfx', kind: 'sound-effects', duration: 12, loop: true, promptInfluence: 0.7, audioOutputFormat: 'wav_44100' })).toEqual({ duration: 12, loop: true, promptInfluence: 0.7, audioOutputFormat: 'wav_44100' })
     expect(providerEffectiveRequestControls({ nodeId: 'music', kind: 'music-generator', duration: 90, forceInstrumental: true, audioOutputFormat: 'mp3_44100_192' })).toEqual({ duration: 90, forceInstrumental: true, audioOutputFormat: 'mp3_44100_192' })

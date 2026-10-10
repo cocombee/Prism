@@ -20,6 +20,11 @@ function edge(source: string, target: string, targetHandle = 'reference', inputF
 }
 
 describe('combined graph prompt X-ray', () => {
+  it('rejects unsupported saved video selections instead of compiling a default model request', () => {
+    const unsupported = node('unknown-video', 'video-generator', { prompt: 'Follow this motion.', videoEngine: 'not-a-supported-provider/video' })
+    expect(() => buildGenerationRequest(unsupported, [unsupported], [])).toThrow(/supported video model/i)
+  })
+
   const characterViews = ['full-body', 'full-body-back', 'front', 'profile', 'three-quarter', 'back', 'smile', 'neutral'] as const
   const nodes: StudioNode[] = [
     node('base-prompt', 'prompt', { prompt: 'A craftsman repairs a ceremonial compass while a storm approaches.' }),
@@ -374,7 +379,7 @@ describe('combined graph prompt X-ray', () => {
     })
     const video = node('zero-video', 'video-generator', { videoEngine: 'bytedance/seedance-2.0/reference-to-video' })
     expect(() => buildGenerationRequest(video, [storyboard, video], [edge(storyboard.id, video.id, 'storyboard-in')])).toThrow(
-      'Storyboard panel 2 is below the minimum 0.5s duration.',
+      'Storyboard panel 2 is below the minimum 1.0s duration.',
     )
     expect(storyboard.data.storyboardPanels?.map((panel) => panel.prompt)).toEqual([
       'The first authored panel remains intact.',
@@ -390,7 +395,7 @@ describe('combined graph prompt X-ray', () => {
         { id: 'two', prompt: 'She checks the departure board.', duration: 1, shotSize: 'medium', camera: 'dolly-in', asset: asset('rendered-panel-two') },
       ],
     })
-    const video = node('passive-video', 'video-generator', { videoEngine: 'fal-ai/bytedance/seedance/v2/text-to-video' })
+    const video = node('passive-video', 'video-generator', { videoEngine: 'bytedance/seedance-2.0/text-to-video' })
     const request = buildGenerationRequest(video, [storyboard, video], [edge('passive-storyboard', 'passive-video', 'storyboard-in')])
 
     expect(request.prompt).toContain('courier enters the station')
@@ -404,7 +409,7 @@ describe('combined graph prompt X-ray', () => {
   it('turns Auto framing and movement into motivated model guidance without inventing a move', () => {
     const autoNodes = [
       node('auto-storyboard', 'storyboard', { storyboardDuration: 6, storyboardPanels: [{ id: 'auto-shot', prompt: 'Idris silently recognizes the compass marking.', duration: 'auto', shotSize: 'auto', camera: 'auto' }] }),
-      node('auto-video', 'video-generator', { videoEngine: 'fal-ai/bytedance/seedance/v1/pro/text-to-video', duration: 6 }),
+      node('auto-video', 'video-generator', { videoEngine: 'bytedance/seedance-2.0/text-to-video', duration: 6 }),
     ]
     const request = buildGenerationRequest(autoNodes[1], autoNodes, [edge('auto-storyboard', 'auto-video', 'storyboard-in')])
     expect(request.prompt).toContain('choose the clearest framing for action and emotion')
@@ -434,7 +439,7 @@ describe('combined graph prompt X-ray', () => {
   it('makes authored Hard Cut boundaries produce separate shots without hidden mode authority', () => {
     const separateNodes = [
       node('separate-storyboard', 'storyboard', { storyboardMode: 'single', storyboardDuration: 6, storyboardPanels: [{ id: 'one', prompt: 'Exterior lighthouse at dawn.', duration: 3, shotSize: 'wide', camera: 'static', transitionToNext: 'hard-cut' }, { id: 'two', prompt: 'Interior lens begins rotating.', duration: 3, shotSize: 'detail', camera: 'static' }] }),
-      node('separate-video', 'video-generator', { videoEngine: 'fal-ai/bytedance/seedance/v2/reference-to-video', duration: 6 }),
+      node('separate-video', 'video-generator', { videoEngine: 'bytedance/seedance-2.0/reference-to-video', duration: 6 }),
     ]
     const request = buildGenerationRequest(separateNodes[1], separateNodes, [edge('separate-storyboard', 'separate-video', 'storyboard-in')])
     expect(request.prompt).toContain('grouped into 2 shots by authored Cut/Continue boundaries')
@@ -453,7 +458,7 @@ describe('combined graph prompt X-ray', () => {
     const video = node('transition-video', 'video-generator', { videoEngine: 'bytedance/seedance-2.5/reference-to-video', duration: 9 })
     const request = buildGenerationRequest(video, [storyboard, video], [edge(storyboard.id, video.id, 'storyboard-in')])
 
-    expect(request.storyboardShots?.map((shot) => shot.transitionToNext)).toEqual(['continue', 'hard-cut', undefined])
+    expect(request.storyboardShots?.map((shot) => shot.transitionToNext)).toEqual(['continue', 'hard-cut', 'continue'])
   })
 
   it('compiles the selected Revamped snapshot without mutating or leaking byte-exact Original', () => {
@@ -518,7 +523,7 @@ describe('combined graph prompt X-ray', () => {
   it('builds explicit multi-view character identity authority in the provider prompt', () => {
     const request = buildGenerationRequest(nodes.find((candidate) => candidate.id === 'video')!, nodes, edges)
     const finalPrompt = resolvedPromptWithReferences(request)
-    expect(finalPrompt.match(/@idris is the sole visual authority for character/g)).toHaveLength(1)
+    expect(finalPrompt.match(/Use @idris as Idris\./g)).toHaveLength(1)
     expect(finalPrompt).toContain('Only 1 person appears.')
     expect(finalPrompt.match(/Studio sheet background and layout NOT inherited\./g)).toHaveLength(1)
     expect(finalPrompt).toContain('@cliff-workshop matches the reference in every appearance.')
@@ -541,11 +546,11 @@ describe('combined graph prompt X-ray', () => {
     const request = buildGenerationRequest(seedanceVideo, [...nodes, seedanceVideo], seedanceEdges)
     const preview = providerPromptPreview(request)
     expect(preview).toContain('REFERENCE AUTHORITY')
-    expect(preview).toContain('@idris is the sole visual authority for character')
-    expect(preview).toContain('@cliff-workshop is the sole visual authority for location')
-    expect(preview).toContain('@brass-compass is the sole visual authority for element')
+    expect(preview).toContain('Use @idris as Idris.')
+    expect(preview).toContain('Use @cliff-workshop for the location')
+    expect(preview).toContain('Use @brass-compass for the element')
     expect(preview).not.toMatch(/@Image\d+/)
-    expect(preview).toContain("omitted to satisfy Seedance 2's 9-image / 12-total limit")
+    expect(preview).toContain("exceed Seedance 2's 9-image / 12-total limit. Generation is blocked")
   })
 
   it('reserves a valid Seedance total budget when image, video, and audio references are combined', () => {
@@ -822,7 +827,7 @@ describe('combined graph prompt X-ray', () => {
     expect(preview).toContain('@Element1 = @idris (character authority)')
     expect(preview).toContain('@start-frame — Starting Frame: Start Frame')
     expect(preview).toContain('@end-frame matches the reference in every appearance.')
-    expect(preview).toContain('@idris is the sole visual authority for character')
+    expect(preview).toContain('Use @idris as Idris.')
     expect(preview).not.toContain('Narrative Role:')
   })
 
@@ -991,9 +996,9 @@ describe('combined graph prompt X-ray', () => {
     for (const shot of shots) {
       expect(shot.prompt).toContain('LOOK-ONLY KODAK AUTHORITY')
       expect(shot.prompt.match(/LOOK-ONLY KODAK AUTHORITY/g)).toHaveLength(1)
-      expect(shot.prompt).toContain('@idris is the sole visual authority for character')
-      expect(shot.prompt).toContain('@cliff-workshop is the sole visual authority for location')
-      expect(shot.prompt).toContain('@brass-compass is the sole visual authority for element')
+      expect(shot.prompt).toContain('Use @idris as Idris.')
+      expect(shot.prompt).toContain('Use @cliff-workshop for the location')
+      expect(shot.prompt).toContain('Use @brass-compass for the element')
       expect(shot.prompt.match(/ACTIVE REFERENCES/g)).toHaveLength(1)
       expect(shot.prompt.match(/KLING REFERENCE MAP:/g)).toHaveLength(1)
     }
@@ -1082,12 +1087,12 @@ HARD AVOID: no identity drift, impossible hand geometry, state reset, text, logo
     ]))
     expect(preview).toContain('REFERENCE AUTHORITY')
     expect(preview).toContain('@repair-storyboard — storyboard.')
-    expect(preview).toContain('@idris is the sole visual authority for character')
-    expect(preview).toContain('@workshop is the sole visual authority for location')
-    expect(preview).toContain('@compass is the sole visual authority for element')
-    expect(preview.match(/@idris is the sole visual authority for character/g)).toHaveLength(1)
-    expect(preview.match(/@workshop is the sole visual authority for location/g)).toHaveLength(1)
-    expect(preview.match(/@compass is the sole visual authority for element/g)).toHaveLength(1)
+    expect(preview).toContain('Use @idris as Idris.')
+    expect(preview).toContain('Use @workshop for the location')
+    expect(preview).toContain('Use @compass for the element')
+    expect(preview.match(/Use @idris as Idris\./g)).toHaveLength(1)
+    expect(preview.match(/Use @workshop for the location\./g)).toHaveLength(1)
+    expect(preview.match(/Use @compass for the element\./g)).toHaveLength(1)
     expect(preview).not.toMatch(/@Image\d+/)
     expect(preview.match(/Grounded practical lighting, restrained color, natural texture\./g)).toHaveLength(1)
     expect(preview).toContain('motion reference')
@@ -1108,11 +1113,14 @@ HARD AVOID: no identity drift, impossible hand geometry, state reset, text, logo
     expect(preview).toContain('Shift the focus plane from the nearer subject to the farther subject')
   })
 
-  it('preserves more than six Storyboard panels for Kling without a family ceiling', () => {
+  it('preserves more than six edited panels in the draft while blocking unsupported native shot count', () => {
     const eightPanels = Array.from({ length: 8 }, (_, index) => ({ id: `k${index}`, prompt: `Shot ${index + 1}`, duration: 1, shotSize: 'auto' as const, camera: 'auto' }))
     const eightStory = node('eight-story', 'storyboard', { storyboardDuration: 8, storyboardPanels: eightPanels })
     const kling = node('twenty-capable', 'video-generator', { videoEngine: 'fal-ai/kling-video/o3/standard/text-to-video', duration: 8 })
-    expect(buildGenerationRequest(kling, [eightStory, kling], [edge('eight-story', 'twenty-capable', 'storyboard-in')]).storyboardShots).toHaveLength(8)
+    const request = buildGenerationRequest(kling, [eightStory, kling], [edge('eight-story', 'twenty-capable', 'storyboard-in')])
+    expect(request.storyboardShots).toHaveLength(8)
+    expect(request.multiPrompt).toHaveLength(8)
+    expect(generationRequirementFailures(request)).toEqual(expect.arrayContaining([expect.stringContaining('supports 1–6 shots')]))
   })
 
   it('preserves optional typed continuity fields from panels into the generation request', () => {

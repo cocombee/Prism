@@ -74,8 +74,17 @@ describe('node input port contracts', () => {
   it('exposes correct semantic and utility media contracts', () => {
     expect(nodeInputPorts({ kind: 'upscaler' }).map((port) => [port.id, port.signal])).toEqual([['image-in', 'image']])
     expect(nodeInputPorts({ kind: 'upscaler', upscalerModel: 'realesrgan-video' }).map((port) => [port.id, port.signal])).toEqual([['video-in', 'video']])
-    expect(nodeInputPorts({ kind: 'character' })).toEqual([expect.objectContaining({ id: 'style-in', signal: 'style', label: 'Creation Style (Optional)' }), expect.objectContaining({ id: 'wardrobe-in', signal: 'image', maxConnections: 1 })])
-    for (const kind of ['location', 'wardrobe', 'element'] as const) expect(nodeInputPorts({ kind })).toEqual([expect.objectContaining({ id: 'style-in', signal: 'style', label: 'Creation Style (Optional)' })])
+    expect(nodeInputPorts({ kind: 'character' })).toEqual([
+      expect.objectContaining({ id: 'style-in', signal: 'style', label: 'Creation Style (Optional)' }),
+      expect.objectContaining({ id: 'wardrobe-in', signal: 'image', maxConnections: 1 }),
+      expect.objectContaining({ id: 'element-in', signal: 'image', icon: 'element-reference' }),
+    ])
+    expect(nodeInputPorts({ kind: 'location' })).toEqual([
+      expect.objectContaining({ id: 'style-in', signal: 'style' }),
+      expect.objectContaining({ id: 'character-in', signal: 'image', icon: 'character-reference' }),
+      expect.objectContaining({ id: 'element-in', signal: 'image', icon: 'element-reference' }),
+    ])
+    for (const kind of ['wardrobe', 'element'] as const) expect(nodeInputPorts({ kind })).toEqual([expect.objectContaining({ id: 'style-in', signal: 'style', label: 'Creation Style (Optional)' })])
     expect(nodeInputPorts({ kind: 'style-reference' })).toEqual([])
     expect(nodeInputPorts({ kind: 'storyboard' })).toEqual([
       expect.objectContaining({ id: 'style-in', signal: 'style', maxConnections: 1 }),

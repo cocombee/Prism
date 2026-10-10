@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { compactProviderError, providerDisplayName, providerErrorDetail } from './providerErrors'
 
 describe('provider errors', () => {
+  it('keeps direct ElevenLabs error identity independent of fal', () => {
+    expect(providerDisplayName('elevenlabs')).toBe('ElevenLabs')
+    expect(compactProviderError('401 unauthorized', 'elevenlabs')).toBe('ElevenLabs rejected this API key. Reconnect it in Connections.')
+  })
   it('names BytePlus failures as the direct Seedance provider', () => {
     expect(providerDisplayName('byteplus')).toBe('BytePlus Seedance')
     expect(compactProviderError('401 unauthorized', 'byteplus')).toBe('BytePlus Seedance rejected this API key. Reconnect it in Connections.')

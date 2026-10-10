@@ -8,16 +8,16 @@ import {
 
 const expected = {
   handheld: {
-    providerClause: 'Restrained natural handheld micro-sway and micro-translation remain local to the current authored viewpoint and framing, then settle at that anchor.',
+    providerClause: 'Restrained natural handheld micro-sway and micro-translation remain local to the current authored viewpoint and framing; settle at that anchor only where authored.',
   },
   'handheld-subtle': {
-    providerClause: 'Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing, then settles calmly at that anchor.',
+    providerClause: 'Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing; settle calmly at that anchor only where authored.',
   },
   'handheld-intense': {
-    providerClause: 'Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition.',
+    providerClause: 'Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition only where authored.',
   },
   'shoulder-rig': {
-    providerClause: 'Weighted shoulder-mounted micro-movement and bodily operator transfer remain local to the current authored viewpoint and framing, then settle firmly at that anchor.',
+    providerClause: 'Weighted shoulder-mounted micro-movement and bodily operator transfer remain local to the current authored viewpoint and framing; settle firmly at that anchor only where authored.',
   },
 } as const
 
@@ -37,7 +37,7 @@ describe('camera support semantics', () => {
       const semantic = cameraSupportSemantics(value)!
       expect(semantic.providerClause).toBe(expected[value].providerClause)
       expect(semantic.revampInstruction).toContain(expected[value].providerClause)
-      expect(semantic.revampInstruction).toContain('support rides only that path, then anchors and settles at the arrived endpoint')
+      expect(semantic.revampInstruction).toContain('support rides only that path while preserving authored pace and endpoint state; settling is added only where authored')
       expect(semantic.revampInstruction).toContain('A non-spatial Continue preserves the current anchor')
       expect(semantic.revampInstruction).toContain('A Cut resets the anchor')
       expect(semantic.negatives).toEqual(expect.arrayContaining([...sharedSupportNegatives]))

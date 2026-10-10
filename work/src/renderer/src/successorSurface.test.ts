@@ -151,7 +151,7 @@ describe('successor project hydration', () => {
     expect(appNext).toContain('void startStartupHydration({')
     expect(appNext).toContain('recentProjects: () => window.prism.projects.recent()')
     expect(appNext).toContain('onRecentProjects: (projects) => setRecentProjects([...projects])')
-    expect(appNext).toContain('if (storedProject) await activateProject(storedProject, false)')
+    expect(appNext).toContain('const activation = activateProject(storedProject, false)')
     expect(appNext).not.toMatch(/Promise\.all\(\[[^\]]*projects\.current\(\)[^\]]*projects\.recent\(\)/)
   })
 })

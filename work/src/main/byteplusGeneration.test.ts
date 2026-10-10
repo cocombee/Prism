@@ -60,3 +60,22 @@ describe('compileBytePlusGenerationRequest', () => {
     expect(resolveMedia).not.toHaveBeenCalled()
   })
 })
+
+
+it('blocks BytePlus overflow before resolving or uploading any media', async () => {
+  const resolveMedia = vi.fn()
+  const references = Array.from({ length: 31 }, (_, i) => ({ role: 'reference' as const, path: `/fixture/${i}.png`, mediaType: 'image' as const }))
+  await expect(compileBytePlusGenerationRequest(request({ videoEngine: 'byteplus/seedance-2.5/reference-to-video', references }), resolveMedia)).rejects.toThrow(/connected 31/)
+  expect(resolveMedia).not.toHaveBeenCalled()
+})
+
+
+it('blocks orphan typed cast before direct BytePlus media resolution', async () => {
+  const resolveMedia = vi.fn()
+  await expect(compileBytePlusGenerationRequest(request({
+    videoEngine: 'byteplus/seedance-2.5/reference-to-video', providerPromptOverride: undefined,
+    references: [{ role: 'character', tag: '@maya', path: '/fictional/maya.png' }],
+    storyboardShots: [{ prompt: 'The cup moves.', duration: 4, camera: 'static', shotSize: 'medium', characterStates: [{ characterTag: '@maya', visibility: 'off-camera' }] }],
+  }), resolveMedia)).rejects.toThrow(/physical cast.*@maya/i)
+  expect(resolveMedia).not.toHaveBeenCalled()
+})

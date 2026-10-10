@@ -1,3 +1,17 @@
+import { generatorVideoDurationLimits, videoMaximumLabel } from '../../shared/videoDurationLimits'
+import { higgsfieldRecoveryActionDisabled } from '../../shared/higgsfieldJobs'
+import { ProviderAvailabilityContext } from './ProviderAvailabilityContext'
+import { filterProviderModelGroups } from '../../shared/providerAvailability'
+import type { HiggsfieldJobsView, HiggsfieldJobCommand, HiggsfieldJobAction } from '../../shared/higgsfieldJobs'
+import { HIGGSFIELD_RUNNABLE_MODELS, higgsfieldBundledCatalogModels, higgsfieldModel, type HiggsfieldPreset } from '../../shared/higgsfieldNative'
+import type { HiggsfieldNodeState } from '../../shared/higgsfieldNodeBinding'
+import type { HiggsfieldContractView } from '../../shared/higgsfieldInputContract'
+import { editNativeInputValue } from '../../shared/nativeInputValue'
+import type { FalRuntimeField } from '../../shared/falRuntimeInputs'
+import { fishSampleRateOptions, fishBitrateOptions, fishNumberOptions } from '../../shared/fishAudio'
+import { isElevenDialogue, elevenSupportsDialogue, elevenSpeechModePatch, ELEVEN_DIALOGUE_MAX_CHARACTERS, type ElevenDialogueTurn } from '../../shared/elevenDialogue'
+import { ElevenVoiceSampleButton } from './ElevenVoiceSampleButton'
+import { SelectorLeadingIcon } from './SelectorLeadingIcon'
 import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Position, type NodeProps } from '@xyflow/react'
@@ -7,6 +21,8 @@ import { measuredFloatingMenuWidth, selectorTriggerFontSize, useContinuousAnchor
 import { generationActionState, useGenerationTimeLeft } from './runPresentation'
 import {
   ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
   Box,
   Clapperboard,
   Check,
@@ -49,8 +65,9 @@ import {
   Video,
   Volume2,
 } from 'lucide-react'
-import type { CharacterView, ElementView, GenerationCostEstimate, ImportedAsset, SemanticAssetAvailability, ServiceAccountStatus, ServiceProvider, StudioNode, StudioNodeData } from '../../shared/types'
-import { curatedAssistantModels, type AssistantProvider } from '../../shared/assistantModels'
+import type { CharacterView, ElementView, GenerationCostEstimate, ImportedAsset, SemanticAssetAvailability, ServiceAccountStatus, ServiceModelAvailability, ServiceProvider, StudioNode, StudioNodeData } from '../../shared/types'
+import type { AssistantProvider } from '../../shared/assistantModels'
+import { ASSISTANT_PROVIDER_GROUPS, assistantModelGroups, resolveAssistantSelection, type AssistantCatalogs } from '../../shared/assistantProviderSelection'
 import { closedVideoModelLabel, defaultVideoRatio, formatDurationSeconds, knownOutputFrameRate, motionCadenceOptions, normalizedMotionCadence, resolvedVideoRatio, resolveVideoModel, videoModelDurationInventory, VIDEO_MODELS, VIDEO_MODEL_MENU_SECTIONS } from '../../shared/videoModels'
 import { normalizedGeneratorDurationPatch } from '../../shared/storyboardVideoSync'
 import { generationServiceProvider } from '../../shared/generationServiceProvider'
@@ -60,16 +77,21 @@ import { siAlibabacloud, siAnthropic, siBytedance, siDeepseek, siElevenlabs, siF
 import { STYLE_PRESETS } from '../../shared/stylePresets'
 import { firstPanelAssetName, mediaRenameStem, normalizeLogicalAssetName } from '../../shared/assetNaming'
 import { nodeInputPorts } from '../../shared/nodePorts'
+import { falFlowMenuOptions, type FalProductionFlow } from '../../shared/falModelFlow'
+import { falNativeFlowForKind } from '../../shared/falNativeExecution'
+import { preserveFalNativeSelection, type FalNativeNodeState } from '../../shared/falNodeBinding'
+import type { FalSchemaContract, FalJson } from '../../shared/falSchemaBinding'
 import { NodePort } from './NodePort'
 import { prioritizeConnectedInputRules, workflowTag, type ConnectedInputRule, type InputFidelity } from '../../shared/inputRules'
 import { formatRequirementList } from '../../shared/generationReadiness'
 import { outputSignalFor } from '../../shared/nodeConnections'
 import { previewFocalPosition } from '../../shared/previewFocus'
 import { FAL_IMAGE_MODELS, FAL_REFERENCE_IMAGE_MODELS, imageModelSelectionPatch, imageResolutionOptions } from '../../shared/imageModels'
-import { compactProviderError } from '../../shared/providerErrors'
+import { compactProviderError, providerDisplayName } from '../../shared/providerErrors'
+import { audioGenerationLabel, elevenSpeechModelsByVersion, directElevenLanguageOptions, elevenSupportsSpeed, ELEVEN_DIRECT_OUTPUT_FORMATS, voiceModelSelectionPatch } from '../../shared/elevenLabsAudio'
 import { nodeNotificationCategory } from '../../shared/nodeNotificationCategory'
 import { activeMediaName, generatedResultName } from '../../shared/generatedMedia'
-import { ELEVEN_AUDIO_OUTPUT_FORMATS, ELEVEN_V3_BUILT_IN_VOICES, FISH_AUDIO_FORMATS, FISH_MP3_BITRATES, FISH_OPUS_BITRATES, FISH_SAMPLE_RATES, FISH_TTS_MODELS } from '../../shared/providerOptions'
+import { ELEVEN_AUDIO_OUTPUT_FORMATS, ELEVEN_V3_BUILT_IN_VOICES, FISH_AUDIO_FORMATS } from '../../shared/providerOptions'
 import { ELEVEN_V3_LANGUAGES, normalizedElevenV3LanguageCode } from '../../shared/voiceLanguages'
 import { ELEMENT_ANCHOR_VIEW, ELEMENT_VIEWS, missingElementViews } from '../../shared/elementViews'
 import { incompleteSemanticReason } from '../../shared/semanticReadiness'
@@ -84,6 +106,7 @@ import { nextVideoPromptRovingMode, videoPromptRovingTabIndex, type VideoPromptM
 import { MediaOfflineState, type MediaOfflineVisualState } from './MediaOfflineState'
 import { useHorizontalAssetSelector } from './useHorizontalAssetSelector'
 import { acceptedAssetBatch, assetBatchDisplayName, removeSavedBatchRow, type AssetBatchInspection, type AssetBatchKind } from '../../shared/assetBatch'
+import { modelCatalogMenu, modelReleaseNeedsExpansion, visibleModelCatalogOptions, type ModelMenuMetadata } from '../../shared/modelCatalogMenu'
 import { filterAndRankSelectorOptions, selectorSearchKeyAction, setSelectorPortalOpen } from '../../shared/selectorSearch'
 import { migrateSemanticAssetLifecycleMetadata } from '../../shared/semanticAssetLifecycleMigration'
 import { reusableEditorDraft } from '../../shared/reusableEditorDraft'
@@ -104,9 +127,9 @@ import elementFrameworkFront from './assets/element-framework/front.png'
 import elementFrameworkSide from './assets/element-framework/side.png'
 import elementFrameworkBack from './assets/element-framework/back.png'
 
-export type ModelCompany = 'fal' | 'byteplus' | 'omniroute' | 'openai' | 'google' | 'anthropic' | 'deepseek' | 'moonshot' | 'meta' | 'black-forest-labs' | 'alibaba' | 'bytedance' | 'kuaishou' | 'elevenlabs' | 'fish'
-export type GroupedMenuOption = { value: string; label: string; iconPath?: string; provider?: ModelCompany; aspectRatioPreview?: string; aliases?: readonly string[]; disabled?: boolean }
-export type GroupedMenuGroup = { label: string; options: GroupedMenuOption[] }
+export type ModelCompany = 'higgsfield' | 'fal' | 'byteplus' | 'omniroute' | 'openai' | 'google' | 'anthropic' | 'deepseek' | 'moonshot' | 'meta' | 'black-forest-labs' | 'alibaba' | 'bytedance' | 'kuaishou' | 'elevenlabs' | 'fish'
+export type GroupedMenuOption = { value: string; label: string; iconPath?: string; provider?: ModelCompany; service?: ServiceProvider; aspectRatioPreview?: string; aliases?: readonly string[]; disabled?: boolean; catalog?: ModelMenuMetadata }
+export type GroupedMenuGroup = { label: string; service?: ServiceProvider; options: GroupedMenuOption[] }
 
 export function GeneratorInputIcon({ id, signal, kind }: { id: string; signal: ReturnType<typeof nodeInputPorts>[number]['signal']; kind: StudioNodeData['kind'] }) {
   const Icon = generatorInputIconFor(id, signal, kind)
@@ -114,6 +137,7 @@ export function GeneratorInputIcon({ id, signal, kind }: { id: string; signal: R
 }
 
 export function generatorInputLabel(id: string, fallback: string): string {
+  if (fallback.startsWith('Unavailable · ')) return fallback
   return ({
     'text-in': 'Add Prompt',
     'storyboard-in': 'Add Storyboard',
@@ -146,22 +170,19 @@ const ELEVEN_SPEED_OPTIONS = Array.from({ length: 11 }, (_, index) => {
   return { value: String(speed), label: `${speed}×` }
 })
 
-const FISH_VOLUME_OPTIONS = Array.from({ length: 41 }, (_, index) => {
-  const decibels = index - 20
-  return { value: String(decibels), label: `${decibels > 0 ? '+' : ''}${decibels} dB` }
-})
-
 export const VIDEO_MODEL_MENU_GROUPS: GroupedMenuGroup[] = VIDEO_MODEL_MENU_SECTIONS.map((section) => ({
   label: section === 'wan' ? 'fal.ai · Wan' : section === 'seedance-2.5' ? 'fal.ai · Seedance 2.5' : section === 'seedance-2' ? 'fal.ai · Seedance 2' : section === 'byteplus-seedance-2.5' ? 'BytePlus · Seedance 2.5' : section === 'byteplus-seedance-2' ? 'BytePlus · Seedance 2' : section === 'kling' ? 'fal.ai · Kling' : 'fal.ai · Google Veo',
   options: VIDEO_MODELS.filter((model) => model.menuSection === section).map((model) => ({
     value: model.id,
     label: model.label,
+    catalog: { service: model.provider === 'byteplus' ? 'BytePlus' : 'fal.ai', company: model.family === 'wan' ? 'Alibaba' : model.family === 'seedance' ? 'ByteDance' : model.family === 'kling' ? 'Kling' : 'Google', release: model.label.replace(/^BytePlus /, '').split(' · ')[0].replace(/^Seedance 2(?= |$)/, 'Seedance 2.0'), mode: ({ text: 'Text to Video', image: 'Image to Video', reference: 'Reference to Video', 'first-last': 'Start / End to Video', extend: 'Extend Video' } as Record<string, string>)[model.mode] },
     iconPath: section === 'wan' ? siAlibabacloud.path : section.startsWith('seedance') ? siBytedance.path : section === 'kling' ? siKuaishou.path : siGoogle.path,
   })),
 }))
 
 export function modelCompanyFor(value: string, label = ''): ModelCompany | undefined {
-  const identity = `${value} ${label}`.toLowerCase()
+  const identity = `${value.replace(/^(?:higgsfield-native|fal-native)::/, '')} ${label}`.toLowerCase()
+  if (/higgsfield|genjutsu/.test(identity)) return 'higgsfield'
   if (/flux|black forest/.test(identity)) return 'black-forest-labs'
   if (/nano-banana|gemini|imagen|veo/.test(identity)) return 'google'
   if (/gpt|openai/.test(identity)) return 'openai'
@@ -177,9 +198,12 @@ export function modelCompanyFor(value: string, label = ''): ModelCompany | undef
   return undefined
 }
 
-export function GroupedMenuSelect({ value, groups, ariaLabel, ariaDescribedBy, accessibleLabel: requestedAccessibleLabel, title, disabled = false, className = '', menuClassName = '', displayLabel, compactLabel: requestedCompactLabel, defaultLabel: requestedDefaultLabel, fillTrack = false, onChange }: {
+export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ariaDescribedBy, accessibleLabel: requestedAccessibleLabel, title, disabled = false, className = '', menuClassName = '', displayLabel, compactLabel: requestedCompactLabel, defaultLabel: requestedDefaultLabel, fillTrack = false, catalog = false, promptCatalog = false, searchable = false, onChange }: {
   value: string
   groups: GroupedMenuGroup[]
+  catalog?: boolean
+  promptCatalog?: boolean
+  searchable?: boolean
   ariaLabel: string
   ariaDescribedBy?: string
   accessibleLabel?: string
@@ -193,10 +217,13 @@ export function GroupedMenuSelect({ value, groups, ariaLabel, ariaDescribedBy, a
   fillTrack?: boolean
   onChange: (value: string) => void
 }) {
+  const availability = useContext(ProviderAvailabilityContext)
+  const groups = catalog || suppliedGroups.some(group => group.service) ? filterProviderModelGroups(suppliedGroups, promptCatalog ? availability.promptConnected : availability.mediaConnected) : suppliedGroups
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeValue, setActiveValue] = useState(value)
-  const [position, setPosition] = useState<{ left: number; bottom: number; width: number; fontSize: number } | null>(null)
+  const [expandedCatalog, setExpandedCatalog] = useState<Set<string>>(new Set())
+  const [position, setPosition] = useState<{ left: number; bottom?: number; top?: number; maxHeight?: number; width: number; fontSize: number } | null>(null)
   const selectorId = useId().replace(/:/g, '')
   const listboxId = `selector-listbox-${selectorId}`
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -205,9 +232,17 @@ export function GroupedMenuSelect({ value, groups, ariaLabel, ariaDescribedBy, a
   const preSearchScrollTop = useRef(0)
   const previousSearchQuery = useRef('')
   const selected = groups.flatMap((group) => group.options).find((option) => option.value === value)
-  const searchableOptions = groups.flatMap((group) => group.options.map((option) => ({ ...option, group: group.label })))
+  const companyNames: Partial<Record<ModelCompany, string>> = { higgsfield: 'Higgsfield', fal: 'fal.ai', byteplus: 'BytePlus', omniroute: 'OmniRoute', openai: 'OpenAI', google: 'Google', anthropic: 'Anthropic', deepseek: 'DeepSeek', moonshot: 'Moonshot', meta: 'Meta', 'black-forest-labs': 'Black Forest Labs', alibaba: 'Alibaba', bytedance: 'ByteDance', kuaishou: 'Kling', elevenlabs: 'ElevenLabs', fish: 'Fish Audio' }
+  const catalogProviders = modelCatalogMenu(groups.map((group) => ({ ...group, options: group.options.map((option) => {
+    const company = option.provider || modelCompanyFor(option.value, option.label)
+    return { ...option, catalog: option.catalog || { service: group.label, company: company && companyNames[company] || group.label, release: option.label } }
+  }) })))
+  const menuGroups = catalog ? catalogProviders.map(provider => ({ label: provider.label, options: provider.releases.flatMap(release => release.options) })) : groups
+  const searchableOptions = menuGroups.flatMap(group => group.options.map(option => ({ ...option, group: group.label, aliases: [...(option.aliases || []), ...(option.catalog ? [option.catalog.service, option.catalog.company, option.catalog.release, option.catalog.mode || ''] : [])] })))
   const filteredOptions = searchQuery ? filterAndRankSelectorOptions(searchableOptions, searchQuery) : searchableOptions
-  const enabledFiltered = filteredOptions.filter((option) => !option.disabled)
+  const visibleCatalogOptions = visibleModelCatalogOptions(catalogProviders, expandedCatalog, Boolean(searchQuery))
+  const visibleCatalogValues = new Set(visibleCatalogOptions.map((option) => option.value))
+  const enabledFiltered = filteredOptions.filter((option) => !option.disabled && (!catalog || visibleCatalogValues.has(option.value)))
   const filteredOrder = new Map(filteredOptions.map((option, index) => [option.value, index]))
   const visibleGroups = groups.map((group) => ({ ...group, options: group.options.filter((option) => filteredOrder.has(option.value)).sort((a, b) => (filteredOrder.get(a.value) || 0) - (filteredOrder.get(b.value) || 0)) })).filter((group) => group.options.length).sort((a, b) => Math.min(...a.options.map((option) => filteredOrder.get(option.value) || 0)) - Math.min(...b.options.map((option) => filteredOrder.get(option.value) || 0)))
   const fallbackModelId = value.replace(/^[^:]+::/, '')
@@ -237,11 +272,14 @@ export function GroupedMenuSelect({ value, groups, ariaLabel, ariaDescribedBy, a
       setOpen(false)
       return
     }
-    const measuredWidth = measuredFloatingMenuWidth(buttonRef.current!, groups.flatMap((group) => [group.label, ...group.options.map((option) => option.label)]), fittedWidth, 360, 44)
+    const measuredWidth = measuredFloatingMenuWidth(buttonRef.current!, groups.flatMap((group) => [group.label, ...group.options.map((option) => option.label)]), catalog ? 280 : fittedWidth, 360, 44)
     const width = Math.min(window.innerWidth - 16, Math.max(rect.width, measuredWidth))
     const fontSize = selectorTriggerFontSize(buttonRef.current!)
-    const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), bottom: window.innerHeight - rect.top + 4, width, fontSize }
-    setPosition((current) => current && Math.abs(current.left - next.left) < .25 && Math.abs(current.bottom - next.bottom) < .25 && Math.abs(current.width - next.width) < .25 && Math.abs(current.fontSize - next.fontSize) < .05 ? current : next)
+    const above = Math.max(0, rect.top - 12)
+    const below = Math.max(0, window.innerHeight - rect.bottom - 12)
+    const useBelow = catalog && below > above
+    const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), bottom: useBelow ? undefined : window.innerHeight - rect.top + 4, top: useBelow ? rect.bottom + 4 : undefined, maxHeight: catalog ? Math.min(520, useBelow ? below : above) : undefined, width, fontSize }
+    setPosition((current) => current && Math.abs(current.left - next.left) < .25 && current.bottom === next.bottom && current.top === next.top && current.maxHeight === next.maxHeight && Math.abs(current.width - next.width) < .25 && Math.abs(current.fontSize - next.fontSize) < .05 ? current : next)
   }
 
   useContinuousAnchor(open, positionMenu)
@@ -315,11 +353,13 @@ export function GroupedMenuSelect({ value, groups, ariaLabel, ariaDescribedBy, a
     if (event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return }
     if (event.key === 'Home') { event.preventDefault(); moveActive(0, 'first'); return }
     if (event.key === 'End') { event.preventDefault(); moveActive(0, 'last'); return }
+    if ((event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('[data-catalog-disclosure], .selector-search-row button')) return
     if (event.key === 'Enter' && activeValue) {
       const option = filteredOptions.find((candidate) => candidate.value === activeValue)
       if (option && !option.disabled) { event.preventDefault(); onChange(option.value); closeMenu(); buttonRef.current?.focus() }
       return
     }
+    if ((catalog || searchable) && event.target instanceof HTMLInputElement) return
     if (!searchQuery) {
       const action = selectorSearchKeyAction(event)
       if (action.activate) {
@@ -335,27 +375,80 @@ export function GroupedMenuSelect({ value, groups, ariaLabel, ariaDescribedBy, a
       positionMenu()
       setSearchQuery('')
       setActiveValue(value)
+      if (catalog) {
+        const owner = catalogProviders.find((provider) => provider.releases.some((release) => release.options.some((option) => option.value === value)))
+        const release = owner?.releases.find((item) => item.options.some((option) => option.value === value))
+        setExpandedCatalog(new Set(owner && release ? [owner.label, release.key] : []))
+      }
       setOpen(true)
-      focusOption(value)
+      if (catalog || searchable) window.requestAnimationFrame(() => inputRef.current?.focus()); else focusOption(value)
     } else closeMenu()
+  }
+
+  const toggleCatalogGroup = (key: string) => setExpandedCatalog((current) => {
+    const next = new Set(current)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
+  const showFeaturedRelease = (provider: string, releaseKey: string, optionValue?: string) => {
+    const release = catalogProviders.find(item => item.label === provider)?.releases.find(item => item.key === releaseKey)
+    if (release && !modelReleaseNeedsExpansion(release) && optionValue) { onChange(optionValue); closeMenu(); buttonRef.current?.focus(); return }
+    setExpandedCatalog(current => new Set([...current, releaseKey]))
+    if (optionValue) { setActiveValue(optionValue); focusOption(optionValue) }
+  }
+  const catalogIdentity = (label: string, option?: GroupedMenuOption) => {
+    const provider = option?.provider || Object.entries(companyNames).find(([, name]) => name === label || label.startsWith(`${name} ·`))?.[0] as ModelCompany | undefined
+    const company = provider || modelCompanyFor(option?.value || '', label)
+    return company ? <CompanyIcon provider={company} /> : <span className="model-company-logo-placeholder" aria-hidden="true" />
+  }
+  const renderOption = (option: GroupedMenuOption, modeLabel: string | false = false, isNew = false) => {
+    const company = option.provider || modelCompanyFor(option.value, option.label)
+    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} title={`${option.label} · ${option.value}`} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu(); buttonRef.current?.focus() }}>{company ? <CompanyIcon provider={company} /> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || <span className="model-company-logo-placeholder" aria-hidden="true" />}<span>{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
   }
 
   return <>
     <button ref={buttonRef} type="button" className={`grouped-menu-select ${className}`} data-equalized-options={fillTrack ? JSON.stringify(equalizedLabels) : undefined} data-equalized-default={fillTrack ? defaultLabel : undefined} data-equalized-full={fillTrack ? selectedLabel : undefined} data-equalized-compact={fillTrack ? compactLabel : undefined} data-equalized-leading={fillTrack && hasEqualizedLeadingMark ? 'true' : undefined} style={fillTrack ? { width: '100%', minWidth: 0, maxWidth: '100%' } : { width: fittedWidth, maxWidth: '100%' }} aria-label={ariaLabel} aria-describedby={ariaDescribedBy} aria-description={accessibleLabel} aria-haspopup="listbox" aria-expanded={open} title={title ? `${title} · ${accessibleLabel}` : accessibleLabel} disabled={disabled} onClick={toggle}>
-      {selectedCompany ? <CompanyIcon provider={selectedCompany} /> : selected?.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={selected.iconPath} /></svg> : null}<span className="selected-label"><span className="selected-label-full">{selectedLabel}</span><span className="selected-label-compact" aria-hidden="true">{compactLabel}</span></span><ChevronDown size={10} />
+      {(selectedCompany || selected?.iconPath) && <SelectorLeadingIcon identity={selectedCompany || selected!.iconPath!}>{selectedCompany ? <CompanyIcon provider={selectedCompany} /> : <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={selected!.iconPath} /></svg>}</SelectorLeadingIcon>}<span className="selected-label"><span className="selected-label-full">{selectedLabel}</span><span className="selected-label-compact" aria-hidden="true">{compactLabel}</span></span><ChevronDown size={10} />
     </button>
-    {open && position && createPortal(<div className={`grouped-menu-select-menu ${menuClassName} nodrag`} style={{ left: position.left, bottom: position.bottom, width: position.width, '--floating-menu-font-size': `${position.fontSize}px` } as CSSProperties} onKeyDown={handleMenuKeyDown}>
-      {searchQuery && <div className="selector-search-row"><input ref={inputRef} value={searchQuery} aria-label={`Search ${ariaLabel} options`} aria-controls={listboxId} aria-activedescendant={activeValue ? `${listboxId}-${activeValue}` : undefined} onChange={(event) => { const next = event.target.value; if (!next) hideSearch(); else setSearchQuery(next) }} /><button type="button" aria-label="Clear selector search" onClick={hideSearch}>×</button></div>}
+    {open && position && createPortal(<div className={`grouped-menu-select-menu ${menuClassName} ${catalog ? 'model-catalog-menu' : ''} nodrag`} style={{ left: position.left, bottom: position.bottom, top: position.top, maxHeight: position.maxHeight, width: position.width, '--floating-menu-font-size': `${position.fontSize}px` } as CSSProperties} onKeyDown={handleMenuKeyDown}>
+      {(catalog || searchable || searchQuery) && <div className="selector-search-row"><input ref={inputRef} value={searchQuery} placeholder={catalog ? 'Search models and modes' : searchable ? 'Search voices' : undefined} aria-label={`Search ${ariaLabel} options`} aria-controls={listboxId} aria-activedescendant={activeValue ? `${listboxId}-${activeValue}` : undefined} onChange={(event) => { const next = event.target.value; if (!next) hideSearch(); else setSearchQuery(next) }} /><button type="button" aria-label="Clear selector search" onClick={hideSearch}>×</button></div>}
       <div className="selector-result-count sr-only" aria-live="polite">{filteredOptions.length} result{filteredOptions.length === 1 ? '' : 's'}</div>
-      <div ref={resultsRef} id={listboxId} className="selector-results" role="listbox" aria-label={`${ariaLabel} options`}>
-        {!filteredOptions.length ? <div className="selector-empty-state" role="status">No matching options</div> : visibleGroups.map((group) => <section key={group.label}>{group.label && <small>{group.label}</small>}{group.options.map((option) => { const company = option.provider || modelCompanyFor(option.value, option.label); return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu() }}>{company ? <CompanyIcon provider={company} /> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || <span className="model-company-logo-placeholder" aria-hidden="true" />}<span>{option.label}</span>{option.value === value && <Check size={11} />}</button> })}</section>)}
+      <div ref={resultsRef} className="selector-results">
+
+        {catalog && !searchQuery && catalogProviders.map(provider => provider.featured.length ? <section className="model-catalog-featured" key={`featured-${provider.label}`}><small>Featured · {provider.label}</small>{provider.featured.map(release => <button type="button" data-catalog-disclosure key={release.key} aria-label={`${release.label} · ${provider.label} · ${modelReleaseNeedsExpansion(release) ? 'show options' : 'choose model'}`} onClick={() => showFeaturedRelease(provider.label, release.key, release.options.find(option => !option.disabled)?.value)}>{catalogIdentity(release.company, release.options[0])}<span>{release.label}</span>{release.isNew && <em className="model-new-badge">New</em>}<ChevronRight size={11} /></button>)}</section> : null)}
+        <div id={listboxId} role="listbox" aria-label={`${ariaLabel} options`}>
+          {!filteredOptions.length ? <div className="selector-empty-state" role="status">No matching options</div> : catalog ? <>
+            <div className="model-catalog-all-label">Latest Models</div>
+            {catalogProviders.map((provider) => {
+              const releases = provider.releases.map((release) => ({ ...release, options: release.options.filter((option) => filteredOrder.has(option.value)) })).filter((release) => release.options.length)
+              if (!releases.length) return null
+              return <div className="model-catalog-provider" role="presentation" key={provider.label}>
+                <div role="presentation" className="model-catalog-company"><small>{catalogIdentity(provider.label)}<span>{provider.label}</span></small></div>
+                {[...new Set(releases.map((release) => release.company))].map((company) => <div role="presentation" className="model-catalog-company" key={company}>{company !== provider.label && <small>{catalogIdentity(company)}<span>{company}</span></small>}{releases.filter((release) => release.company === company).map((release) => {
+                  const releaseOpen = Boolean(searchQuery) || expandedCatalog.has(release.key)
+                  if (!modelReleaseNeedsExpansion(release)) return <section key={release.key}>{release.options.map((option) => renderOption(option, false, release.isNew))}</section>
+                  return <section key={release.key} role="group" aria-label={`${provider.label} · ${company} · ${release.label}`}>
+                    <button type="button" data-catalog-disclosure className="model-catalog-disclosure" aria-expanded={releaseOpen} onClick={() => toggleCatalogGroup(release.key)}>{catalogIdentity(release.company, release.options[0])}<span>{release.label}</span>{release.isNew && <em className="model-new-badge">New</em>}<ChevronRight size={11} className={releaseOpen ? 'is-expanded' : ''} /></button>
+                    {releaseOpen && release.options.map((option) => {
+                      const releaseLabel = option.catalog?.release || release.label
+                      const tier = releaseLabel.startsWith(release.label) ? releaseLabel.slice(release.label.length).replace(/^[\s·-]+/, '') : releaseLabel === release.label ? '' : releaseLabel
+                      const label = [tier, option.catalog?.mode].filter(Boolean).join(' · ') || option.label
+                      return renderOption(option, label)
+                    })}
+                  </section>
+                })}</div>)}
+              </div>
+            })}
+          </> : visibleGroups.map((group) => <section key={group.label}>{group.label && <small>{group.label}</small>}{group.options.map((option) => renderOption(option))}</section>)}
+        </div>
       </div>
     </div>, document.body)}
   </>
 }
 
-export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, displayLabel, title, disabled = false, className = '', menuClassName = '', defaultLabel, fillTrack = false, onChange }: {
+export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, displayLabel, title, disabled = false, className = '', menuClassName = '', defaultLabel, fillTrack = false, searchable = false, service, onChange }: {
   value: string | undefined
+  service?: ServiceProvider
   options: GroupedMenuOption[]
   ariaLabel: string
   accessibleLabel?: string
@@ -366,11 +459,12 @@ export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, d
   menuClassName?: string
   defaultLabel?: string
   fillTrack?: boolean
+  searchable?: boolean
   onChange: (value: string) => void
 }) {
   return <GroupedMenuSelect
     value={value || options[0]?.value || ''}
-    groups={[{ label: '', options }]}
+    groups={[{ label: '', service, options }]}
     ariaLabel={ariaLabel}
     accessibleLabel={accessibleLabel}
     displayLabel={displayLabel}
@@ -380,6 +474,7 @@ export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, d
     menuClassName={`simple-menu-select-menu ${menuClassName}`}
     defaultLabel={defaultLabel}
     fillTrack={fillTrack}
+    searchable={searchable}
     onChange={onChange}
   />
 }
@@ -499,6 +594,22 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
       const groupStyle = window.getComputedStyle(group)
       return Math.max(0, group.clientWidth - numeric(groupStyle.paddingLeft) - numeric(groupStyle.paddingRight))
     }
+    const mountProbeInContext = (probe: HTMLElement) => {
+      // Preserve ancestor selectors and inherited tokens without React Flow's
+      // transform or layout constraints. A detached voice row otherwise loses
+      // its label/grid and input rules and rejects a valid painted allocation.
+      let root: HTMLElement = probe
+      for (let parent = group.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+        const context = parent.cloneNode(false) as HTMLElement
+        context.removeAttribute('id')
+        context.style.setProperty('display', 'contents', 'important')
+        context.style.setProperty('transform', 'none', 'important')
+        context.appendChild(root)
+        root = context
+      }
+      document.body.appendChild(root)
+      return () => root.remove()
+    }
     const paintedWidth = (control: HTMLElement, value: string) => {
       const style = window.getComputedStyle(control)
       const context = document.createElement('canvas').getContext('2d')
@@ -518,9 +629,9 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
       probe.style.setProperty('max-width', 'none', 'important')
       probe.style.setProperty('flex-basis', 'auto', 'important')
       host.appendChild(probe)
-      document.body.appendChild(host)
+      const unmount = mountProbeInContext(host)
       const width = probe.getBoundingClientRect().width
-      host.remove()
+      unmount()
       return width
     }
     const paintedElement = (wrapper: Element) => wrapper.querySelector<HTMLElement>('[data-equalized-default], .quantity-stepper, .storyboard-budget, .compact-toggle, .play-tooltip-anchor, :scope > button, :scope > label') || wrapper as HTMLElement
@@ -548,7 +659,7 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
         }
         probe.appendChild(probeRow)
       }
-      document.body.appendChild(probe)
+      const unmount = mountProbeInContext(probe)
       const probeStyle = window.getComputedStyle(probe)
       const probeRect = probe.getBoundingClientRect()
       const usableLeft = probeRect.left + numeric(probeStyle.paddingLeft)
@@ -558,7 +669,7 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
         return { id: (wrapper as HTMLElement).dataset.fluidControlId || 'unknown', left: rect.left, right: rect.right }
       }))
       const validation = validatePaintedControlLayout(ariaLabel, usableLeft, usableRight, sharedGap, paintedRows)
-      probe.remove()
+      unmount()
       return validation
     }
     const commitAllocation = (availableWidth: number) => {
@@ -881,22 +992,227 @@ function ProviderIcon({ provider }: { provider: AssistantProvider }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={icon.path} /></svg>
 }
 
-export function CompanyIcon({ provider }: { provider: ModelCompany }) {
-  if (provider === 'fal') return <span className="fal-company-wordmark" aria-hidden="true">fal</span>
-  if (provider === 'omniroute') return <span className="model-company-wordmark" aria-hidden="true">OR</span>
-  if (provider === 'black-forest-labs') return <span className="model-company-wordmark" aria-hidden="true">BFL</span>
-  const icon = provider === 'meta' ? siMeta : provider === 'alibaba' ? siAlibabacloud : provider === 'bytedance' || provider === 'byteplus' ? siBytedance : provider === 'kuaishou' ? siKuaishou : provider === 'elevenlabs' ? siElevenlabs : provider === 'fish' ? siFishaudio : null
-  return <span className="provider-company-logo" aria-hidden="true">{icon ? <svg viewBox="0 0 24 24"><path d={icon.path} /></svg> : <ProviderIcon provider={provider as AssistantProvider} />}</span>
+export function voiceModelMenuGroups(models: ServiceModelAvailability['models'], fishAvailability?: ServiceModelAvailability, savedFish?: string): GroupedMenuGroup[] {
+  return [
+    { label: 'ElevenLabs · Direct', service: 'elevenlabs', options: elevenSpeechModelsByVersion(models).map((model) => ({ value: `elevenlabs-direct::${model.id}`, label: model.label, provider: 'elevenlabs' as const })) },
+    { label: 'fal.ai', service: 'fal', options: [{ value: 'elevenlabs', label: 'ElevenLabs Eleven v3', provider: 'elevenlabs' }] },
+    { label: 'Fish Audio', service: 'fish', options: [...(fishAvailability?.models || []).map(model => ({ value: `fish-audio::${model.id}`, label: model.label, provider: 'fish' as const, disabled: Boolean(fishAvailability?.catalogStale), catalog: { service: 'Fish Audio', company: 'Fish Audio', release: model.label } })), ...(savedFish && !fishAvailability?.models.some(model => model.id === savedFish) ? [{ value: `fish-audio::${savedFish}`, label: `Unavailable (${savedFish})`, provider: 'fish' as const, disabled: true }] : [])] },
+  ]
 }
 
-function ConnectedRuleRows({ items, onMode }: { items: ConnectedInputRule[]; onMode: (edgeId: string, mode: InputFidelity) => void }) {
-  return <>{prioritizeConnectedInputRules(items).filter((item) => item.toggleable && item.edgeId).map((item) => <div key={`${item.edgeId || item.tag}-${item.label}`} title={item.rule}>
+export function VoiceModelSelect({ data, models, onChange, className = '', falAvailability, fishAvailability, onFalSelect }: { data: StudioNodeData; models: ServiceModelAvailability['models']; onChange(patch: Partial<StudioNodeData>): void; className?: string; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+  const value = data.voiceEngine === 'fish-audio' ? `fish-audio::${data.fishModel || 's2-pro'}` : data.voiceEngine === 'elevenlabs-direct' ? `elevenlabs-direct::${data.voiceModelId || ''}` : 'elevenlabs'
+  const label = data.voiceEngine === 'elevenlabs-direct' ? models.find((model) => model.id === data.voiceModelId)?.label || data.voiceModelId || 'Choose ElevenLabs model' : data.voiceEngine === 'fish-audio' ? fishAvailability?.models.find(model => model.id === (data.fishModel || 's2-pro'))?.label || `Fish Audio ${data.fishModel || 's2-pro'}` : 'ElevenLabs Eleven v3'
+  const groups = falAvailability ? liveFalModelGroups('voice', falAvailability, voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined), data.falNative) : voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined)
+  return <GroupedMenuSelect catalog className={className} ariaLabel="Voice provider and model" defaultLabel={data.falNative?.label || label} displayLabel={data.falNative?.label || label} fillTrack value={data.falNative ? `fal-native::${data.falNative.endpointId}` : value} groups={groups} onChange={(selection) => { if (selection.startsWith('fal-native::')) { onFalSelect?.(selection.slice(12)); return } const patch = voiceModelSelectionPatch(selection, data, models, fishAvailability?.catalogStale ? [] : fishAvailability?.models || []); if (patch) onChange({ ...preserveFalNativeSelection(data), ...patch }) }} />
+}
+
+export function SoundModelSelect({ data, onChange, className = '', falAvailability, onFalSelect }: { data: StudioNodeData; onChange(patch: Partial<StudioNodeData>): void; className?: string; falAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+  const legacy: GroupedMenuGroup[] = [
+    { label: 'ElevenLabs · Direct', service: 'elevenlabs', options: [{ value: 'elevenlabs', label: 'Sound Effects v2', provider: 'elevenlabs' }] },
+    { label: 'fal.ai', service: 'fal', options: [{ value: 'fal', label: 'ElevenLabs Sound Effects v2', provider: 'elevenlabs' }] },
+  ]
+  return <GroupedMenuSelect catalog className={className} ariaLabel="Sound effect provider and model" value={data.falNative ? `fal-native::${data.falNative.endpointId}` : data.audioProvider || 'fal'} displayLabel={data.falNative?.label} groups={falAvailability ? liveFalModelGroups('effects', falAvailability, legacy, data.falNative) : legacy} onChange={(provider) => { if (provider.startsWith('fal-native::')) onFalSelect?.(provider.slice(12)); else if (provider === 'elevenlabs' || provider === 'fal') onChange({ ...preserveFalNativeSelection(data), audioProvider: provider, error: undefined }) }} />
+}
+
+export function directAudioFormatLabel(format: string): string {
+  return `${audioFormatLabel(format)}${/^(pcm|ulaw|alaw)_/.test(format) ? ' → WAV' : ''}`
+}
+
+export function DirectElevenVoiceSelect({ data, availability, onChange, ariaLabel = 'ElevenLabs voice ID' }: { ariaLabel?: string; data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void }) {
+  const voices = availability?.voices || []
+  const savedVoice = voices.some((voice) => voice.id === data.voice)
+  return <SimpleMenuSelect className="voice-primary-voice" searchable ariaLabel={ariaLabel} defaultLabel="Choose voice" fillTrack value={savedVoice ? data.voice : '__manual'} options={[...voices.map((voice) => ({ value: voice.id, label: voice.label })), { value: '__manual', label: 'Enter voice ID' }]} onChange={(voice) => onChange({ voice: voice === '__manual' ? '' : voice, error: undefined })} />
+}
+
+export function DirectElevenLanguageSelect({ data, availability, onChange }: { data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void }) {
+  const model = availability?.models.find((item) => item.id === data.voiceModelId)
+  const options: GroupedMenuOption[] = directElevenLanguageOptions(model)
+  if (data.languageCode && !options.some((item) => item.value === data.languageCode)) options.push({ value: data.languageCode, label: `Unavailable (${data.languageCode})`, disabled: true })
+  return <SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" defaultLabel="Auto" fillTrack value={data.languageCode || ''} options={options} onChange={(languageCode) => onChange({ languageCode: languageCode || undefined })} />
+}
+
+export function DirectElevenVoiceControls({ data, availability, onChange, falAvailability, fishAvailability, onFalSelect }: { data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+  const model = availability?.models.find((item) => item.id === data.voiceModelId)
+  const settingOptions = (selected: number) => {
+    const values = Array.from({ length: 21 }, (_, index) => index / 20)
+    if (!values.includes(selected)) values.push(selected)
+    return values.map((value) => ({ value: String(value), label: String(Number.isFinite(value) ? value.toFixed(2) : value), disabled: !Number.isFinite(value) || value < 0 || value > 1 }))
+  }
+  return <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
+    {availability?.catalogError && <label className="voice-primary-custom" title={availability.catalogError}><span role="alert">Could not load models · check Connections</span></label>}
+    <FluidControlGroup className="voice-primary-row voice-primary-row-two" ariaLabel="Voice Model And Voice Controls" gap={7} allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }} recalculationKey={`${data.voiceModelId}:${data.voice}:${data.elevenSpeechMode}`} controls={[
+      { id: 'model', kind: 'selector', defaultLabel: model?.label || 'Choose ElevenLabs model', fullLabel: model?.label || 'Choose ElevenLabs model', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} models={availability?.models || []} onChange={onChange} falAvailability={falAvailability} fishAvailability={fishAvailability} onFalSelect={onFalSelect} /></label> },
+      { id: 'mode', kind: 'selector', intrinsicWidth: 100, node: <label><span>Mode</span><SimpleMenuSelect ariaLabel="ElevenLabs speech mode" fillTrack value={data.elevenSpeechMode || 'speech'} options={[{ value: 'speech', label: 'Speech' }, { value: 'dialogue', label: 'Dialogue', disabled: !elevenSupportsDialogue(data.voiceModelId, model) }]} onChange={value => onChange(elevenSpeechModePatch(data, value as 'speech' | 'dialogue', () => crypto.randomUUID()))} /></label> },
+      ...(!isElevenDialogue(data) ? [{ id: 'voice', kind: 'selector' as const, intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><DirectElevenVoiceSelect data={data} availability={availability} onChange={onChange} /></label> }] : []),
+    ] as FluidGroupControl<'model' | 'mode' | 'voice'>[]} />
+    {!isElevenDialogue(data) && !availability?.voices?.some((voice) => voice.id === data.voice) && <label className="voice-primary-custom"><span>{availability?.voiceCatalogError ? 'Voices unavailable · enter voice ID' : 'Voice ID'}</span><input className="voice-primary-input" aria-label="ElevenLabs voice ID" value={data.voice || ''} onChange={(event) => onChange({ voice: event.target.value, error: undefined })} placeholder="Voice ID (required)" /></label>}
+    <FluidControlGroup className="voice-primary-row" ariaLabel="Voice Stability Similarity And Sample Controls" recalculationKey={`${data.voiceModelId}:${data.stability}:${data.similarityBoost}:${data.voice}:${data.elevenSpeechMode}`} gap={7} allocation={{ minRows: 1, maxRows: 2 }} controls={[
+      { id: 'stability', kind: 'selector', intrinsicWidth: 72, node: <label><span>Stability</span><SimpleMenuSelect ariaLabel="ElevenLabs stability" defaultLabel="0.50" fillTrack value={String(data.stability ?? 0.5)} options={settingOptions(data.stability ?? 0.5)} onChange={(value) => onChange({ stability: Number(value) })} /></label> },
+      { id: 'similarity', kind: 'selector', intrinsicWidth: 72, node: <label><span>Similarity</span><SimpleMenuSelect ariaLabel="ElevenLabs similarity" defaultLabel="0.75" fillTrack value={String(data.similarityBoost ?? 0.75)} options={settingOptions(data.similarityBoost ?? 0.75)} onChange={(value) => onChange({ similarityBoost: Number(value) })} /></label> },
+      ...(!isElevenDialogue(data) ? [{ id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <label><span>Test</span><ElevenVoiceSampleButton voice={availability?.voices?.find((voice) => voice.id === data.voice)} availability={availability} /></label> }] : []),
+    ]} />
+  </div>
+}
+
+export function ElevenDialogueEditor({ data, availability, onChange }: { data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void }) {
+  const turns = data.elevenDialogueTurns || []
+  const patchTurn = (id: string, patch: Partial<ElevenDialogueTurn>) => onChange({ elevenDialogueTurns: turns.map(turn => turn.id === id ? { ...turn, ...patch } : turn), error: undefined })
+  const move = (index: number, delta: number) => { const next = [...turns]; [next[index], next[index + delta]] = [next[index + delta], next[index]]; onChange({ elevenDialogueTurns: next, error: undefined }) }
+  return <>
+    {turns.map((turn, index) => <div key={turn.id} data-dialogue-turn={turn.id}>
+      <div className="voice-primary-controls equalized-control-group nodrag">
+        <FluidControlGroup className="voice-primary-row" ariaLabel={`Dialogue Speaker ${index + 1}`} gap={7} allocation={{ minRows: 1, maxRows: 2 }} recalculationKey={`${turn.id}:${turn.voiceId}:${index}:${turns.length}`} controls={[
+          { id: 'voice', kind: 'selector', intrinsicWidth: 112, minimumWidth: 80, shrinkPriority: 'model', node: <label><span>Speaker {index + 1}</span><DirectElevenVoiceSelect data={{ ...data, voice: turn.voiceId }} availability={availability} ariaLabel={`Speaker ${index + 1} voice`} onChange={patch => patchTurn(turn.id, { voiceId: patch.voice || '' })} /></label> },
+          { id: 'sample', kind: 'fixed-action', intrinsicWidth: 28, node: <label><span>Test</span><ElevenVoiceSampleButton voice={availability?.voices?.find(voice => voice.id === turn.voiceId)} availability={availability} /></label> },
+          { id: 'up', kind: 'fixed-action', intrinsicWidth: 28, node: <label><span>Up</span><button type="button" className="compact-settings compact-options" aria-label={`Move turn ${index + 1} earlier`} disabled={!index} onClick={() => move(index, -1)}><ArrowUp size={14} /></button></label> },
+          { id: 'down', kind: 'fixed-action', intrinsicWidth: 28, node: <label><span>Down</span><button type="button" className="compact-settings compact-options" aria-label={`Move turn ${index + 1} later`} disabled={index === turns.length - 1} onClick={() => move(index, 1)}><ArrowDown size={14} /></button></label> },
+          { id: 'remove', kind: 'fixed-action', intrinsicWidth: 28, node: <label><span>Remove</span><button type="button" className="compact-settings compact-options" aria-label={`Remove turn ${index + 1}`} onClick={() => onChange({ elevenDialogueTurns: turns.filter(item => item.id !== turn.id), error: undefined })}><Trash2 size={14} /></button></label> },
+        ]} />
+        {!availability?.voices?.some(voice => voice.id === turn.voiceId) && <label className="voice-primary-custom"><span>Voice ID</span><input className="voice-primary-input" aria-label={`Speaker ${index + 1} voice ID`} value={turn.voiceId} onChange={event => patchTurn(turn.id, { voiceId: event.target.value })} /></label>}
+      </div>
+      <TaggedPromptTextarea className="node-prompt nodrag" aria-label={`Turn ${index + 1} speech text`} value={turn.text} connectedTags={[]} availableTags={[]} placeholder="Enter this speaker’s words and delivery tags…" onValueChange={text => patchTurn(turn.id, { text })} />
+    </div>)}
+    <div className="voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Dialogue Turn Actions" gap={7} allocation={{ minRows: 1, maxRows: 1 }} recalculationKey={String(turns.length)} controls={[
+      { id: 'add', kind: 'fixed-action', intrinsicWidth: 28, node: <label><span>Add</span><button type="button" className="compact-settings compact-options" aria-label="Add dialogue turn" disabled={turns.length >= ELEVEN_DIALOGUE_MAX_CHARACTERS} onClick={() => onChange({ elevenDialogueTurns: [...turns, { id: crypto.randomUUID(), voiceId: data.voice || '', text: '' }], error: undefined })}><Plus size={14} /></button></label> },
+    ]} /><label className="voice-primary-custom"><span>{turns.reduce((total, turn) => total + Array.from(turn.text).length, 0)} / {ELEVEN_DIALOGUE_MAX_CHARACTERS} characters · up to 10 voices per request</span></label></div>
+  </>
+}
+
+export function liveFalModelGroups(flow: FalProductionFlow, availability: ServiceModelAvailability | undefined, others: GroupedMenuGroup[] = [], saved?: FalNativeNodeState): GroupedMenuGroup[] {
+  const fal: GroupedMenuGroup = { label: 'fal.ai', service: 'fal', options: falFlowMenuOptions(flow, availability, saved ? { id: saved.endpointId, label: saved.label } : undefined).map(option => ({ ...option, value: `fal-native::${option.value}`, provider: modelCompanyFor(option.value, option.label) || 'fal' })) }
+  return [...others.filter(group => !group.label.startsWith('fal.ai')), ...(fal.options.length ? [fal] : [])]
+}
+
+export interface HiggsfieldPresetView { presets?: HiggsfieldPreset[]; loading?: boolean; error?: string }
+/** Same catalog, selector, field group and Inspector owners as existing production controls. */
+export function videoModelGroups(fal?: ServiceModelAvailability, higgsfield?: ServiceModelAvailability, data?: Pick<StudioNodeData, 'falNative' | 'higgsfieldNative'>): GroupedMenuGroup[] {
+  const groups = liveFalModelGroups('video', fal, VIDEO_MODEL_MENU_GROUPS, data?.falNative)
+  const models = (higgsfield?.models || higgsfieldBundledCatalogModels()).filter(model => !('category' in model) || !model.category || /video|motion/i.test(model.category))
+  const options: GroupedMenuOption[] = models.map(model => {
+    const contract = HIGGSFIELD_RUNNABLE_MODELS.find(item => item.id === model.id)
+    return { value: `higgsfield-native::${model.id}`, label: model.label, provider: modelCompanyFor(model.id, 'catalog' in model && model.catalog ? model.catalog.company : model.label), disabled: !contract,
+      catalog: 'catalog' in model && model.catalog ? model.catalog : { service: 'Higgsfield', company: contract?.kind === 'seedance' ? 'ByteDance' : 'Higgsfield', release: contract ? contract.kind === 'seedance' ? 'Seedance 2.5' : 'Genjutsu 1.0' : model.label, mode: contract?.label.split(' · ')[1] } }
+  })
+  if (data?.higgsfieldNative && !options.some(option => option.value === `higgsfield-native::${data.higgsfieldNative!.endpointId}`)) options.push({ value: `higgsfield-native::${data.higgsfieldNative.endpointId}`, label: `Unavailable (${data.higgsfieldNative.label})`, provider: 'higgsfield', disabled: true })
+  return [...groups, { label: 'Higgsfield', service: 'higgsfield', options }]
+}
+export function HiggsfieldRecoveryControls({ nodeId, view, onRefresh, onAction }: { nodeId: string; view: HiggsfieldJobsView; onRefresh(): void; onAction(command: HiggsfieldJobCommand): void }) {
+  const jobs = (view.jobs || []).filter(job => job.nodeId === nodeId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const [selected, setSelected] = useState(''), [action, setAction] = useState<HiggsfieldJobAction>('check'), [dashboardReviewed, setDashboardReviewed] = useState(false)
+  const job = jobs.find(job => job.id === selected) || jobs[0]
+  useEffect(() => { setDashboardReviewed(false) }, [job?.id, nodeId])
+  const actions = [{ value: 'check', label: !job?.requestId && job?.canReconcile ? 'Reconcile' : 'Check status' }, { value: 'recover', label: 'Recover result' }, { value: 'cancel', label: 'Cancel job' }, { value: 'review', label: 'Confirm review' }, { value: 'relocate', label: 'Use document' }]
+  const disabled = higgsfieldRecoveryActionDisabled(job, action, { loading: view.loading, busy: view.busy, dashboardReviewed })
+  return <section className="inspector-section">
+    <label>Remote job recovery</label>
+    <section className="inspector-grid">
+      <label><span>Saved jobs</span><button type="button" className="compact-settings compact-options" aria-label="Refresh saved Higgsfield jobs" disabled={view.loading || Boolean(view.busy)} onClick={onRefresh}><RefreshCcw size={14} /></button></label>
+      <label><span>Job</span><SimpleMenuSelect fillTrack ariaLabel="Saved Higgsfield job" value={job?.id || ''} options={jobs.map(job => ({ value: job.id, label: `${job.state.replace('_', ' ')} · ${new Date(job.createdAt).toLocaleTimeString()}` }))} onChange={setSelected} /></label>
+      {job && <label className="inspector-wide"><span>Request ID</span><input readOnly aria-label="Higgsfield remote request ID" value={job.requestId || (job.canReconcile ? 'Unknown — reconcile original request' : 'Unknown — check provider dashboard')} /></label>}
+      <label><span>Action</span><SimpleMenuSelect fillTrack ariaLabel="Higgsfield recovery action" value={action} options={actions} onChange={value => { setAction(value as HiggsfieldJobAction); setDashboardReviewed(false) }} /></label>
+      <label><span>{actions.find(item => item.value === action)?.label}</span><button type="button" className="compact-settings compact-options" aria-label="Apply Higgsfield recovery action" disabled={disabled} onClick={() => job && onAction({ id: job.id, nodeId, action, ...(action === 'review' ? { dashboardReviewed } : {}) })}>{action === 'recover' ? <Save size={14} /> : action === 'cancel' ? <StopIcon size={14} /> : action === 'review' ? <Check size={14} /> : <RefreshCcw size={14} />}</button></label>
+      {action === 'review' && <label className="inspector-wide inspector-switch"><input type="checkbox" aria-label="I resolved this request in the original provider dashboard" checked={dashboardReviewed} onChange={event => setDashboardReviewed(event.target.checked)} /><span>I resolved this request in the original provider dashboard</span></label>}
+      {job?.ownerMatches === false && <p className="reference-budget inspector-wide">This job belongs to the original project document. Use current document after a rename within this project, open the original document, or explicitly review the original dashboard. Moving its saved output to another root requires separate recovery.</p>}
+      <p className="reference-budget inspector-wide">Check and recover reuse the original request. Reconciliation can complete its original submission; it never creates a separate generation. Dashboard review allows another Run; it does not cancel remote work or recover an abandoned result.</p>
+      {view.error && <p role="alert" className="reference-budget inspector-wide">{view.error}</p>}
+    </section>
+  </section>
+}
+export function HiggsfieldFields({ state, view, inputView, placement, onChange, onRefresh, onRefreshInputs }: { state: HiggsfieldNodeState; view?: HiggsfieldPresetView; inputView?: HiggsfieldContractView; placement: 'primary' | 'advanced'; onChange(state: HiggsfieldNodeState): void; onRefresh?(): void; onRefreshInputs?(): void }) {
+  let restyle = false
+  try { const model=higgsfieldModel(state.endpointId);if(model.kind!=='genjutsu')return <HiggsfieldSeedanceFields state={state} view={inputView} placement={placement} onChange={onChange} onRefresh={onRefreshInputs} />;restyle = model.minImages === 0 } catch { return <section className="inspector-section"><p className="reference-budget">The saved route has no verified contract. Its values and connections are preserved.</p></section> }
+  const resolution = String(state.values.resolution ?? '720p')
+  const resolutionField = <label><span>Resolution</span><SimpleMenuSelect ariaLabel="Higgsfield resolution" fillTrack value={resolution} options={['480p', '720p', '1080p', ...(!['480p', '720p', '1080p'].includes(resolution) ? [resolution] : [])].map(value => ({ value, label: value, disabled: !['480p', '720p', '1080p'].includes(value) }))} onChange={value => onChange({ ...state, values: { ...state.values, resolution: value } })} /></label>
+  const preset = typeof state.values.preset_id === 'string' ? state.values.preset_id : ''
+  const presetOptions = (view?.presets || []).map(item => ({ value: item.id, label: item.name }))
+  if (preset && !presetOptions.some(option => option.value === preset)) presetOptions.unshift({ value: preset, label: `Unavailable (${preset})` })
+  const presetField = <label><span>Style preset</span><GroupedMenuSelect searchable ariaLabel="Higgsfield style preset" fillTrack value={preset} displayLabel={presetOptions.find(option => option.value === preset)?.label || (view?.loading ? 'Loading presets…' : 'Choose preset')} groups={[{ label: 'Genjutsu presets', options: presetOptions.map(option => ({ ...option, disabled: !view?.presets?.some(item => item.id === option.value) })) }]} onChange={value => onChange({ ...state, values: { ...state.values, preset_id: value } })} /></label>
+  if (placement === 'advanced') return <section className="inspector-grid">
+    {resolutionField}{restyle && presetField}
+    {restyle && <label><span>Presets</span><button type="button" className="compact-settings compact-options" aria-label="Refresh Higgsfield presets" disabled={view?.loading} onClick={onRefresh}><RefreshCcw size={14} /></button></label>}
+    <label className="inspector-wide inspector-switch"><input type="checkbox" aria-label="Allow source trimming to 30 seconds" checked={state.allowSourceTrimming === true} onChange={event => onChange({ ...state, allowSourceTrimming: event.target.checked })} /><span>Allow source trimming to 30 seconds</span></label>
+    <p className="reference-budget inspector-wide">The source video supplies timing, cuts and audio. Import a local video for duration checks; a remote video needs trimming consent.</p>
+    {view?.error && restyle && <p className="reference-budget inspector-wide" role="alert">{view.error}</p>}
+  </section>
+  const controls = [{ id: 'resolution', kind: 'selector' as const, intrinsicWidth: 72, minimumWidth: 64, node: resolutionField }, ...(restyle ? [{ id: 'preset', kind: 'selector' as const, intrinsicWidth: 112, minimumWidth: 80, node: presetField }] : [])]
+  return <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Primary Higgsfield Fields" gap={7} allocation={{ minRows: 1, maxRows: controls.length }} recalculationKey={`${state.endpointId}:${resolution}:${preset}:${view?.loading}:${view?.presets?.length}`} controls={controls} /></div>
+}
+
+function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts?: Record<string, string> }>(state: T, fields: FalRuntimeField[], onChange: (state: T) => void) {
+  return fields.map(field => {
+    const value = state.values[field.key]
+    const optional = !field.required ? [{ value: '@unset', label: 'Default' }] : []
+    const nullable = field.nullable ? [{ value: 'null', label: 'None' }] : []
+    const selected = Object.prototype.hasOwnProperty.call(state.values, field.key) ? JSON.stringify(value) : '@unset'
+    const changeChoice = (token: string) => {
+      const values = { ...state.values }, drafts = { ...state.drafts }
+      if (token === '@unset') delete values[field.key]; else values[field.key] = JSON.parse(token) as FalJson
+      delete drafts[field.key]; onChange({ ...state, values, drafts })
+    }
+    const choices = [...optional, ...nullable, ...(field.control === 'boolean' ? [true, false] : field.choices || []).map(choice => ({ value: JSON.stringify(choice), label: typeof choice === 'string' ? choice : JSON.stringify(choice) }))]
+    if (selected !== '@unset' && !choices.some(choice => choice.value === selected)) choices.push({ value: selected, label: `Unavailable (${String(value)})`, disabled: true } as typeof choices[number])
+    const input = field.control === 'choice' || field.control === 'boolean'
+      ? <SimpleMenuSelect ariaLabel={`Model ${field.label}`} fillTrack value={selected} options={choices} onChange={changeChoice} />
+      : field.control === 'unsupported' ? <input className="voice-primary-input" aria-label={`Model ${field.label}`} readOnly disabled value="Requires supported adapter" />
+      : field.control === 'json' ? <textarea aria-label={`Model ${field.label}`} rows={3} value={state.drafts?.[field.key] ?? (value === undefined ? '' : JSON.stringify(value, null, 2))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, 'json'))} />
+      : <input className="voice-primary-input" aria-label={`Model ${field.label}`} type={field.control === 'number' ? 'number' : 'text'} step={field.schema.multipleOf || (field.schema.type === 'integer' ? 1 : 'any')} value={state.drafts?.[field.key] ?? (value === undefined || value === null ? '' : String(value))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, field.control === 'number' ? 'number' : 'text'))} />
+    return { id: field.key, kind: 'selector' as const, intrinsicWidth: 112, minimumWidth: 72, node: <label key={field.key} title={field.schema.description}><span>{field.label}</span>{input}</label> }
+  })
+}
+
+function HiggsfieldSeedanceFields({ state, view, placement, onChange, onRefresh }: { state: HiggsfieldNodeState; view?: HiggsfieldContractView; placement: 'primary' | 'advanced'; onChange(state: HiggsfieldNodeState): void; onRefresh?(): void }) {
+  const contract = view?.contract?.endpointId === state.endpointId ? view.contract : undefined
+  const controls = nativeFieldControls(state, (contract?.fields || []).filter(field => field.placement === placement && field.key !== 'prompt' && field.control !== 'media'), onChange)
+  if (placement === 'advanced') {
+    const removed = Object.entries(state.values).filter(([key]) => contract && !contract.fields.some(field => field.key === key && field.control !== 'media' && field.key !== 'prompt'))
+    return <section className="inspector-grid">
+      {controls.map(control => control.node)}
+      <label><span>Model inputs</span><button type="button" className="compact-settings compact-options" aria-label="Refresh Higgsfield model inputs" disabled={view?.loading} onClick={onRefresh}><RefreshCcw size={14} /></button></label>
+      {Boolean(state.repairs?.length) && <label title={state.repairs!.join(' ')}><span>Changed inputs</span><SimpleMenuSelect ariaLabel="Review changed Higgsfield inputs" value="@pending" options={[{ value: '@pending', label: 'Review required', disabled: true }, { value: '@reviewed', label: 'I reviewed the saved values and connections' }]} onChange={() => onChange({ ...state, reviewedFingerprint: state.fingerprint, repairs: [] })} /></label>}
+      {removed.map(([key, value]) => <label key={key}><span>{key} · preserved</span><SimpleMenuSelect ariaLabel={`Preserved ${key}`} value="@saved" displayLabel={String(typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 80)} options={[{ value: '@saved', label: 'Preserved value', disabled: true }, { value: '@discard', label: 'Remove saved value' }]} onChange={() => { const values = { ...state.values }, drafts = { ...state.drafts }; delete values[key]; delete drafts[key]; onChange({ ...state, values, drafts, reviewedFingerprint: undefined }) }} /></label>)}
+      {(!contract || view?.loading || view?.error) && <p className="reference-budget inspector-wide" role={view?.error ? 'alert' : 'status'}>{view?.error || 'Loading current model inputs…'}</p>}
+      {contract?.unsupportedInputs.map(item => <p key={item.key} className="reference-budget inspector-wide" role="alert">{item.reason}</p>)}
+    </section>
+  }
+  if (!controls.length) return null
+  return <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Primary Higgsfield Fields" gap={7} allocation={{ minRows: 1, maxRows: controls.length }} recalculationKey={`${state.endpointId}:${state.fingerprint}:${JSON.stringify(state.values)}`} controls={controls} /></div>
+}
+
+export function FalNativeFields({ state, contract, placement, onChange }: { state: FalNativeNodeState; contract?: FalSchemaContract; placement: 'primary' | 'advanced'; onChange(state: FalNativeNodeState): void }) {
+  const fields = (contract?.runtime?.fields || []).filter(field => field.placement === placement && field.key !== state.promptField && field.control !== 'media')
+  const controls = nativeFieldControls(state, fields, onChange)
+  if (placement === 'advanced') {
+    const textFields = contract?.runtime?.fields.filter(field => field.control === 'text') || []
+    const removed = Object.entries(state.values).filter(([key]) => contract && !contract.runtime?.fields.some(field => field.key === key))
+    return <section className="inspector-grid">
+      <label><span>Prompt field</span><SimpleMenuSelect ariaLabel="Final prompt field" value={state.promptField || '@none'} options={[{ value: '@none', label: 'None' }, ...textFields.map(field => ({ value: field.key, label: field.label })), ...(state.promptField && !textFields.some(field => field.key === state.promptField) ? [{ value: state.promptField, label: `Unavailable (${state.promptField})`, disabled: true }] : [])]} onChange={key => onChange({ ...state, promptField: key === '@none' ? null : key })} /></label>
+      {controls.map(control => control.node)}
+      {Boolean(state.repairs?.length) && <label title={state.repairs!.join(" ")}><span>Changed inputs</span><SimpleMenuSelect ariaLabel="Review changed inputs" value="@pending" options={[{ value: "@pending", label: "Review required", disabled: true }, { value: "@reviewed", label: "I reviewed the saved values and connections" }]} onChange={() => onChange({ ...state, reviewedFingerprint: state.fingerprint, repairs: [] })} /></label>}
+      {removed.map(([key, value]) => <label key={key}><span>{key} · preserved</span><SimpleMenuSelect ariaLabel={`Preserved ${key}`} value="@saved" displayLabel={String(typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 80)} options={[{ value: '@saved', label: 'Preserved value', disabled: true }, { value: '@discard', label: 'Remove saved value' }]} onChange={() => { const values = { ...state.values }, drafts = { ...state.drafts }; delete values[key]; delete drafts[key]; onChange({ ...state, values, drafts }) }} /></label>)}
+    </section>
+  }
+  if (!controls.length) return null
+  return <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Primary Model Fields" gap={7} allocation={{ minRows: 1, maxRows: Math.max(1, controls.length) }} recalculationKey={`${state.endpointId}:${state.fingerprint}:${JSON.stringify(state.values)}`} controls={controls} /></div>
+}
+
+export function CompanyIcon({ provider }: { provider: ModelCompany }) {
+  if (provider === 'fal') return <span className="fal-company-wordmark" data-company={provider} aria-hidden="true">fal</span>
+  if (provider === 'higgsfield') return <span className="model-company-wordmark" data-company={provider} aria-hidden="true">HF</span>
+  if (provider === 'omniroute') return <span className="model-company-wordmark" data-company={provider} aria-hidden="true">OR</span>
+  if (provider === 'black-forest-labs') return <span className="model-company-wordmark" data-company={provider} aria-hidden="true">BFL</span>
+  const icon = provider === 'meta' ? siMeta : provider === 'alibaba' ? siAlibabacloud : provider === 'bytedance' || provider === 'byteplus' ? siBytedance : provider === 'kuaishou' ? siKuaishou : provider === 'elevenlabs' ? siElevenlabs : provider === 'fish' ? siFishaudio : null
+  return <span className="provider-company-logo" data-company={provider} aria-hidden="true">{icon ? <svg viewBox="0 0 24 24"><path d={icon.path} /></svg> : <ProviderIcon provider={provider as AssistantProvider} />}</span>
+}
+
+function ConnectedRuleRows({ items, onMode, readOnly = false }: { items: ConnectedInputRule[]; readOnly?: boolean; onMode: (edgeId: string, mode: InputFidelity) => void }) {
+  return <>{prioritizeConnectedInputRules(items).filter((item) => item.edgeId && (readOnly || item.toggleable)).map((item) => <div key={`${item.edgeId || item.tag}-${item.label}`} title={item.rule}>
     <b>{item.tag}</b><span>{item.label}</span>
-    <div className="input-fidelity-toggle" role="group" aria-label={`${item.label} fidelity`}>
+    {!readOnly && <div className="input-fidelity-toggle" role="group" aria-label={`${item.label} fidelity`}>
       <button type="button" className={item.mode === 'guide' ? 'is-active' : ''} aria-pressed={item.mode === 'guide'} title="Guide: use the content as loose direction and allow interpretation" onClick={() => onMode(item.edgeId!, 'guide')}>Guide</button>
       <button type="button" className={!item.mode || item.mode === 'auto' ? 'is-active' : ''} aria-pressed={!item.mode || item.mode === 'auto'} title={item.rule.startsWith('AUTO → PRESERVE') ? 'Auto → Preserve: the authored prompt asks for exact or unchanged source content' : item.rule.startsWith('AUTO → GUIDE') ? 'Auto → Guide: the authored prompt explicitly allows interpretation' : 'Auto: balance fidelity with automatic quality repair'} onClick={() => onMode(item.edgeId!, 'auto')}>Auto</button>
       <button type="button" className={item.mode === 'lock' ? 'is-active' : ''} aria-pressed={item.mode === 'lock'} title="Lock: exact planar artwork uses verified post-generation placement; other imagery uses the provider’s strongest available preservation" onClick={() => onMode(item.edgeId!, 'lock')}>Lock</button>
-    </div>
+    </div>}
   </div>)}</>
 }
 
@@ -965,6 +1281,13 @@ function ViewFramework({ kind, view }: { kind: 'character' | 'element'; view: Ch
 }
 
 interface NodeRuntime {
+  falSchema?: (endpointId: string) => { contract?: FalSchemaContract; error?: string; loading?: boolean }
+  selectFalModel?: (id: string, endpointId: string) => void
+  selectHiggsfieldModel?: (id: string, endpointId: string) => void
+  higgsfieldSchema?: (endpointId: string) => HiggsfieldContractView
+  refreshHiggsfieldInputs?: (endpointId: string) => void
+  higgsfieldPresets?: () => HiggsfieldPresetView
+  refreshHiggsfieldPresets?: () => void
   updateNode: (id: string, patch: Partial<StudioNodeData>) => void
   updatePrompt: (id: string, prompt: string) => void
   videoPromptState: (id: string) => { connected: boolean; mode: 'auto' | 'manual'; autoPrompt: string; autoError?: string; manualPrompt: string; activePrompt: string; fingerprint: string; resetDisabled: boolean } | null
@@ -1006,7 +1329,7 @@ interface NodeRuntime {
   connectedInputRules: (id: string) => ConnectedInputRule[]
   connectedInputMedia: (id: string, handleId: string) => { url?: string; path?: string; title?: string; type?: 'image' | 'video' | 'audio' } | undefined
   connectedStoryboardVideoFamily: (id: string) => string | undefined
-  connectedStoryboardVideo: (id: string) => { nodeId: string; modelId: string; duration: number; durationOptions: number[] } | undefined
+  connectedStoryboardVideo: (id: string) => import('../../shared/storyboardVideoSync').ConnectedStoryboardVideo | undefined
   setInputFidelity: (edgeId: string, mode: InputFidelity) => void
   openInspector: (id: string) => void
   resetNodeSettings: (id: string) => void
@@ -1017,7 +1340,8 @@ interface NodeRuntime {
   importStoryboardPanel: (id: string, panelId: string) => void
   openStyleChooser: (id: string) => void
   rewriteStoryboardPanel: (id: string, panelId?: string) => void
-  availableModels: (provider: ServiceProvider) => Array<{ id: string; label: string }>
+  availableModels: (provider: ServiceProvider) => ServiceModelAvailability['models']
+  serviceAvailability?: (provider: ServiceProvider) => ServiceModelAvailability | undefined
   modelAvailabilityVerified: (provider: ServiceProvider) => boolean
   runAssistantNode: (id: string) => void
   estimateNode: (id: string) => Promise<GenerationCostEstimate | null>
@@ -1063,7 +1387,7 @@ const DIRECT_IMAGE_MODELS = {
 
 function referenceCapableImageModelGroups(openAIModels: readonly { id: string; label: string }[], googleModels: readonly { id: string; label: string }[]): GroupedMenuGroup[] {
   return [
-    { label: 'fal.ai', options: [
+    { label: 'fal.ai', service: 'fal', options: [
       { value: `fal::${FAL_IMAGE_MODELS.nanoBananaEdit}`, label: 'Nano Banana Pro', provider: 'google' as const },
       { value: `fal::${FAL_IMAGE_MODELS.seedream5ProEdit}`, label: 'Seedream 5.0 Pro', provider: 'bytedance' as const },
       { value: `fal::${FAL_IMAGE_MODELS.gptImage2Edit}`, label: 'GPT Image 2', provider: 'openai' as const },
@@ -1085,11 +1409,19 @@ export function videoDurationOptions(engine: StudioNodeData['videoEngine'] = 'wa
 }
 
 export function normalizedVideoDuration(data: Pick<StudioNodeData, 'videoEngine' | 'duration' | 'autoDuration' | 'frameRate'>): number | 'auto' {
-  const options = videoDurationOptions(data.videoEngine, data.frameRate)
-  if (options.includes('auto') && data.autoDuration) return 'auto'
-  const numeric = data.duration || 5
-  const numericOptions = options.filter((value): value is number => typeof value === 'number')
-  return numericOptions.reduce((nearest, value) => Math.abs(value - numeric) < Math.abs(nearest - numeric) ? value : nearest, numericOptions[0])
+  if (data.autoDuration) return 'auto'
+  // This is an observational value: unsupported saved timing stays visible for review.
+  return data.duration ?? generatorVideoDurationLimits(data).selectedSeconds ?? 5
+}
+
+export function videoDurationMenuOptions(data: Pick<StudioNodeData, 'videoEngine' | 'duration' | 'autoDuration' | 'frameRate'>) {
+  const options: Array<{value:string;label:string;disabled?:boolean}> = videoDurationOptions(data.videoEngine, data.frameRate).filter((seconds): seconds is number => typeof seconds === 'number').map(seconds => ({value:String(seconds),label:formatDurationSeconds(seconds)}))
+  const selected = normalizedVideoDuration(data)
+  if (!options.some(option => option.value === String(selected))) {
+    const error = generatorVideoDurationLimits(data).error
+    options.unshift({value:String(selected),label:selected === 'auto' ? 'Automatic · review' : `${formatDurationSeconds(selected)}${error ? ' · review' : ''}`,disabled:Boolean(error)})
+  }
+  return options
 }
 
 export function normalizedImageRatio(value?: string) {
@@ -1392,12 +1724,15 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   }, [nodeAssetTag])
   const showsAssetTag = hasMaterializedAsset(data) || reusableEditorDirty
   const Icon = meta.icon
-  const enhanceProvider: AssistantProvider = data.assistantProvider === 'fal' ? 'openai' : data.assistantProvider || 'openai'
-  const enhanceModels = data.kind === 'prompt' ? curatedAssistantModels(enhanceProvider, runtime?.availableModels(enhanceProvider) || []) : []
-  const enhanceGroups = data.kind === 'prompt' ? ([
-    ['openai', 'OpenAI'], ['google', 'Gemini'], ['anthropic', 'Claude'], ['deepseek', 'DeepSeek'], ['moonshot', 'Kimi'],
-  ] as const).map(([provider, label]) => ({ provider, label, models: curatedAssistantModels(provider, runtime?.availableModels(provider) || []) })) : []
-  const enhanceModel = enhanceModels.some((model) => model.id === data.assistantModelId) ? data.assistantModelId || '' : enhanceModels[0]?.id || ''
+  const enhanceCatalogs: AssistantCatalogs = data.kind === 'prompt'
+    ? Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availableModels(provider) || []]))
+    : {}
+  const enhanceSelection = resolveAssistantSelection(data.assistantProvider, data.assistantModelId, enhanceCatalogs)
+  const enhanceProvider: AssistantProvider = enhanceSelection?.provider || ASSISTANT_PROVIDER_GROUPS.find(({ id: provider }) => provider === data.assistantProvider)?.id || 'openai'
+  const enhanceGroups = assistantModelGroups(enhanceCatalogs, data.assistantProvider, data.assistantModelId)
+    .map((group) => ({ provider: group.provider, label: group.label, models: group.options.map((option) => ({ id: option.value.slice(option.value.indexOf('::') + 2), label: option.label })) }))
+  const enhanceModels = enhanceGroups.find((group) => group.provider === enhanceProvider)?.models || []
+  const enhanceModel = enhanceSelection?.model || ''
   const enhanceModelLabel = enhanceModels.find((model) => model.id === enhanceModel)?.label || 'Choose Model'
   const enhanceAccount = data.kind === 'prompt' ? runtime?.providerAccount(enhanceProvider) : undefined
   const errorProvider: ServiceProvider = data.kind === 'prompt' ? enhanceProvider : generationServiceProvider(data)
@@ -1408,7 +1743,8 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const rerun = generationAction === 'rerun'
   const generationTimeLeft = useGenerationTimeLeft(data, running, id)
   const inputPorts = nodeInputPorts(data)
-  const acceptsText = inputPorts.some((port) => port.signal === 'text')
+  // Audio nodes intentionally have no upstream text port, but own a local editor.
+  const acceptsText = inputPorts.some((port) => port.signal === 'text') || ['voiceover', 'sound-effects', 'music-generator'].includes(data.kind)
   const outputsText = data.kind === 'prompt'
   const outputsMedia = ['upload', 'image-generator', 'image-editor', 'upscaler', 'video-generator', 'output', 'character', 'location', 'wardrobe', 'element', 'style-reference', 'voiceover', 'sound-effects', 'music-generator'].includes(data.kind)
   const runnable = isRunnableNodeKind(data.kind)
@@ -1436,6 +1772,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const connectedTags = acceptsText ? runtime?.connectedReferenceTags(id) || [] : []
   const connectedInputRules = runtime?.connectedInputRules(id) || []
   const fidelityInputRules = connectedInputRules.filter((rule) => rule.toggleable && rule.edgeId)
+  const visibleInputRules = data.higgsfieldNative ? connectedInputRules : fidelityInputRules
   const connectedPromptTags = [...new Set([...connectedTags, ...connectedInputRules.flatMap((rule) => [rule.tag, ...(rule.aliases || [])])])]
   const availablePromptTags = runtime?.availablePromptTags(id) || connectedPromptTags
   const upscalerIsVideo = data.kind === 'upscaler' && data.upscalerModel === 'realesrgan-video'
@@ -1450,13 +1787,13 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const usesBuiltInElevenVoice = (ELEVEN_V3_BUILT_IN_VOICES as readonly string[]).includes(elevenVoiceValue)
   const hasImageReferences = connectedInputRules.some((rule) => !['Prompt', 'Text List'].includes(rule.label)) || Boolean(data.assetUrl)
   const selectedRatio = data.kind === 'image-generator' ? normalizedImageRatio(data.aspectRatio) : data.aspectRatio || '16:9'
-  const selectedVideoModel = data.kind === 'video-generator' ? resolveVideoModel(data.videoEngine) : null
+  const selectedVideoModel = data.kind === 'video-generator' && !data.falNative && !data.higgsfieldNative ? resolveVideoModel(data.videoEngine) : null
   const closedVideoLabel = closedVideoModelLabel(selectedVideoModel || resolveVideoModel(data.videoEngine))
   const nativeVideoFps = selectedVideoModel ? knownOutputFrameRate(selectedVideoModel, data.frameRate) : undefined
   const effectiveMotionCadence = selectedVideoModel ? normalizedMotionCadence(selectedVideoModel, data.frameRate, data.motionCadence) : undefined
   useEffect(() => {
-    if (data.kind === 'video-generator' && effectiveMotionCadence !== data.motionCadence) runtime?.updateNode(id, { motionCadence: effectiveMotionCadence })
-  }, [data.kind, data.motionCadence, effectiveMotionCadence, id, runtime])
+    if (!data.falNative && !data.higgsfieldNative && data.kind === 'video-generator' && effectiveMotionCadence !== data.motionCadence) runtime?.updateNode(id, { motionCadence: effectiveMotionCadence })
+  }, [data.falNative, data.higgsfieldNative, data.kind, data.motionCadence, effectiveMotionCadence, id, runtime])
   const stageRatio = selectedRatio === 'auto' ? (data.kind === 'video-generator' ? '16:9' : '1:1') : selectedRatio
   const [stageWidth, stageHeight] = stageRatio.split(':').map(Number)
   const stageOrientation = stageHeight > stageWidth ? 'portrait' : 'landscape'
@@ -1481,7 +1818,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const googleImageModels = [...DIRECT_IMAGE_MODELS.google, ...connectedGoogleImageModels].filter((model, index, models) => models.findIndex((candidate) => candidate.id === model.id) === index)
   const referenceImageModelGroups = referenceCapableImageModelGroups(openAIImageModels, googleImageModels)
   const imageModelGroups: GroupedMenuGroup[] = usesReferenceImageCatalog ? referenceImageModelGroups : [
-    { label: 'fal.ai', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider as ModelCompany })) },
+    { label: 'fal.ai', service: 'fal', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider as ModelCompany })) },
     { label: 'OpenAI', options: openAIImageModels.map((model) => ({ value: `openai::${model.id}`, label: model.label, provider: 'openai' as const })) },
     { label: 'Google', options: googleImageModels.map((model) => ({ value: `google::${model.id}`, label: model.label, provider: 'google' as const })) },
   ]
@@ -1648,8 +1985,8 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const providerAccount = runtime?.providerAccount(billingProvider)
   const providerBlocked = providerAccount && ['credit-required', 'temporarily-limited', 'unavailable'].includes(providerAccount.state)
   const providerDisconnected = !runtime?.providerConnected(billingProvider)
-  const providerName = billingProvider === 'byteplus' ? 'BytePlus Seedance' : billingProvider === 'openai' ? 'OpenAI' : billingProvider === 'google' ? 'Google Gemini' : billingProvider === 'fish' ? 'Fish Audio' : 'fal.ai'
-  const providerModelLabel = selectedVideoModel?.label || modelDisplayName(imageModelId || data.videoEngine || data.kind)
+  const providerName = providerDisplayName(billingProvider)
+  const providerModelLabel = data.higgsfieldNative?.label || data.falNative?.label || audioGenerationLabel(data, runtime?.serviceAvailability?.('elevenlabs')) || selectedVideoModel?.label || modelDisplayName(imageModelId || data.videoEngine || data.kind)
   const runReadiness = runnable || ['character', 'element'].includes(data.kind) ? runtime?.runReadiness(id) : undefined
   const runDisabled = Boolean(runReadiness?.disabled && !providerDisconnected)
   const runTooltip = running
@@ -1704,7 +2041,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
     || data.kind === 'character' && characterCreateOpen
     || ['element', 'location', 'wardrobe'].includes(data.kind) && semanticCreateOpen
   const semanticAssetLabel = data.kind === 'style-reference' ? 'Style' : data.kind === 'character' ? 'Character' : data.kind === 'location' ? 'Location' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Element'
-  const semanticModelControl = <GroupedMenuSelect className="compact-engine image-engine" menuClassName="character-ai-provider-menu" ariaLabel={`${semanticAssetLabel} image model`} title="Image model" defaultLabel={modelDisplayName(imageModelId)} fillTrack value={`${imageProvider}::${imageModelId}`} groups={referenceImageModelGroups} onChange={(nextValue) => { const [provider, ...modelParts] = nextValue.split('::'); runtime?.updateNode(id, { ...imageModelSelectionPatch(provider as StudioNodeData['imageProvider'], modelParts.join('::'), data.imageResolution), error: undefined }) }} />
+  const semanticModelControl = <GroupedMenuSelect catalog className="compact-engine image-engine" menuClassName="character-ai-provider-menu" ariaLabel={`${semanticAssetLabel} image model`} title="Image model" defaultLabel={modelDisplayName(imageModelId)} fillTrack value={`${imageProvider}::${imageModelId}`} groups={referenceImageModelGroups} onChange={(nextValue) => { const [provider, ...modelParts] = nextValue.split('::'); runtime?.updateNode(id, { ...imageModelSelectionPatch(provider as StudioNodeData['imageProvider'], modelParts.join('::'), data.imageResolution), error: undefined }) }} />
   const selectedSemanticResultIsGenerated = semanticLifecycle?.references.find((reference) => reference.id === semanticLifecycle.selectedId)?.source === 'generated'
   const semanticSaveDisabled = selectedSemanticResultIsGenerated
     ? !semanticLifecycle?.canSave
@@ -1731,6 +2068,16 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         <div className="asset-batch-footer"><button disabled={assetBatchBusy || assetBatchRows.some((row) => !row.displayName.trim())} onClick={() => void saveAllBatchRows()}><Save size={13} />Save All Assets</button></div>
       </>}
   </div> : null
+
+  const nativeModelSelect = data.falNative ? <GroupedMenuSelect catalog ariaLabel="Live model" fillTrack displayLabel={data.falNative.label} value={`fal-native::${data.falNative.endpointId}`} groups={data.falNative.flow === 'video' ? videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data) : liveFalModelGroups(data.falNative.flow, runtime?.serviceAvailability?.('fal'), data.falNative.flow === 'image' ? imageModelGroups : data.falNative.flow === 'voice' ? voiceModelMenuGroups(runtime?.availableModels('elevenlabs') || [], runtime?.serviceAvailability?.('fish'), data.fishModel) : [{ label: 'ElevenLabs · Direct', service: 'elevenlabs', options: [{ value: 'elevenlabs', label: 'Sound Effects v2', provider: 'elevenlabs' }] }], data.falNative)} onChange={(selection) => {
+              if (selection.startsWith('higgsfield-native::')) { runtime?.selectHiggsfieldModel?.(id, selection.slice('higgsfield-native::'.length)); return }
+              if (selection.startsWith('fal-native::')) { runtime?.selectFalModel?.(id, selection.slice(12)); return }
+              const preserved = preserveFalNativeSelection(data)
+              if (data.kind === 'video-generator') runtime?.updateNode(id, { ...preserved, videoEngine: selection })
+              else if (data.kind === 'voiceover') { const patch = voiceModelSelectionPatch(selection, data, runtime?.availableModels('elevenlabs') || [], runtime?.serviceAvailability?.('fish')?.catalogStale ? [] : runtime?.availableModels('fish') || []); if (patch) runtime?.updateNode(id, { ...preserved, ...patch }) }
+              else if (data.kind === 'sound-effects') runtime?.updateNode(id, { ...preserved, audioProvider: selection as 'fal' | 'elevenlabs' })
+              else { const [provider, ...parts] = selection.split('::'); runtime?.updateNode(id, { ...preserved, ...imageModelSelectionPatch(provider as StudioNodeData['imageProvider'], parts.join('::'), data.imageResolution) }) }
+            }} /> : null
 
   return (
     <article className={`studio-node kind-${data.kind} tone-${meta.tone} ${selected ? 'is-selected' : ''} ${data.locked ? 'is-locked' : ''} ${running ? 'is-generating' : ''} ${isCanvasGenerator ? 'is-canvas-generator' : ''} ${isMediaTile ? 'is-media-tile' : ''}`} aria-busy={running || undefined}>
@@ -1767,7 +2114,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           {enhanceOpen && <div className="prompt-enhance-popover prompt-enhance-inline">
             <div className="prompt-enhance-compact">
               <div className="prompt-enhance-model-picker">
-                <GroupedMenuSelect className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Enhance model" value={`${enhanceProvider}::${enhanceModel || ''}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map((group) => ({ label: group.label, options: group.models.map((model) => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined, progress: undefined }) }} />
+                <GroupedMenuSelect catalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Enhance model" value={`${enhanceProvider}::${enhanceModel || ''}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map((group) => ({ label: group.label, options: group.models.map((model) => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined, progress: undefined }) }} />
               </div>
               <button className="prompt-enhance-round" title="Connections" aria-label="Open Connections" onClick={() => runtime?.openConnections(enhanceProvider, enhanceModelLabel)}><Settings size={13} /></button>
               <button className="prompt-enhance-apply" title="Apply Enhancement" aria-label="Apply Enhancement" disabled={enhanceBlocked || !enhanceModel || !(data.prompt || '').trim() || data.runState === 'running'} onClick={() => runtime?.runAssistantNode(id)}>{data.runState === 'running' ? <LoaderCircle size={11} className="spin" /> : 'Apply'}</button>
@@ -1895,14 +2242,14 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           : mediaPreview(data))}
 
       {isCanvasGenerator && <>
-        {fidelityInputRules.length > 0 && <div className="generator-connected-context nodrag">
-          <div className="connected-input-rules" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={fidelityInputRules} onMode={runtime!.setInputFidelity} /></div>
+        {visibleInputRules.length > 0 && <div className="generator-connected-context nodrag">
+          <div className="connected-input-rules" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>
         </div>}
         <div className="generator-stage nodrag" style={{ aspectRatio: stageRatio.replace(':', ' / ') }} {...generatedMediaInteraction}>
           {mediaPreview(data)}
           {generatedMediaOverlay}
           {!data.outputUrl && !data.outputPath && <div className="generator-input-slots nodrag" aria-label={`Available ${isImageGeneratorSurface ? 'Image' : 'Video'} Inputs`} data-input-count={inputPorts.length} data-stage-orientation={stageOrientation} style={{ '--generator-input-columns': stageOrientation === 'portrait' ? 1 : inputPorts.length >= 6 ? 3 : Math.min(2, Math.max(1, inputPorts.length)) } as CSSProperties}>
-            {inputPorts.map((port) => <button key={port.id} type="button" aria-label={`Add ${port.label}`} title={`Add ${port.label}`} onClick={(event) => runtime?.openInputQuickConnect(id, port.id, event.clientX, event.clientY)}><GeneratorInputIcon id={port.id} signal={port.signal} kind={data.kind} /><span>{generatorInputLabel(port.id, port.label)}</span></button>)}
+            {inputPorts.map((port) => <button key={port.id} type="button" disabled={port.maxConnections === 0} aria-label={`Add ${port.label}`} title={`Add ${port.label}`} onClick={(event) => runtime?.openInputQuickConnect(id, port.id, event.clientX, event.clientY)}><GeneratorInputIcon id={port.id} signal={port.signal} kind={data.kind} /><span>{generatorInputLabel(port.id, port.label)}</span></button>)}
           </div>}
         </div>
         <div className={`video-prompt-owner-shell ${videoPrompt ? `is-${videoPrompt.mode}` : ''}`}>
@@ -1920,7 +2267,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           />
           {videoPrompt?.mode === 'auto' && <span id={`video-prompt-owner-${id}`} className="storyboard-visually-hidden">Compiled from connected Storyboard. Edit panels, timing, framing, camera, and transitions in Storyboard.</span>}
           {manualSeedDisclosure && <span className="storyboard-visually-hidden" role="status" aria-live="polite">Manual draft copied once from the current Auto prompt.</span>}
-          {data.kind === 'video-generator' && videoPrompt && <div className="storyboard-prompt-actions video-prompt-actions" role="radiogroup" aria-label="Video prompt mode" onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setVideoPromptRovingMode(videoPrompt?.mode || 'manual') }}>
+          {data.kind === 'video-generator' && (!data.higgsfieldNative || data.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) && videoPrompt && <div className="storyboard-prompt-actions video-prompt-actions" role="radiogroup" aria-label="Video prompt mode" onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setVideoPromptRovingMode(videoPrompt?.mode || 'manual') }}>
             <div className="storyboard-transition-choice">
               <button type="button" role="radio" className={`storyboard-transition-option ${videoPrompt?.mode === 'auto' ? 'is-active' : ''}`} aria-checked={videoPrompt?.mode === 'auto'} aria-disabled={!videoPrompt?.connected} aria-label="Use Locked Storyboard Prompt" data-tooltip={videoPrompt?.connected ? 'Locked · Compiled from Storyboard' : 'Connect a Storyboard to use Locked'} tabIndex={videoPromptRovingTabIndex('auto', videoPromptRovingMode)} onKeyDown={handleVideoPromptModeKey} onClick={() => { if (videoPrompt?.connected) { setVideoPromptRovingMode('auto'); runtime?.setVideoPromptMode(id, 'auto') } }}>{videoPrompt?.mode === 'auto' ? 'Locked' : 'Lock'}</button>
               <button type="button" role="radio" className={`storyboard-transition-option ${videoPrompt?.mode === 'manual' ? 'is-active' : ''}`} aria-checked={videoPrompt?.mode === 'manual'} aria-label="Use User Prompt" data-tooltip={manualSeedDisclosure ? 'User · Draft copied once from Locked' : data.manualPromptSeeded ? 'User · Edit your saved draft' : 'User · Start from the current Locked prompt'} tabIndex={videoPromptRovingTabIndex('manual', videoPromptRovingMode)} onKeyDown={handleVideoPromptModeKey} onClick={() => { setVideoPromptRovingMode('manual'); runtime?.setVideoPromptMode(id, 'manual') }}>User</button>
@@ -1932,21 +2279,23 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
 
       {mediaContextMenu && createPortal(<div className="generated-media-context-menu" style={{ left: Math.min(mediaContextMenu.x, window.innerWidth - 190), top: Math.min(mediaContextMenu.y, window.innerHeight - 54) }} onMouseDown={(event) => event.stopPropagation()} onMouseLeave={() => setMediaContextMenu(null)}><button onClick={() => { runtime?.copyGeneratedMedia(id, activeGeneratedIndex); setMediaContextMenu(null) }}><Copy size={13} />Copy {activeGeneratedResult?.type === 'video' ? 'Video' : activeGeneratedResult?.type === 'audio' ? 'Audio' : 'Image'}</button></div>, document.body)}
 
-      {acceptsText && !isCanvasGenerator && data.kind !== 'style-reference' && data.kind !== 'character' && (
+      {isElevenDialogue(data) && !data.falNative && <ElevenDialogueEditor data={data} availability={runtime?.serviceAvailability?.('elevenlabs')} onChange={patch => runtime?.updateNode(id, patch)} />}
+      {acceptsText && !isCanvasGenerator && !(isElevenDialogue(data) && !data.falNative) && data.kind !== 'style-reference' && data.kind !== 'character' && (
         <>
-          {fidelityInputRules.length > 0 && <div className="inline-connected-input-rules nodrag" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={fidelityInputRules} onMode={runtime!.setInputFidelity} /></div>}
+          {visibleInputRules.length > 0 && <div className="inline-connected-input-rules nodrag" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>}
           <TaggedPromptTextarea
             className="node-prompt nodrag"
             value={data.prompt || ''}
             connectedTags={connectedPromptTags}
             availableTags={availablePromptTags}
-            placeholder={data.kind === 'image-editor' ? 'Describe the edit…' : 'Write a prompt or connect a Prompt node…'}
+            aria-label={data.kind === 'voiceover' ? 'Speech text' : data.kind === 'sound-effects' ? 'Sound effect description' : data.kind === 'music-generator' ? 'Music description' : undefined}
+            placeholder={data.kind === 'voiceover' ? 'Enter speech text…' : data.kind === 'sound-effects' ? 'Describe the sound effect…' : data.kind === 'music-generator' ? 'Describe the music…' : data.kind === 'image-editor' ? 'Describe the edit…' : 'Write a prompt or connect a Prompt node…'}
             onValueChange={(prompt) => runtime?.updatePrompt(id, prompt)}
           />
         </>
       )}
 
-      {!isCanvasGenerator && (!acceptsText || data.kind === 'style-reference') && fidelityInputRules.length > 0 && <div className="inline-connected-input-rules nodrag" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={fidelityInputRules} onMode={runtime!.setInputFidelity} /></div>}
+      {!isCanvasGenerator && (!acceptsText || data.kind === 'style-reference') && visibleInputRules.length > 0 && <div className="inline-connected-input-rules nodrag" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>}
 
       {data.kind === 'upscaler' && (upscalerBeforeUrl ? upscalerIsVideo ? <div className="upscaler-video-stage nodrag" aria-label={upscalerAfterUrl ? 'Upscaled video result' : 'Video to upscale'}><video src={upscalerAfterUrl || upscalerBeforeUrl} controls playsInline preload="metadata" /><span>{upscalerAfterUrl ? 'After' : 'Before'}</span></div> : <div className={`upscaler-comparison-stage nodrag ${upscalerAfterUrl ? 'has-after' : 'before-only'}`} aria-label={upscalerAfterUrl ? 'Before and after upscale comparison' : 'Image to upscale'}>
         <img className="upscaler-ratio-source" src={upscalerBeforeUrl} alt="" aria-hidden="true" />
@@ -1986,6 +2335,35 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         </div>
       )}
 
+      {data.kind === 'video-generator' && <div className="primary-node-controls nodrag"><span className="engine-note" aria-label="Maximum video duration">{data.higgsfieldNative && !data.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/') ? 'Source video · Max 30s' : data.higgsfieldNative?.endpointId.endsWith('/video-edit') ? 'Source video timing' : videoMaximumLabel(generatorVideoDurationLimits(data, data.falNative ? runtime?.falSchema?.(data.falNative.endpointId).contract : undefined, data.higgsfieldNative ? runtime?.higgsfieldSchema?.(data.higgsfieldNative.endpointId).contract : undefined))}</span></div>}
+
+      {data.higgsfieldNative && <>
+        <HiggsfieldFields state={data.higgsfieldNative} view={runtime?.higgsfieldPresets?.()} inputView={runtime?.higgsfieldSchema?.(data.higgsfieldNative.endpointId)} placement="primary" onChange={higgsfieldNative => runtime?.updateNode(id, { higgsfieldNative })} />
+        <div className="compact-generator-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Higgsfield Model Actions" recalculationKey={`${data.higgsfieldNative.endpointId}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 1, maxRows: 1, firstId: 'model', terminalIds: ['settings', 'run'] }} controls={[
+          { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <GroupedMenuSelect catalog ariaLabel="Video Model" fillTrack displayLabel={data.higgsfieldNative.label} value={`higgsfield-native::${data.higgsfieldNative.endpointId}`} groups={videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data)} onChange={selection => {
+            if (selection.startsWith('higgsfield-native::')) runtime?.selectHiggsfieldModel?.(id, selection.slice('higgsfield-native::'.length))
+            else if (selection.startsWith('fal-native::')) runtime?.selectFalModel?.(id, selection.slice(12))
+            else runtime?.updateNode(id, { ...preserveFalNativeSelection(data), videoEngine: selection })
+          }} /> },
+          { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28, node: <button className="compact-settings compact-options" aria-label="Node Settings" onClick={() => runtime?.openInspector(id)}><Settings size={14} /></button> },
+          { id: 'run', kind: 'fixed-action', intrinsicWidth: 28, node: <PlayTooltip tooltip={runTooltip} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass}`} aria-label={running ? 'Stop' : 'Run'} disabled={!running && runDisabled} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)}>{running ? <StopIcon size={14} /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
+        ]} /></div>
+      </>}
+
+      {data.falNative && <>
+        {!isCanvasGenerator && <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag">
+          <FluidControlGroup className="voice-primary-row" ariaLabel="Selected Live Model" recalculationKey={data.falNative.endpointId} gap={7} allocation={{ minRows: 1, maxRows: 1 }} controls={[
+            { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <label><span>Model</span>{nativeModelSelect}</label> },
+          ]} />
+        </div>}
+        <FalNativeFields state={data.falNative} contract={runtime?.falSchema?.(data.falNative.endpointId).contract} placement="primary" onChange={(falNative) => runtime?.updateNode(id, { falNative })} />
+        {isCanvasGenerator && <div className="compact-generator-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Live Model Actions" recalculationKey={`${data.falNative.endpointId}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 1, maxRows: 1, firstId: 'model', terminalIds: ['settings', 'run'] }} controls={[
+          { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: nativeModelSelect },
+          { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28, node: <button className="compact-settings compact-options" aria-label="Node Settings" onClick={() => runtime?.openInspector(id)}><Settings size={14} /></button> },
+          { id: 'run', kind: 'fixed-action', intrinsicWidth: 28, node: <PlayTooltip tooltip={runTooltip} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass}`} aria-label={running ? 'Stop' : 'Run'} disabled={!running && runDisabled} onClick={() => running ? runtime?.stopNode(id) : runtime?.runNode(id)}>{running ? <StopIcon size={14} /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
+        ]} /></div>}
+      </>}
+
       {data.kind === 'video-generator' && selectedVideoModel?.family === 'wan' && <FluidControlGroup
         className="primary-node-controls video-primary-controls nodrag"
         ariaLabel="Primary Video Quality Controls"
@@ -1999,10 +2377,10 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         ]}
       />}
 
-      {isCanvasGenerator && <div className={`compact-generator-footer ${data.kind === 'video-generator' ? 'compact-video-footer' : ''} nodrag`}>
+      {isCanvasGenerator && !data.falNative && !data.higgsfieldNative && <div className={`compact-generator-footer ${data.kind === 'video-generator' ? 'compact-video-footer' : ''} nodrag`}>
         {isImageGeneratorSurface ? <ImageGenerationControlGroup
           recalculationKey={`${imageProvider}:${imageModelId}:${data.outputFormat || 'png'}:${selectedImageResolution}:${data.quantity || 1}:${normalizedImageRatio(data.aspectRatio)}`}
-          model={<GroupedMenuSelect className="compact-engine image-engine" ariaLabel="Image engine" title="Image engine" defaultLabel={modelDisplayName(imageModelId)} fillTrack value={`${imageProvider}::${imageModelId}`} groups={imageModelGroups} onChange={(nextValue) => { const [provider, ...modelParts] = nextValue.split('::'); runtime?.updateNode(id, imageModelSelectionPatch(provider as StudioNodeData['imageProvider'], modelParts.join('::'), data.imageResolution)) }} />}
+          model={<GroupedMenuSelect catalog className="compact-engine image-engine" ariaLabel="Image engine" title="Image engine" defaultLabel={modelDisplayName(imageModelId)} fillTrack value={`${imageProvider}::${imageModelId}`} groups={runtime?.serviceAvailability?.('fal') ? liveFalModelGroups('image', runtime.serviceAvailability('fal'), imageModelGroups) : imageModelGroups} onChange={(nextValue) => { if (nextValue.startsWith('fal-native::')) { runtime?.selectFalModel?.(id, nextValue.slice(12)); return } const [provider, ...modelParts] = nextValue.split('::'); runtime?.updateNode(id, imageModelSelectionPatch(provider as StudioNodeData['imageProvider'], modelParts.join('::'), data.imageResolution)) }} />}
           format={<ImageFormatControl format={data.outputFormat} webp={usesNanoImageModel} onFormat={(outputFormat) => runtime?.updateNode(id, { outputFormat })} />}
           resolution={<ImageResolutionControl resolution={selectedImageResolution} resolutions={supportedImageResolutions} onResolution={(imageResolution) => runtime?.updateNode(id, { imageResolution })} />}
           quantity={<div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div>}
@@ -2012,21 +2390,23 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         /> : <FluidControlGroup
           className="compact-video-footer-group"
           ariaLabel="Video Footer Controls"
-          allocation={{ minRows: 2, maxRows: 2, firstId: 'model', terminalIds: ['settings', 'run'], preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'resolution', 'sound', 'settings', 'run']] }}
+          allocation={{ minRows: 2, maxRows: 3, firstId: 'model', terminalIds: ['settings', 'run'], preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'resolution', 'sound', 'settings', 'run']] }}
           gap={6}
           recalculationKey={`${selectedVideoModel?.id}:${normalizedVideoDuration(data)}:${data.resolution || ''}:${data.aspectRatio || ''}:${data.quantity || 1}:${effectiveMotionCadence}:${Boolean(data.generateAudio)}`}
           controls={([
-            { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: closedVideoLabel, fullLabel: closedVideoLabel, compactLabel: closedVideoLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, preferredRow: 0, preferredZone: 'start', fixedAnchor: 'first', node: <GroupedMenuSelect className="compact-engine video-engine" menuClassName="video-model-menu" ariaLabel="Video Model" accessibleLabel={selectedVideoModel?.label || 'WAN Controlled'} displayLabel={closedVideoLabel} compactLabel={closedVideoLabel} defaultLabel={closedVideoLabel} fillTrack value={selectedVideoModel?.id || 'wan-controlled'} groups={VIDEO_MODEL_MENU_GROUPS} onChange={(engine) => {
+            { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: closedVideoLabel, fullLabel: closedVideoLabel, compactLabel: closedVideoLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, preferredRow: 0, preferredZone: 'start', fixedAnchor: 'first', node: <GroupedMenuSelect catalog className="compact-engine video-engine" menuClassName="video-model-menu" ariaLabel="Video Model" accessibleLabel={selectedVideoModel?.label || 'WAN Controlled'} displayLabel={closedVideoLabel} compactLabel={closedVideoLabel} defaultLabel={closedVideoLabel} fillTrack value={selectedVideoModel?.id || 'wan-controlled'} groups={videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data)} onChange={(engine) => {
+              if (engine.startsWith('higgsfield-native::')) { runtime?.selectHiggsfieldModel?.(id, engine.slice('higgsfield-native::'.length)); return }
+              if (engine.startsWith('fal-native::')) { runtime?.selectFalModel?.(id, engine.slice(12)); return }
               const model = resolveVideoModel(engine)
               const frameRate = model.frameRates.length ? (model.frameRates.includes(data.frameRate || 24) ? data.frameRate || 24 : model.frameRates[0]) : undefined
               const durationPatch = normalizedGeneratorDurationPatch({ videoEngine: engine, duration: data.duration, frameRate })
               runtime?.updateNode(id, { videoEngine: engine, aspectRatio: defaultVideoRatio(model) || data.aspectRatio, ...durationPatch, generateAudio: model.nativeAudio ? data.generateAudio : false, resolution: model.resolutions.length ? (model.resolutions.includes(data.resolution || '') ? data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined, frameRate, motionCadence: normalizedMotionCadence(model, frameRate, data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : data.inferenceSteps, guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : data.guidanceScale, acceleration: model.family === 'wan' ? 'regular' : data.acceleration })
             }} title={providerBlocked ? `${providerAccount?.message || 'This provider is unavailable.'} You can still inspect another model's controls.` : 'Video Model'} /> },
-            { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: `${effectiveMotionCadence} fps`, intrinsicWidth: 54, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <GroupedMenuSelect className="compact-fps" ariaLabel="Motion FPS" title="Motion FPS controls how frequently movement visibly updates without changing encoded provider Native FPS or playback speed." displayLabel={`${effectiveMotionCadence} fps`} defaultLabel={`${effectiveMotionCadence} fps`} fillTrack value={String(effectiveMotionCadence)} groups={[
+            { id: 'motion', kind: 'selector', visible: true, available: effectiveMotionCadence !== undefined, defaultLabel: `${effectiveMotionCadence} fps`, intrinsicWidth: 54, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <GroupedMenuSelect className="compact-fps" ariaLabel="Motion FPS" title="Motion FPS controls how frequently movement visibly updates without changing encoded provider Native FPS or playback speed." displayLabel={`${effectiveMotionCadence} fps`} defaultLabel={`${effectiveMotionCadence} fps`} fillTrack value={String(effectiveMotionCadence)} groups={[
               { label: 'Motion FPS', options: motionCadenceOptions(selectedVideoModel || resolveVideoModel(data.videoEngine), data.frameRate).map((fps) => ({ value: String(fps), label: `${fps} fps` })) },
             ]} onChange={(value) => runtime?.updateNode(id, { motionCadence: Number(value) })} /> },
             { id: 'ratio', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.ratios.length), defaultLabel: defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9', intrinsicWidth: 44, priority: 50, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Aspect Ratio" title="Video Aspect Ratio" defaultLabel={defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9'} fillTrack value={selectedVideoModel ? resolvedVideoRatio(selectedVideoModel, data.aspectRatio) : '16:9'} options={aspectRatioMenuOptions((selectedVideoModel?.ratios || []).filter((ratio) => ratio !== 'auto'))} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} /> },
-            { id: 'duration', kind: 'selector', visible: true, available: videoDurationOptions(data.videoEngine, data.frameRate).length > 1, defaultLabel: formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0])), intrinsicWidth: 42, priority: 60, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Duration" title="Video Duration" defaultLabel={formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0]))} fillTrack value={String(normalizedVideoDuration(data))} options={videoDurationOptions(data.videoEngine, data.frameRate).filter((seconds): seconds is number => typeof seconds === 'number').map((seconds) => ({ value: String(seconds), label: formatDurationSeconds(seconds) }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value), autoDuration: false })} /> },
+            { id: 'duration', kind: 'selector', visible: true, available: videoDurationOptions(data.videoEngine, data.frameRate).length > 1, defaultLabel: formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0])), intrinsicWidth: 42, priority: 60, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Duration" title="Video Duration" defaultLabel={formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0]))} fillTrack value={String(normalizedVideoDuration(data))} options={videoDurationMenuOptions(data)} onChange={(value) => runtime?.updateNode(id, { duration: Number(value), autoDuration: false })} /> },
             { id: 'quantity', kind: 'bounded-elastic', visible: true, available: true, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, preferredRow: 1, preferredZone: 'start', node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
             { id: 'resolution', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.resolutions.length), defaultLabel: selectedVideoModel?.resolutions[0] || '720p', intrinsicWidth: 48, priority: 55, preferredRow: 1, preferredZone: 'middle', node: <SimpleMenuSelect className="compact-resolution" ariaLabel="Video Resolution" title="Video Resolution" defaultLabel={selectedVideoModel?.resolutions[0] || '720p'} fillTrack value={selectedVideoModel?.resolutions.includes(data.resolution || '') ? data.resolution || selectedVideoModel.resolutions[0] : selectedVideoModel?.resolutions[0] || ''} options={(selectedVideoModel?.resolutions || []).map((resolution) => ({ value: resolution, label: resolution }))} onChange={(value) => runtime?.updateNode(id, { resolution: value as StudioNodeData['resolution'] })} /> },
             { id: 'sound', kind: 'intrinsic', visible: true, available: Boolean(selectedVideoModel?.nativeAudio), defaultLabel: 'Sound', intrinsicWidth: 28, priority: 45, preferredRow: 1, preferredZone: 'middle', node: <button type="button" className={`compact-settings compact-options compact-sound ${data.generateAudio ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={Boolean(data.generateAudio)} disabled={running} onClick={() => runtime?.updateNode(id, { generateAudio: !data.generateAudio })}><Volume2 size={14} /></button> },
@@ -2054,13 +2434,14 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         </div>
       </div>}
 
-      {data.kind === 'upscaler' && <div className="primary-node-controls upscaler-primary-controls nodrag" aria-label="Primary Upscaler Controls">
-        <label className="upscaler-model-field"><span>Model</span><SimpleMenuSelect ariaLabel="Upscaler model" value={data.upscalerModel || 'clarity-image'} options={[{ value: 'clarity-image', label: 'Clarity Image Upscaler' }, { value: 'realesrgan-video', label: 'RealESRGAN Video Upscaler' }]} onChange={(upscalerModel) => runtime?.updateNode(id, { upscalerModel: upscalerModel as StudioNodeData['upscalerModel'], outputPath: undefined, outputUrl: undefined, outputType: undefined, generatedResults: undefined, error: undefined })} /></label>
+      {data.kind === 'upscaler' && !data.falNative && <div className="primary-node-controls upscaler-primary-controls nodrag" aria-label="Primary Upscaler Controls">
+        <label className="upscaler-model-field"><span>Model</span><SimpleMenuSelect service="fal" ariaLabel="Upscaler model" value={data.upscalerModel || 'clarity-image'} options={[{ value: 'clarity-image', label: 'Clarity Image Upscaler' }, { value: 'realesrgan-video', label: 'RealESRGAN Video Upscaler' }]} onChange={(upscalerModel) => runtime?.updateNode(id, { upscalerModel: upscalerModel as StudioNodeData['upscalerModel'], outputPath: undefined, outputUrl: undefined, outputType: undefined, generatedResults: undefined, error: undefined })} /></label>
         <label className={upscalerIsVideo ? 'is-disabled' : ''}><span>Creativity · {(data.creativity ?? 0.35).toFixed(2)}</span><input disabled={upscalerIsVideo} type="range" min="0" max="1" step="0.05" value={data.creativity ?? 0.35} onChange={(event) => runtime?.updateNode(id, { creativity: Number(event.target.value) })} /></label>
         <label className={upscalerIsVideo ? 'is-disabled' : ''}><span>Resemblance · {(data.resemblance ?? 0.6).toFixed(2)}</span><input disabled={upscalerIsVideo} type="range" min="0" max="1" step="0.05" value={data.resemblance ?? 0.6} onChange={(event) => runtime?.updateNode(id, { resemblance: Number(event.target.value) })} /></label>
       </div>}
 
-      {data.kind === 'voiceover' && <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
+      {data.kind === 'voiceover' && !data.falNative && data.voiceEngine === 'elevenlabs-direct' && <DirectElevenVoiceControls data={data} availability={runtime?.serviceAvailability?.('elevenlabs')} fishAvailability={runtime?.serviceAvailability?.('fish')} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
+      {data.kind === 'voiceover' && !data.falNative && data.voiceEngine !== 'elevenlabs-direct' && <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
         <FluidControlGroup
           className="voice-primary-row voice-primary-row-two"
           ariaLabel="Voice Model And Voice Controls"
@@ -2068,13 +2449,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }}
           recalculationKey={`${data.voiceEngine}:${data.fishModel || ''}:${data.fishReferenceId || ''}:${data.voice || ''}`}
           controls={[
-            { id: 'model', kind: 'selector', defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><GroupedMenuSelect className="voice-primary-model" ariaLabel="Voice provider and model" defaultLabel="ElevenLabs Eleven v3" fillTrack value={data.voiceEngine === 'fish-audio' ? `fish-audio::${data.fishModel || 's2-pro'}` : 'elevenlabs'} groups={[
-              { label: 'fal.ai', options: [{ value: 'elevenlabs', label: 'ElevenLabs Eleven v3', provider: 'elevenlabs' }] },
-              { label: 'Fish Audio', options: FISH_TTS_MODELS.map((model) => ({ value: `fish-audio::${model.value}`, label: `Fish Audio ${model.label}`, provider: 'fish' as const })) },
-            ]} onChange={(selection) => {
-              if (selection.startsWith('fish-audio::')) runtime?.updateNode(id, { voiceEngine: 'fish-audio', fishModel: selection.split('::')[1] as StudioNodeData['fishModel'], error: undefined })
-              else runtime?.updateNode(id, { voiceEngine: 'elevenlabs', error: undefined })
-            }} /></label> },
+            { id: 'model', kind: 'selector', defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} fishAvailability={runtime?.serviceAvailability?.('fish')} models={runtime?.availableModels('elevenlabs') || []} onChange={(patch) => runtime?.updateNode(id, patch)} /></label> },
             data.voiceEngine === 'fish-audio'
               ? { id: 'voice', kind: 'intrinsic', intrinsicWidth: 132, node: <label className="voice-primary-voice-field"><span>Voice ID</span><input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" value={data.fishReferenceId || ''} onChange={(event) => runtime?.updateNode(id, { fishReferenceId: event.target.value, error: undefined })} placeholder="Reference ID (required)" /></label> }
               : { id: 'voice', kind: 'selector', intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><SimpleMenuSelect className="voice-primary-voice" ariaLabel="ElevenLabs voice" defaultLabel={ELEVEN_V3_BUILT_IN_VOICES[0]} fillTrack value={usesBuiltInElevenVoice ? elevenVoiceValue : '__custom'} options={[...ELEVEN_V3_BUILT_IN_VOICES.map((voice) => ({ value: voice, label: voice })), { value: '__custom', label: 'Custom voice name / ID' }]} onChange={(voice) => runtime?.updateNode(id, { voice: voice === '__custom' ? '' : voice, error: undefined })} /></label> },
@@ -2095,36 +2470,44 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           />
           {!usesBuiltInElevenVoice && <label className="voice-primary-custom"><span>Custom Voice</span><input className="voice-primary-input" aria-label="Custom ElevenLabs voice name or ID" value={data.voice || ''} onChange={(event) => runtime?.updateNode(id, { voice: event.target.value, error: undefined })} placeholder="Voice name or ID (required)" /></label>}
         </>}
-        {data.voiceEngine === 'fish-audio' ? <>
-          <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish Audio Format" value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label>
-          <label><span>Sample Rate</span><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" value={String(data.fishSampleRate || 44100)} options={FISH_SAMPLE_RATES.map((value) => ({ value: String(value), label: `${value / 1000} kHz` }))} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: Number(value) })} /></label>
-          {(data.fishFormat || 'mp3') === 'mp3' && <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" value={String(data.fishMp3Bitrate || 128)} options={FISH_MP3_BITRATES.map((value) => ({ value: String(value), label: `${value} kbps` }))} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label>}
-          {data.fishFormat === 'opus' && <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" value={String(data.fishOpusBitrate ?? 48)} options={FISH_OPUS_BITRATES.map((value) => ({ value: String(value), label: value === -1000 ? 'Auto' : `${value} kbps` }))} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label>}
-          <label><span>Volume</span><SimpleMenuSelect ariaLabel="Fish Audio Volume" value={String(Math.round(Math.min(20, Math.max(-20, data.fishVolume ?? 0))))} options={FISH_VOLUME_OPTIONS} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label>
-        </> : null}
+        {data.voiceEngine === 'fish-audio' && <FluidControlGroup
+          className="voice-primary-row voice-primary-output-row"
+          ariaLabel="Fish Audio Output Controls"
+          gap={7}
+          allocation={{ minRows: 1, maxRows: 3 }}
+          recalculationKey={`${data.fishFormat || 'mp3'}:${data.fishSampleRate || 44100}:${data.fishMp3Bitrate || 128}:${data.fishOpusBitrate ?? 48}:${data.fishVolume ?? 0}:${data.speed ?? 1}`}
+          controls={[
+            { id: 'format', kind: 'selector', intrinsicWidth: 52, node: <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish Audio Format" defaultLabel="MP3" fillTrack value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label> },
+            { id: 'sample-rate', kind: 'selector', intrinsicWidth: 70, node: <label><span>Sample Rate</span><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" defaultLabel="44.1 kHz" fillTrack value={data.fishSampleRate === undefined ? '@default' : String(data.fishSampleRate)} options={fishSampleRateOptions(data.fishFormat, data.fishSampleRate)} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label> },
+            ...((data.fishFormat || 'mp3') === 'mp3' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" defaultLabel="128 kbps" fillTrack value={String(data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', data.fishMp3Bitrate ?? 128)} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label> }] : []),
+            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? 48)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? 48)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
+            { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label><span>Speed</span><SimpleMenuSelect ariaLabel="Fish Audio Speed" defaultLabel="1×" fillTrack value={String(data.speed ?? 1)} options={fishNumberOptions(Array.from({ length: 31 }, (_, i) => Number((0.5 + i / 20).toFixed(2))), data.speed ?? 1, '×', 0.5, 2)} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
+            { id: 'volume', kind: 'selector', intrinsicWidth: 52, node: <label><span>Volume</span><SimpleMenuSelect ariaLabel="Fish Audio Volume" defaultLabel="0 dB" fillTrack value={String(data.fishVolume ?? 0)} options={fishNumberOptions(Array.from({ length: 41 }, (_, i) => i - 20), data.fishVolume ?? 0, ' dB', -20, 20)} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label> },
+          ]}
+        />}
       </div>}
 
       {runnable && !isCanvasGenerator && !['element', 'location', 'wardrobe'].includes(data.kind) && (
         <div className="compact-generator-footer compact-generic-footer nodrag">
-          {!['element', 'location', 'wardrobe'].includes(data.kind) && <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster">
+          {!data.falNative && !['element', 'location', 'wardrobe'].includes(data.kind) && <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster">
             <button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, -1) : runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={12} /></button>
             <span>x{data.quantity || 1}</span>
             <button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, 1) : runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={12} /></button>
           </span></div>}
           {data.kind === 'upscaler' && <SimpleMenuSelect className="upscaler-scale-select" ariaLabel="Upscale Amount" title="Upscale Amount" value={String(data.scale || 2)} options={[2, 3, 4].map((value) => ({ value: String(value), label: `${value}×` }))} onChange={(value) => runtime?.updateNode(id, { scale: Number(value) })} />}
-          {data.kind === 'sound-effects' && <div className="compact-model sound-effects-model" title="ElevenLabs Sound Effects v2"><CompanyIcon provider="elevenlabs" /><span>ElevenLabs SFX v2</span></div>}
-          {data.kind === 'sound-effects' && <><SimpleMenuSelect ariaLabel="Sound Effect Duration" title="Sound Effect Duration" value={String(data.duration || 5)} options={[0.5,1,2,3,5,8,10,15,22].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /><label className="compact-toggle compact-loop" title="Loop Sound Effect"><span>Loop</span><input aria-label="Loop Sound Effect" type="checkbox" checked={Boolean(data.loop)} onChange={(event) => runtime?.updateNode(id, { loop: event.target.checked })} /><i /></label><SimpleMenuSelect className="sound-output-format" ariaLabel="Sound Effect Output Format" title="Sound Effect Output Format" value={data.audioOutputFormat || 'mp3_44100_128'} options={ELEVEN_AUDIO_OUTPUT_FORMATS.map((value) => ({ value, label: audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></>}
+          {data.kind === 'sound-effects' && !data.falNative && <SoundModelSelect className="compact-engine voice-engine" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
+          {data.kind === 'sound-effects' && !data.falNative && <><SimpleMenuSelect ariaLabel="Sound Effect Duration" title="Sound Effect Duration" value={String(data.duration || 5)} options={(data.audioProvider === 'elevenlabs' ? [0.5,1,2,3,5,8,10,15,22,30] : [0.5,1,2,3,5,8,10,15,22]).map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /><label className="compact-toggle compact-loop" title="Loop Sound Effect"><span>Loop</span><input aria-label="Loop Sound Effect" type="checkbox" checked={Boolean(data.loop)} onChange={(event) => runtime?.updateNode(id, { loop: event.target.checked })} /><i /></label><SimpleMenuSelect className="sound-output-format" ariaLabel="Sound Effect Output Format" title="Sound Effect Output Format" value={data.audioOutputFormat || 'mp3_44100_128'} options={(data.audioProvider === 'elevenlabs' ? ELEVEN_DIRECT_OUTPUT_FORMATS : ELEVEN_AUDIO_OUTPUT_FORMATS).map((value) => ({ value, label: data.audioProvider === 'elevenlabs' ? directAudioFormatLabel(value) : audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></>}
           {data.kind === 'music-generator' && <><SimpleMenuSelect ariaLabel="Music Duration" title="Music Duration" value={String(data.duration || 30)} options={[10,30,60,120].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /><label className="compact-audio" title="Instrumental Only"><input aria-label="Instrumental Only" type="checkbox" checked={Boolean(data.forceInstrumental)} onChange={(event) => runtime?.updateNode(id, { forceInstrumental: event.target.checked })} /><Music2 size={12} /></label></>}
-          {['element', 'location', 'wardrobe'].includes(data.kind) && <GroupedMenuSelect className="compact-engine image-engine" ariaLabel={`${data.kind === 'element' ? 'Element' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Location'} image model`} title="Image model" value={`${imageProvider}::${imageModelId}`} groups={[
-            { label: 'fal.ai', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider })) },
+          {['element', 'location', 'wardrobe'].includes(data.kind) && <GroupedMenuSelect catalog className="compact-engine image-engine" ariaLabel={`${data.kind === 'element' ? 'Element' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Location'} image model`} title="Image model" value={`${imageProvider}::${imageModelId}`} groups={[
+            { label: 'fal.ai', service: 'fal', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider as ModelCompany })) },
             { label: 'OpenAI', options: openAIImageModels.map((model) => ({ value: `openai::${model.id}`, label: model.label })) },
             { label: 'Google', options: googleImageModels.map((model) => ({ value: `google::${model.id}`, label: model.label })) },
           ]} onChange={(nextValue) => {
             const [provider, ...modelParts] = nextValue.split('::')
             runtime?.updateNode(id, { imageProvider: provider as StudioNodeData['imageProvider'], imageModelId: modelParts.join('::') })
           }} />}
-          {data.kind === 'image-editor' && <GroupedMenuSelect className="compact-engine image-engine" ariaLabel="Image editing engine" title="Image editing engine" value={`${imageProvider}::${imageModelId}`} groups={[
-            { label: 'fal.ai', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider })) },
+          {data.kind === 'image-editor' && <GroupedMenuSelect catalog className="compact-engine image-engine" ariaLabel="Image editing engine" title="Image editing engine" value={`${imageProvider}::${imageModelId}`} groups={[
+            { label: 'fal.ai', service: 'fal', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider as ModelCompany })) },
             { label: 'OpenAI', options: openAIImageModels.map((model) => ({ value: `openai::${model.id}`, label: model.label })) },
             { label: 'Google', options: googleImageModels.map((model) => ({ value: `google::${model.id}`, label: model.label })) },
           ]} onChange={(nextValue) => {

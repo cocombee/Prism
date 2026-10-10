@@ -17,7 +17,8 @@ const request: GenerationRequest = {
 describe('visible provider prompt body parity', () => {
   it('uses one complete long body for Locked, preview, and submitted Seedance payload', () => {
     const locked = visibleProviderPromptBody(request)
-    for (const heading of ['ASSISTANT TASK', 'REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'IDENTITY AND ANATOMY CONTINUITY', 'NEGATIVE PROMPT']) expect(locked).toContain(heading)
+    for (const heading of ['REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'IDENTITY AND ANATOMY CONTINUITY', 'NEGATIVE PROMPT']) expect(locked).toContain(heading)
+    expect(locked).not.toMatch(/ASSISTANT TASK|EDIT CONTROL|EDITABLE VARIABLE REGISTRY/)
     expect(providerPromptPreview(request)).toBe(locked)
     expect(providerSeedancePayloadCompilation(request).text).toBe(locked.replaceAll('@hero', '[Image1]'))
   })
@@ -39,7 +40,7 @@ describe('visible provider prompt body parity', () => {
     expect(providerSeedancePayloadCompilation({ ...request, videoEngine: 'bytedance/seedance-2.0/reference-to-video', providerPromptOverride: body, references: refs }).text).toBe('Use @Image1, then @Video1, then @Audio1.')
   })
 
-  it('keeps visible and Manual/User bodies exact while qualifying only the submitted hidden provider contract', () => {
+  it('shows qualified skin instructions in the exact submitted body while preserving Manual/User bytes', () => {
     const qualified: GenerationRequest = {
       ...request,
       prompt: 'A visible organic human woman crosses a physically photographed live-action hall.',
@@ -48,9 +49,13 @@ describe('visible provider prompt body parity', () => {
       references: [{ role: 'character', tag: '@hero', description: 'Organic human woman, age 42, warm brown complexion and authored freckles.', path: '/hero.png', mediaType: 'image', slot: 'reference' }],
     }
     const visible = visibleProviderPromptBody(qualified)
-    expect(visible).not.toContain('NATURAL SKIN TEXTURE')
-    expect(visible).not.toContain(NATURAL_SKIN_NEGATIVE_TERMS[0])
+    expect(visible).toContain('NATURAL SKIN TEXTURE')
+    expect(visible).toContain(NATURAL_SKIN_NEGATIVE_TERMS[0])
+    expect(visible.match(/^NEGATIVE PROMPT$/gm)).toHaveLength(1)
+    expect(visible.indexOf('NATURAL SKIN TEXTURE')).toBeLessThan(visible.indexOf('NEGATIVE PROMPT'))
+    expect(compileProviderPromptForSubmission(qualified).text).toBe(visible)
     const payload = providerSeedancePayloadCompilation(qualified).text
+    expect(payload).toBe(visible.replaceAll('@hero', '[Image1]'))
     expect(payload).toContain(`NATURAL SKIN TEXTURE\n${NATURAL_SKIN_POSITIVE_CLAUSES.join('\n\n')}`)
     for (const term of NATURAL_SKIN_NEGATIVE_TERMS) expect(payload).toContain(term)
 
@@ -58,10 +63,11 @@ describe('visible provider prompt body parity', () => {
     const manualRequest = { ...qualified, providerPromptOverride: manual }
     expect(visibleProviderPromptBody(manualRequest)).toBe(manual)
     expect(providerPromptPreview(manualRequest)).toBe(manual)
-    expect(providerSeedancePayloadCompilation(manualRequest).text.startsWith(manual)).toBe(true)
+    expect(providerSeedancePayloadCompilation(manualRequest).text).toBe(manual)
+    expect(compileProviderPromptForSubmission(manualRequest).text).toBe(manual)
   })
 
-  it('passes under-limit text unchanged, safely compresses duplicates, and blocks irreducible mandatory state', () => {
+  it('passes under-limit text unchanged, compresses optional guidance, and preserves deliberate authored lock repetitions', () => {
     const typed: GenerationRequest = {
       ...request,
       storyboardShots: [{
@@ -71,6 +77,10 @@ describe('visible provider prompt body parity', () => {
       shotLocks: 'door stays closed\ndoor stays closed',
     }
     const unlimited = compileProviderPrompt(typed, { family: 'seedance' })
+    // The fixture deliberately authors two lock lines. The compiler must emit
+    // that block once, rather than normalize either authored occurrence away.
+    expect(typed.shotLocks!.match(/door stays closed/g)).toHaveLength(2)
+    expect(unlimited.text.split(typed.shotLocks!)).toHaveLength(2)
     const underLimit = compileProviderPrompt(typed, { family: 'seedance', ceiling: unlimited.text.length, ceilingSource: 'fixture-model-capability' })
     expect(underLimit.text).toBe(unlimited.text)
     expect(underLimit.promptBudgetDiagnostic).toMatchObject({
@@ -79,7 +89,8 @@ describe('visible provider prompt body parity', () => {
     })
 
     const compressedProbe = compileProviderPrompt(typed, { family: 'seedance', ceiling: unlimited.text.length - 1, ceilingSource: 'fixture-model-capability' })
-    expect(compressedProbe.text.match(/door stays closed/g)?.length || 0).toBeLessThanOrEqual(1)
+    expect(compressedProbe.text.match(/door stays closed/g)).toHaveLength(2)
+    expect(compressedProbe.text.split(typed.shotLocks!)).toHaveLength(2)
     expect(compressedProbe.text).toContain('CHARACTER STATE · @hero | world=exact doorway | action=holds the latch | contacts=right hand on latch')
     expect(compressedProbe.promptBudgetDiagnostic?.compressedCharacterCount).toBeLessThan(compressedProbe.promptBudgetDiagnostic!.measuredCharacterCount)
 
@@ -91,6 +102,20 @@ describe('visible provider prompt body parity', () => {
     const semanticMaster = visibleProviderPromptBody(typed)
     expect(providerPromptPreview(typed)).toBe(semanticMaster)
     expect(providerSeedancePayloadCompilation(typed).text).toBe(semanticMaster.replaceAll('@hero', '[Image1]'))
+  })
+
+  it('budgets visible skin clauses before submission and preserves qualified Manual CRLF bytes', () => {
+    const qualified = { ...request, prompt: 'A visible human woman in live-action photography.', authoredPrompt: 'A visible human woman in live-action photography.' }
+    const full = compileProviderPrompt(qualified)
+    expect(full.text).toContain('NATURAL SKIN TEXTURE')
+    const limit = full.text.length
+    const exact = compileProviderPromptForSubmission(qualified, { ceiling: limit })
+    expect(exact.text).toBe(full.text)
+    expect(exact.promptBudgetDiagnostic).toMatchObject({ measuredCharacterCount: limit, compressedCharacterCount: limit, blocking: false })
+    expect(() => compileProviderPromptForSubmission(qualified, { ceiling: 50 })).toThrow(/Prompt budget blocks provider dispatch/)
+    const manual = '  A visible human woman in live-action photography.\r\nNEGATIVE PROMPT\r\nUser exclusions.  '
+    expect(compileProviderPromptForSubmission({ ...qualified, providerPromptOverride: manual }).text).toBe(manual)
+    expect(providerSeedancePayloadCompilation({ ...qualified, providerPromptOverride: manual }).text).toBe(manual)
   })
 
   it('projects connected visual references as sole authority without leaking metadata and preserves one named authored delta', () => {
@@ -110,9 +135,11 @@ describe('visible provider prompt body parity', () => {
     }
     const semanticMaster = visibleProviderPromptBody(referenceExclusive)
     for (const tag of ['@image2', '@image6', '@image3', '@image5', '@image4']) expect(semanticMaster).toContain(tag)
-    expect(semanticMaster.match(/@image2 is the sole authority for image2 as one complete physical body and one cast member, wearing the appearance governed by @image6 on that same body\./g)).toHaveLength(1)
-    expect(semanticMaster.match(/@image3 is the sole authority for image3 as one complete physical body and one cast member, wearing the appearance governed by @image5 on that same body\./g)).toHaveLength(1)
-    expect(semanticMaster.match(/@image3 is the sole authority for image3 as one complete physical body and one cast member, wearing the appearance governed by @image4 on that same body\./g)).toHaveLength(1)
+    expect(semanticMaster.match(/Use @image2 as image2\./g)).toHaveLength(1)
+    expect(semanticMaster.match(/Use @image3 as image3\./g)).toHaveLength(1)
+    expect(semanticMaster.match(/Use @image6 for @image2's wardrobe\./g)).toHaveLength(1)
+    expect(semanticMaster.match(/Use @image5 for @image3's glasses or accessory\./g)).toHaveLength(1)
+    expect(semanticMaster.match(/Use @image4 for @image3's helmet or headwear\./g)).toHaveLength(1)
     expect(semanticMaster.match(/Authored appearance delta · @image4 · visor finish=matte/g)).toHaveLength(1)
     expect(semanticMaster).toContain('Manual garment prose: a hand-knitted red scarf with two tassels.')
     for (const metadata of ['mustard', 'leopard', 'round cyan glasses', 'black frame', 'blue lenses', 'cyan blue plastic helmet']) expect(semanticMaster).not.toContain(metadata)

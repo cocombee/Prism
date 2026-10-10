@@ -2,7 +2,7 @@ import type { StoryboardPanel } from './types'
 
 export const STORYBOARD_MIN_PANELS = 2
 export const STORYBOARD_MAX_PANELS = 20
-export const STORYBOARD_MIN_PANEL_DURATION = 0.5
+export const STORYBOARD_MIN_PANEL_DURATION = 1
 
 export interface StoryboardPanelMutation {
   panels: StoryboardPanel[]
@@ -12,7 +12,8 @@ export interface StoryboardPanelMutation {
 
 export function migrateStoryboardPanelDuration(panel: StoryboardPanel): StoryboardPanel {
   if (panel.duration === 'auto') return { ...panel, duration: 1 }
-  if (!Number.isFinite(panel.duration) || Number(panel.duration) < STORYBOARD_MIN_PANEL_DURATION) return { ...panel, duration: STORYBOARD_MIN_PANEL_DURATION }
+  // Preserve saved numeric timing, including values that now require explicit review.
+  if (!Number.isFinite(panel.duration)) return { ...panel, duration: 1 }
   return panel
 }
 

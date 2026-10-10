@@ -32,5 +32,6 @@ export function soleVisualAuthorityLine(reference: VisualReference): string | un
         ? ` used by ${reference.boundCharacterTag}`
         : ''
     : ''
-  return `${reference.tag} is the sole visual authority for ${reference.role}${ownership}; colour, material, construction, pattern, shape, fit, markings, and accessory design come only from the connected reference.`
+  if (reference.role === 'character') return `Use ${reference.tag} as ${reference.name?.trim() || reference.tag.replace(/^@/, '')}.`
+  return `Use ${reference.tag} for the ${reference.role}${ownership}.`
 }

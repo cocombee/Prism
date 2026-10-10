@@ -30,10 +30,10 @@ describe('Storyboard 2–20 panel collection', () => {
     expect(final.focusPanelId).toBe('p19')
   })
 
-  it('allows disconnected additions under the cap and blocks a connected addition below the 0.5s minimum', () => {
+  it('allows disconnected additions under the cap and blocks a connected addition below the1.0s minimum', () => {
     expect(canAppendStoryboardPanel(panels(19))).toBe(true)
     expect(canAppendStoryboardPanel(panels(20))).toBe(false)
-    expect(canAppendStoryboardPanel(panels(3), 0.5)).toBe(true)
-    expect(canAppendStoryboardPanel(panels(3), 0.49)).toBe(false)
+    expect(canAppendStoryboardPanel(panels(3), 1)).toBe(true)
+    expect(canAppendStoryboardPanel(panels(3), 0.99)).toBe(false)
   })
 })

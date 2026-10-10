@@ -22,19 +22,19 @@ describe('cinematic direction layer', () => {
     expect(directionInputsFor({ ...base, storyboardShotCount: 4, multiPrompt: undefined }).hasAuthoredShotPlan).toBe(true)
   })
 
-  it('uses connected Style prose in quantified lighting and style sections', () => {
+  it('uses connected Style without inventing fixtures or a photographic medium', () => {
     const styled = cinematicDirection({ ...base, stylePrompt: 'Grounded tungsten interiors.' })
-    expect(styled).toContain('LIGHTING')
+    expect(styled).not.toContain('LIGHTING')
     expect(styled).toContain('Grounded tungsten interiors.')
-    expect(styled).toContain('5600K')
+    expect(styled).not.toContain('5600K')
     expect(styled).toContain('STYLE')
-    expect(cinematicDirection(base)).toContain('Photoreal live-action, fine film grain, 8K master.')
+    expect(cinematicDirection(base)).not.toContain('Photoreal live-action, fine film grain, 8K master.')
   })
 
   it('quantifies an authored camera recipe', () => {
     const directed = cinematicDirection({ ...base, storyboardShots: [{ prompt: 'Advance.', duration: 3, shotSize: 'medium', camera: 'dolly-in' }] })
     expect(directed).toContain('CAMERA')
-    expect(directed).toContain('Dolly physically toward the subject on the viewing axis; preserve parallax, decelerate into the selected endpoint, then hold. Speed and distance remain authored or unspecified.')
+    expect(directed).toContain('Dolly physically toward the subject on the viewing axis; preserve parallax and the authored pace through the selected endpoint; decelerate or hold only where authored. Speed and distance remain authored or unspecified.')
     expect(directed).not.toMatch(/\b\d+(?:\.\d+)?\s*(?:m\/s|metres?|meters?)\b/i)
     expect(directed).not.toContain('Choose one motivated move')
   })
@@ -60,8 +60,8 @@ describe('cinematic direction layer', () => {
   it('ships inside the resolved provider prompt in production order', () => {
     const resolved = resolvedPromptWithReferences({ ...base, references: [{ role: 'character', tag: '@courier', description: 'red rain coat', slot: 'reference' }] })
     expect(resolved.indexOf('SCENE CONTEXT')).toBeLessThan(resolved.indexOf('ACTIVE REFERENCES'))
-    expect(resolved.indexOf('ACTIVE REFERENCES')).toBeLessThan(resolved.indexOf('LIGHTING'))
-    expect(resolved.indexOf('LIGHTING')).toBeLessThan(resolved.indexOf('POSITIVE LOCKS'))
+    expect(resolved.indexOf('ACTIVE REFERENCES')).toBeLessThan(resolved.indexOf('POSITIVE LOCKS'))
+    expect(resolved).not.toContain('5600K')
     expect(resolved).toContain('@courier')
   })
 

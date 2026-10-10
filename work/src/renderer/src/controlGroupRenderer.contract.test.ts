@@ -65,7 +65,7 @@ describe('active node-wide fluid control renderer contract', () => {
   })
 
   it('uses the confirmed Video 4/5 composition with no primary Bitrate while preserving Inspector Bitrate', () => {
-    const footer = componentBody(nodeCard, 'className="compact-video-footer-group"', '</div>}')
+    const footer = componentBody(nodeCard, 'ariaLabel="Video Footer Controls"', '</div>}')
     expect(footer).toContain("preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'resolution', 'sound', 'settings', 'run']]")
     expect(footer).not.toContain("id: 'bitrate'")
     expect(nodeCard).not.toContain('ariaLabel="Video Bitrate"')
@@ -129,7 +129,7 @@ describe('active node-wide fluid control renderer contract', () => {
   })
 
   it('passes full compact and minimum model metadata to Video and async Storyboard selectors', () => {
-    const video = componentBody(nodeCard, 'className="compact-video-footer-group"', '</div>}')
+    const video = componentBody(nodeCard, 'ariaLabel="Video Footer Controls"', '</div>}')
     expect(video).toContain('fullLabel: closedVideoLabel')
     expect(video).toContain('compactLabel: closedVideoLabel')
     expect(video).toContain("shrinkPriority: 'model'")
@@ -155,7 +155,7 @@ describe('active node-wide fluid control renderer contract', () => {
   })
 
   it('omits unavailable primary Video selectors rather than rendering fixed placeholders', () => {
-    const footer = componentBody(nodeCard, 'className="compact-video-footer-group"', '</div>}')
+    const footer = componentBody(nodeCard, 'ariaLabel="Video Footer Controls"', '</div>}')
     expect(footer).toContain("available: Boolean(selectedVideoModel?.ratios.length)")
     expect(footer).toContain("available: Boolean(selectedVideoModel?.resolutions.length)")
     expect(footer).not.toContain("value={selectedVideoModel?.ratios.length ? resolvedVideoRatio(selectedVideoModel, data.aspectRatio) : 'fixed'}")

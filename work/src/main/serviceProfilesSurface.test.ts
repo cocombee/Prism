@@ -33,7 +33,10 @@ describe('service profile IPC boundary', () => {
 
   it('keeps profile credentials in main and resolves fal generation from the active project selection', () => {
     expect(main).toContain('new ServiceProfileStore')
-    expect(main).toContain("serviceProfileStore().loadCredentialForProject('fal', currentProject?.serviceProfileOverrides)")
+    expect(main).toContain("return loadServiceCredential('fal')")
+    expect(main).toContain("const key = await loadServiceCredential('fish')")
+    expect(main).toContain('serviceProfileStore().isConnectedForProject(provider, runtimeServiceFailures.overrides(provider, currentProject?.serviceProfileOverrides))')
+    expect(main).not.toContain('async function loadFishCredential()')
     expect(preload).not.toMatch(/decrypt|safeStorage|credentialPath/)
     expect(types).not.toMatch(/interface ServiceProfile[\s\S]*apiKey/)
   })

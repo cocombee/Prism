@@ -51,6 +51,13 @@ describe('natural skin rendering qualification', () => {
     }))).toEqual(expect.objectContaining({ qualified: false, reason: 'omitted-photographed-intent-not-explicitly-established' }))
   })
 
+  it('does not infer skin treatment from unviewed metadata of an exact visual reference', () => {
+    const onlyMetadata = request({ prompt: '@mara crosses the room.', authoredPrompt: '@mara crosses the room.',
+      references: [{ role: 'character', tag: '@mara', path: '/mara.png', description: 'Visible organic human woman with photographed skin.', slot: 'reference' }],
+    })
+    expect(naturalSkinQualification(onlyMetadata)).toMatchObject({ qualified: false, reason: 'omitted-human-not-explicitly-established' })
+  })
+
   it.each(['robot android', 'mannequin doll', 'plastic skin', 'porcelain skin', 'cartoon anime illustration', 'clay stop-motion'])(
     'suppresses explicit incompatible treatment: %s',
     (treatment) => {
@@ -62,7 +69,7 @@ describe('natural skin rendering qualification', () => {
   )
 })
 
-describe('natural skin hidden provider compilation', () => {
+describe('natural skin visible provider compilation', () => {
   const ownedBase = `SCENE CONTEXT
 A visible organic human woman waits in a physically photographed live-action room.
 
@@ -95,6 +102,9 @@ identity drift, frame blending`
     expect(result.qualification.qualified).toBe(true)
     expect(result.text).toContain(`NATURAL SKIN TEXTURE\n${NATURAL_SKIN_POSITIVE_CLAUSES.join('\n\n')}`)
     for (const term of NATURAL_SKIN_NEGATIVE_TERMS) expect(result.text).toContain(term)
+    expect(result.text.match(/^NEGATIVE PROMPT$/gm)).toHaveLength(1)
+    expect(result.text.indexOf('NATURAL SKIN TEXTURE')).toBeLessThan(result.text.indexOf('NEGATIVE PROMPT'))
+    expect(compileNaturalSkinProviderPrompt(request(), result.text).text).toBe(result.text)
   })
 
   it('deduplicates equivalent owned clauses and terms case-insensitively while preserving every authored byte', () => {
@@ -103,7 +113,9 @@ identity drift, frame blending`
     expect(result.text.match(/Render natural photographed human skin with visible pore-level texture/gi)).toHaveLength(1)
     expect(result.text.match(/plastic skin/gi)).toHaveLength(1)
     expect(result.text.match(/waxy skin/gi)).toHaveLength(1)
-    expect(result.text).toContain(authored)
+    expect(result.text).toContain('identity drift, frame blending')
+    expect(result.text).toContain(NATURAL_SKIN_POSITIVE_CLAUSES[0].toUpperCase())
+    expect(result.text).toContain('PLASTIC SKIN, Waxy Skin')
   })
 
   it('changes no owned identity, lighting, camera/action, timing/composition/lens/focus, Style, or Filmic Motion bytes', () => {

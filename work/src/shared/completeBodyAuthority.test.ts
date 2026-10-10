@@ -21,7 +21,7 @@ const node = (id: string, kind: StudioNode['data']['kind'], patch: Partial<Studi
 })
 
 describe('complete dressed-body and same-body appearance authority', () => {
-  it('1.1.14: binds one merged complete Character once across three Continue beats in one uninterrupted shot', () => {
+  it('binds one merged complete Character once across three Continue beats in one uninterrupted shot', () => {
     const request = base([
       { role: 'character', tag: '@maya', name: 'Maya', path: '/maya-dressed.png', mediaType: 'image', slot: 'reference', characterAuthorityMode: 'complete-dressed-body' },
     ], [
@@ -30,7 +30,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
       { panelId: 'c3', prompt: 'She stops at the counter.', duration: 1, shotSize: 'close-up', camera: 'static' },
     ])
     const compiled = compileProviderPrompt(request)
-    const exact = '@maya is the sole complete authority for Maya as one fully dressed physical body and one cast member.'
+    const exact = 'Use @maya as Maya.'
     expect(compiled.text.match(new RegExp(exact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1)
     expect(compiled.text).toContain('Maya crosses to the counter.')
     expect(compiled.text).toContain('She stops at the counter.')
@@ -38,7 +38,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
     expect(compiled.continuityLedger?.global).toMatchObject({ identities: ['@maya'], wardrobe: [] })
   })
 
-  it('1.1.14: rebinds only the applicable complete Character once per edited owning shot', () => {
+  it('rebinds only the applicable complete Character once per edited owning shot', () => {
     const request = base([
       { role: 'character', tag: '@maya', name: 'Maya', path: '/maya-dressed.png', mediaType: 'image', slot: 'reference', characterAuthorityMode: 'complete-dressed-body' },
       { role: 'character', tag: '@liam', name: 'Liam', path: '/liam-dressed.png', mediaType: 'image', slot: 'reference', characterAuthorityMode: 'complete-dressed-body' },
@@ -47,19 +47,19 @@ describe('complete dressed-body and same-body appearance authority', () => {
       { panelId: 'e2', prompt: '@maya sits.', duration: 2, shotSize: 'medium', camera: 'static' },
     ])
     const compiled = compileProviderPrompt(request).text
-    const exact = '@maya is the sole complete authority for Maya as one fully dressed physical body and one cast member.'
+    const exact = 'Use @maya as Maya.'
     expect(compiled.match(new RegExp(exact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(2)
-    expect(compiled).not.toContain('@liam is the sole complete authority')
+    expect(compiled).not.toContain('Use @liam as Liam.')
   })
 
-  it('1.1.14: never generates ambiguous pronouns for multiple complete Characters', () => {
+  it('never generates ambiguous pronouns for multiple complete Characters', () => {
     const request = base([
       { role: 'character', tag: '@maya', name: 'Maya', path: '/maya-dressed.png', mediaType: 'image', slot: 'reference', characterAuthorityMode: 'complete-dressed-body' },
       { role: 'character', tag: '@liam', name: 'Liam', path: '/liam-dressed.png', mediaType: 'image', slot: 'reference', characterAuthorityMode: 'complete-dressed-body' },
     ], [{ panelId: 'm1', prompt: '@maya faces @liam.', duration: 2, shotSize: 'medium', camera: 'static' }])
     const compiled = compileProviderPrompt(request).text
-    expect(compiled).toContain('@maya is the sole complete authority for Maya')
-    expect(compiled).toContain('@liam is the sole complete authority for Liam')
+    expect(compiled).toContain('Use @maya as Maya.')
+    expect(compiled).toContain('Use @liam as Liam.')
     expect(compiled).not.toMatch(/\b(?:he|she|they|him|her|them)\b/i)
   })
 
@@ -74,7 +74,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
     ])
 
     const compiled = compileProviderPrompt(request)
-    const exact = '@maya is the sole complete authority for Maya as one fully dressed physical body and one cast member.'
+    const exact = 'Use @maya as Maya.'
     expect(compiled.text.match(new RegExp(exact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1)
     expect(compiled.continuityLedger?.global.identities).toEqual(['@maya'])
     expect(compiled.continuityLedger?.global.wardrobe).toEqual([])
@@ -100,7 +100,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
     expect(compiled.continuityLedger?.global.wardrobe).toEqual([])
     expect(orderedProviderImageReferences(request).map((reference) => reference.tag)).toEqual(['@maya'])
     const payload = providerSeedancePayloadCompilation(request).text
-    expect(payload).toContain('[Image1] is the sole complete authority for Maya')
+    expect(payload).toContain('Use [Image1] as Maya.')
     expect(payload).not.toContain('@maya-coat')
     expect(payload).not.toContain('[Image2]')
   })
@@ -121,7 +121,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
     ])
 
     const compiled = compileProviderPrompt(request)
-    const exact = '@maya is the sole authority for Maya as one complete physical body and one cast member, wearing the appearance governed by @maya-coat on that same body.'
+    const exact = "Use @maya-coat for @maya's wardrobe."
     expect(compiled.text.match(new RegExp(exact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1)
     expect(compiled.continuityLedger?.global.identities).toEqual(['@maya'])
     expect(compiled.continuityLedger?.global.wardrobe).toEqual([])
@@ -143,7 +143,8 @@ describe('complete dressed-body and same-body appearance authority', () => {
       })),
     ], [{ panelId: 'shot-d', prompt: '@maya turns.', duration: 4, shotSize: 'medium', camera: 'static' }])
     const compiled = compileProviderPromptForSubmission(request)
-    for (const { tag } of layers) expect(compiled.text).toContain(`wearing the appearance governed by ${tag} on that same body.`)
+    for (const { tag, scope } of layers) expect(compiled.text).toContain(`Use ${tag} for @maya's ${scope === 'helmet-headwear' ? 'helmet or headwear' : scope === 'glasses-accessory' ? 'glasses or accessory' : 'assigned item'}.`)
+    expect(compiled.text.match(/Use @maya as Maya\./g)).toHaveLength(1)
     expect(compiled.continuityLedger?.global).toMatchObject({ identities: ['@maya'], wardrobe: [], props: [] })
     expect(compiled.text).not.toMatch(/Only [234] people|mannequin|donor body|separate torso/i)
   })
@@ -173,7 +174,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
       { panelId: 'h2', prompt: 'The work continues.', duration: 2, shotSize: 'medium', camera: 'static', continuityGroupId: 'maya-sequence', activeCharacterTags: ['@maya'], characterStateDeltas: [{ characterTag: '@maya', visibility: 'off-camera' }] },
     ])
     const compiled = compileProviderPromptForSubmission(request)
-    const exact = '@maya is the sole authority for Maya as one complete physical body and one cast member, wearing the appearance governed by @maya-coat on that same body.'
+    const exact = "Use @maya-coat for @maya's wardrobe."
     expect(compiled.text.match(new RegExp(exact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(2)
     expect(compiled.continuityLedger?.global).toMatchObject({ identities: ['@maya'], wardrobe: [] })
     expect(compiled.continuityLedger?.shots.map((shot) => shot.characterStates[0]?.visibility)).toEqual(['partially-visible', 'off-camera'])
@@ -249,10 +250,10 @@ describe('complete dressed-body and same-body appearance authority', () => {
     ]))
     expect(generationRequirementFailures(request)).toEqual([])
     const submitted = compileProviderPromptForSubmission(request).text
-    expect(submitted).toContain('@maya is the sole authority for Maya as one complete physical body and one cast member, wearing the appearance governed by @maya-coat on that same body.')
+    expect(submitted).toContain("Use @maya-coat for @maya's wardrobe.")
     expect(submitted).toContain('Approved Maya identity.')
     const adapter = providerSeedancePayloadCompilation(request).text
-    expect(adapter).toMatch(/\[Image\d+\] is the sole authority for Maya as one complete physical body and one cast member, wearing the appearance governed by \[Image\d+\] on that same body\./)
+    expect(adapter).toMatch(/Use \[Image\d+\] for \[Image\d+\]'s wardrobe\./)
     const manifest = buildStoryboardConnectedContextManifest('storyboard', [character, wardrobe, storyboard, video], edges, '@maya enters.', storyboard.data.storyboardPanels![0])
     expect(manifest.text).toContain('body-authority=identity-body-with-layers')
     expect(manifest.text).toContain('anchor=@maya-coat | role=Appearance | owner=@maya | scope=wardrobe | selection=explicit-replacement | shots=shot-i')

@@ -115,9 +115,9 @@ export function semanticAuthorityCompletion(request: GenerationRequest): Semanti
         if (record.approvedIdentityDescription) characterContinuityLines.push(`${record.tag} approved identity: ${record.approvedIdentityDescription}`)
         characterContinuityLines.push(`${record.tag} retains the exact connected Character identity across every appearance.`)
       }
-      if (record.role === 'wardrobe') wardrobeContinuityLines.push(`${record.tag}${record.boundCharacterTag ? ` remains worn only by ${record.boundCharacterTag}` : ''}; the connected reference remains sole visual authority.`)
-      if (record.role === 'element') elementContinuityLines.push(`${record.tag}${record.boundCharacterTag ? ` remains used only by ${record.boundCharacterTag}` : ''}; the connected reference remains sole visual authority.`)
-      if (record.role === 'location') sceneContinuityLines.push(`${record.tag} remains the sole connected visual authority for the Location.`)
+      if (record.role === 'wardrobe') wardrobeContinuityLines.push(`${record.tag}${record.boundCharacterTag ? ` remains worn only by ${record.boundCharacterTag}` : ''}; keep it consistent through the sequence.`)
+      if (record.role === 'element') elementContinuityLines.push(`${record.tag}${record.boundCharacterTag ? ` remains used only by ${record.boundCharacterTag}` : ''}; keep it consistent through the sequence.`)
+      if (record.role === 'location') sceneContinuityLines.push(`${record.tag} remains the same location through the sequence.`)
       continue
     }
 
@@ -126,7 +126,7 @@ export function semanticAuthorityCompletion(request: GenerationRequest): Semanti
       if (!covered(scopes, /\b(?:identity|face|facial|likeness)\b/i)) missing.push('Preserve exact identity, face, likeness, and natural asymmetry.')
       if (!covered(scopes, /\b(?:anatomy|body proportions?|physical proportions?)\b/i)) missing.push('Preserve anatomy and body proportions.')
       if (record.characterOwnsWardrobe && !covered(scopes, /\b(?:wardrobe|clothing|outfit|garment|accessories)\b/i)) missing.push('The Character reference owns its wardrobe and accessories because no Wardrobe authority is bound.')
-      if (missing.length) authorityLines.push(`${record.tag} is the Character visual authority; ${missing.join(' ')}`)
+      if (missing.length) authorityLines.push(`Use ${record.tag} as the Character. ${missing.join(' ')}`)
       if (!continuityCovered(scopes)) characterContinuityLines.push(`${record.tag} retains exact identity, anatomy, body proportions, and natural asymmetry through motion, occlusion, and every cut; never blend, replace, or reinterpret it as another person.${record.characterOwnsWardrobe ? ' Its reference wardrobe and accessories remain consistent across every appearance.' : ''}`)
       continue
     }
@@ -147,7 +147,7 @@ export function semanticAuthorityCompletion(request: GenerationRequest): Semanti
     if (record.role === 'location') {
       if (!covered(scopes, /\b(?:layout|geometry|perspective|scale|spatial)\b/i)) missing.push('Preserve environment layout, scene geometry, perspective, scale, and spatial relationships.')
       if (!covered(scopes, /\b(?:atmosphere|lighting|weather|environment state)\b/i)) missing.push('Preserve atmosphere, lighting logic, weather, and environment state.')
-      if (missing.length) authorityLines.push(`${record.tag} is the Location visual authority; ${missing.join(' ')}`)
+      if (missing.length) authorityLines.push(`Use ${record.tag} for the location. ${missing.join(' ')}`)
       if (!continuityCovered(scopes)) sceneContinuityLines.push(`${record.tag} retains layout, perspective, scale, environment geometry, lighting logic, and persistent scene state across the full timeline.`)
       continue
     }
@@ -156,7 +156,7 @@ export function semanticAuthorityCompletion(request: GenerationRequest): Semanti
       if (!covered(scopes, /\b(?:visual language|medium|rendering|style authority)\b/i)) missing.push('Preserve the visual language, medium, and rendering approach.')
       if (!covered(scopes, /\b(?:palette|texture|finish|lens|grain|contrast)\b/i)) missing.push('Preserve palette, texture, finish, lens character, grain, and contrast behavior.')
       if (!covered(scopes, /\b(?:without copying|do not copy|subject.*not inherited|depicted subjects?)\b/i)) missing.push('Do not inherit or copy depicted subjects from the Style reference.')
-      if (missing.length) authorityLines.push(`${record.tag} is the Style visual authority; ${missing.join(' ')}`)
+      if (missing.length) authorityLines.push(`Use ${record.tag} for the visual style. ${missing.join(' ')}`)
       if (!continuityCovered(scopes)) styleContinuityLines.push(`${record.tag} remains consistent across every shot and output.`)
       continue
     }
@@ -165,7 +165,7 @@ export function semanticAuthorityCompletion(request: GenerationRequest): Semanti
       if (!covered(scopes, /\b(?:design|proportions?|construction|silhouette|shape)\b/i)) missing.push('Preserve object design, proportions, construction, silhouette, and shape.')
       if (!covered(scopes, /\b(?:materials?|colou?rs?|markings?|texture)\b/i)) missing.push('Preserve materials, colors, markings, and texture.')
       if (!covered(scopes, /\b(?:attachment|contact|held|carried|worn|physical state)\b/i)) missing.push('Preserve assigned attachment, contact, and physical state without inventing use or performance.')
-      if (missing.length) authorityLines.push(`${record.tag} is the Element visual authority; ${missing.join(' ')}`)
+      if (missing.length) authorityLines.push(`Use ${record.tag} for the item. ${missing.join(' ')}`)
       if (!continuityCovered(scopes)) elementContinuityLines.push(`${record.tag} retains object identity, design, materials, markings, attachment, contact, and accumulated physical state across the full timeline.`)
     }
   }
@@ -187,6 +187,6 @@ export function semanticAuthorityCompletion(request: GenerationRequest): Semanti
     elementContinuityLines,
     sceneContinuityLines,
     styleContinuityLines,
-    pointOfUseLine: pointOfUse.length ? `Connected visual authorities in this shot: ${pointOfUse.join('; ')}.` : '',
+    pointOfUseLine: pointOfUse.length ? `References used in this shot: ${pointOfUse.join('; ')}.` : '',
   }
 }

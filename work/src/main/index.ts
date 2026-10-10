@@ -1,4 +1,41 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, protocol, safeStorage, shell } from 'electron'
+import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
+import { effectiveProviderPromptOwnership } from '../shared/providerPromptOwnership'
+import { SeedancePromptIntegrityError } from '../shared/seedancePromptIntegrity'
+import { requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError } from '../shared/videoDialogueAudio'
+import { persistHiggsfieldOutput } from './higgsfieldOutput'
+import { performHiggsfieldJobAction, higgsfieldRecoveryView, higgsfieldJobCommand, HiggsfieldJobActions } from './higgsfieldJobRecovery'
+import { HiggsfieldJobStore, higgsfieldCredentialIdentity, higgsfieldJobView } from './higgsfieldJobStore'
+import { beginHiggsfieldJob } from './higgsfieldJobLifecycle'
+import type { HiggsfieldJobScope, HiggsfieldJobView } from '../shared/higgsfieldJobs'
+import type { HiggsfieldJobObserver } from './higgsfieldApi'
+import { projectServiceProfileSelection } from '../shared/serviceProfiles'
+import { inspectHiggsfieldImage } from './higgsfieldImageInspection'
+import { executeHiggsfieldSeedanceGeneration } from './higgsfieldSeedanceGeneration'
+import { higgsfieldSeedanceManagedMedia } from './higgsfieldSeedanceManagedMedia'
+import { executeHiggsfieldGeneration } from './higgsfieldGeneration'
+import { HiggsfieldApi, HiggsfieldRemoteJobError } from './higgsfieldApi'
+import { probeManagedMp4 } from './managedVideoProbe'
+import { HIGGSFIELD_BUNDLED_CATALOG_REVISION, higgsfieldBundledCatalogModels, planHiggsfieldNativeInput, higgsfieldSeedanceRequest, type HiggsfieldMediaSource, type HiggsfieldPreset } from '../shared/higgsfieldNative'
+import { legacyVideoDurationPlan, authoredTimelineSeconds } from '../shared/videoTiming'
+import { prepareDirectImageInputs } from './directImageInputs'
+import { directImageControls } from '../shared/directImageControls'
+import { validateFalContractValue } from './falSchemaValidation'
+import { readFishAdvertisedCatalog } from './fishCatalogDiscovery'
+import { HiggsfieldPublicCatalog } from './higgsfieldCatalogDiscovery'
+import { readHiggsfieldInputContract } from './higgsfieldInputContract'
+import { resolveHiggsfieldCurrentInput } from './higgsfieldCurrentInput'
+import { loadOwnedWorkflow, saveOwnedWorkflow } from './workflowPersistence'
+import type { WorkflowSaveOwner } from '../shared/workflowSaveOwnership'
+import { compileFishAudioRequest, FISH_CATALOG_TTL } from '../shared/fishAudio'
+import { generateFishAudio } from './fishAudioApi'
+import { persistFishAudio } from './fishAudioPersistence'
+import { ScopedCatalogCache } from './scopedCatalogCache'
+import { readFalModelCatalog } from './falCatalogDiscovery'
+import { FalModelSchemaCache, readFalModelSchema } from './falSchemaDiscovery'
+import { executeFalNativeGeneration } from './falNativeGeneration'
+import type { FalSchemaContract } from '../shared/falSchemaBinding'
+import { falEndpointId } from '../shared/falModelCatalog'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, protocol, safeStorage, session, shell } from 'electron'
 import { copyFile, mkdir, readFile, readdir, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import type { Dirent } from 'node:fs'
@@ -8,8 +45,9 @@ import { promisify } from 'node:util'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { fal } from '@fal-ai/client'
-import { resolveVideoModel, VIDEO_MODELS, type VideoModelDefinition } from '../shared/videoModels'
+import type { FalClient } from '@fal-ai/client'
+import { createOwnedFalClient, subscribeOwnedFalClient } from './falClientOwner'
+import { resolveVideoModel, type VideoModelDefinition } from '../shared/videoModels'
 import { BYTEPLUS_BASE_URL } from '../shared/byteplusSeedance'
 import { bytePlusLiveModels, isBytePlusActivationFailure } from '../shared/byteplusAvailability'
 import { compileBytePlusGenerationRequest } from './byteplusGeneration'
@@ -20,6 +58,14 @@ import { effectiveFalImageModel, falImageEditInput, FAL_IMAGE_MODELS, imageRefer
 import { publishedFalEstimate } from '../shared/generationPricing'
 import { fluxKontextInput, nanoBananaInput } from '../shared/falImageInputs'
 import { providerDisplayName, providerErrorDetail } from '../shared/providerErrors'
+import { ProjectCommandQueue } from './projectCommandQueue'
+import { ProjectProfileRecoveryState } from './projectProfileTransaction'
+import { ProviderRequestState } from './providerRequestState'
+import { generationServiceProvider } from '../shared/generationServiceProvider'
+import { readProviderCatalogPages } from './providerCatalogPages'
+import { generateElevenAudio, readElevenAvailability } from './elevenLabsApi'
+import { persistElevenAudio } from './elevenLabsAudioPersistence'
+import { isDirectElevenAudio } from '../shared/elevenLabsAudio'
 import { mediaRenameStem, normalizeImportedMediaName, normalizeLogicalAssetName, normalizedOrdinaryMediaIdentity } from '../shared/assetNaming'
 import { isExactRelinkCandidate, mediaFamily } from '../shared/assetInteraction'
 import { isFalBillingScopeDenial, shouldRecheckFalBillingFailure } from '../shared/falAccountStatus'
@@ -48,6 +94,7 @@ import { modelDisplayName } from '../shared/modelNames'
 import { generationTimingKey } from '../shared/generationTiming'
 import { providerNativeShutterFields } from '../shared/providerShutter'
 import { assertGenerationRequirements } from '../shared/generationReadiness'
+import { seedanceReferenceCandidates } from '../shared/referenceCapacity'
 import { pruneMissingGeneratedResults, recoverCompletedGenerationNodes } from '../shared/workflowRunRecovery'
 import { characterCollectionMembersForIntent, collisionSafeCollectionName, planCharacterCollectionCommit } from '../shared/characterPersistence'
 import { compositeLockedArtwork } from './artworkComposite'
@@ -84,10 +131,6 @@ const execFileAsync = promisify(execFile)
 
 const falElectronFetch: typeof fetch = (input, init) => net.fetch(input instanceof URL ? input.toString() : input, init)
 
-function configureFalClient(credentials: string): void {
-  fal.config({ credentials, fetch: falElectronFetch })
-}
-
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'prism-asset',
@@ -109,12 +152,21 @@ let mainWindow: BrowserWindow | null = null
 let currentProject: ProjectWorkspace | null = null
 let currentProjectDocumentPath: string | null = null
 let pendingProjectDocumentPath: string | null = null
-const runtimeServiceFailures = new Map<ServiceProvider, ServiceAccountStatus & { expiresAt?: number }>()
+const runtimeServiceFailures = new ProviderRequestState<ServiceAccountStatus & { expiresAt?: number }>()
 const generationLifecycle = new GenerationLifecycle()
 const generationContext = new AsyncLocalStorage<ProjectGenerationIdentity>()
 const assetJsonMutations = new JsonMutationQueue()
 const historyJsonMutations = new JsonMutationQueue()
 const projectJsonMutations = new JsonMutationQueue()
+const projectCommands = new ProjectCommandQueue()
+const projectProfileRecovery = new ProjectProfileRecoveryState()
+const falCatalogCache = new ScopedCatalogCache<ServiceModelAvailability>(5 * 60_000)
+const fishCatalogCache = new ScopedCatalogCache<ServiceModelAvailability>(FISH_CATALOG_TTL - 60_000)
+const higgsfieldCatalogCache = new ScopedCatalogCache<ServiceModelAvailability>(8 * 60_000)
+const higgsfieldPublicCatalog = new HiggsfieldPublicCatalog((url, init) => session.fromPartition('prism-public-higgsfield-documents').fetch(url, init))
+let fishPublicRead: Promise<ServiceModelAvailability> | undefined
+const falSchemaCache = new FalModelSchemaCache()
+const higgsfieldPresetCache = new ScopedCatalogCache<HiggsfieldPreset[]>(9 * 60_000)
 let serviceProfileStoreInstance: ServiceProfileStore | null = null
 
 type StoredProjectWorkspace = ProjectWorkspace & { documentPath?: string }
@@ -137,7 +189,24 @@ function assertGenerationCommit(): void {
   if (identity) generationLifecycle.assertActive(identity)
 }
 
+function currentProjectOwner(): string {
+  return currentProject && currentProjectDocumentPath
+    ? JSON.stringify([currentProject.id, resolve(currentProject.rootPath), resolve(currentProjectDocumentPath)]) : ''
+}
+
+function activateProviderRequestProject(): void {
+  runtimeServiceFailures.activateProject(currentProjectOwner() || null)
+}
+
+function withProviderRequest<T>(provider: ServiceProvider, work: () => Promise<T>, validateResult = true): Promise<T> {
+  projectProfileRecovery.assertReady()
+  projectCommands.assertIdle()
+  activateProviderRequestProject()
+  return runtimeServiceFailures.run(provider, work, { overrides: currentProject?.serviceProfileOverrides, validateResult })
+}
+
 function activateCurrentProject(): void {
+  activateProviderRequestProject()
   if (!currentProject || !currentProjectDocumentPath) {
     generationLifecycle.activate(null)
     return
@@ -161,7 +230,7 @@ const serviceCredentialPath = (provider: ServiceProvider) => provider === 'fal' 
   : provider === 'fish' ? fishCredentialPath()
     : join(dataRoot(), `${provider}-credential.enc`)
 const OMNIROUTE_BASE_URL = 'http://127.0.0.1:20128/v1'
-const SERVICE_PROVIDERS: ServiceProvider[] = ['fal', 'byteplus', 'fish', 'omniroute', 'openai', 'anthropic', 'google', 'deepseek', 'moonshot']
+const SERVICE_PROVIDERS: ServiceProvider[] = ['higgsfield', 'elevenlabs', 'fal', 'byteplus', 'fish', 'omniroute', 'openai', 'anthropic', 'google', 'deepseek', 'moonshot']
 const ASSISTANT_PROVIDERS = new Set<AssistantProvider>(['omniroute', 'openai', 'anthropic', 'google', 'deepseek', 'moonshot'])
 
 function isAssistantProvider(provider: unknown): provider is AssistantProvider {
@@ -222,28 +291,29 @@ async function serviceConnected(provider: ServiceProvider): Promise<boolean> {
       return false
     }
   }
-  const registry = await serviceProfileStore().listProfiles(provider, false)
-  if (registry.profiles.some((profile) => profile.provider === provider && profile.status === 'connected')) return true
-  try { await stat(serviceCredentialPath(provider)); return true } catch { return false }
+  return serviceProfileStore().isConnectedForProject(provider, runtimeServiceFailures.overrides(provider, currentProject?.serviceProfileOverrides))
 }
 
 async function saveServiceCredential(provider: ServiceProvider, raw: unknown): Promise<void> {
   if (provider === 'omniroute') throw new Error('OmniRoute is a local gateway and does not use a Prism-stored API key.')
   const key = typeof raw === 'string' ? raw.trim() : ''
   if (key.length < 20) throw new Error('That API key does not look complete.')
-  await serviceProfileStore().addProfile(provider, key)
-  runtimeServiceFailures.delete(provider)
+  await runtimeServiceFailures.change(provider, () => serviceProfileStore().addProfile(provider, key))
 }
 
 async function removeServiceCredential(provider: ServiceProvider): Promise<void> {
   if (provider === 'omniroute') return
-  try { await unlink(serviceCredentialPath(provider)) } catch { /* Already absent. */ }
-  runtimeServiceFailures.delete(provider)
+  await runtimeServiceFailures.change(provider, async () => {
+    try { await unlink(serviceCredentialPath(provider)) } catch { /* Already absent. */ }
+  })
 }
 
 async function loadServiceCredential(provider: ServiceProvider): Promise<string> {
   if (provider === 'omniroute') throw new Error('OmniRoute local requests do not load a Prism credential.')
-  return serviceProfileStore().loadCredentialForProject(provider, currentProject?.serviceProfileOverrides)
+  runtimeServiceFailures.assertCurrent(provider)
+  const key = await serviceProfileStore().loadCredentialForProject(provider, runtimeServiceFailures.overrides(provider, currentProject?.serviceProfileOverrides))
+  runtimeServiceFailures.assertCurrent(provider)
+  return key
 }
 
 async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, instruction: unknown, requestedModel?: unknown): Promise<string> {
@@ -304,15 +374,62 @@ async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, 
 
 async function fetchProviderModelCatalog(provider: ServiceProvider, input: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(input, init)
+    return await fetch(input, { ...init, signal: init?.signal || AbortSignal.timeout(10_000) })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Could not load ${providerDisplayName(provider)} model catalog: ${detail}`)
   }
 }
 
+async function readOwnedFishCatalog(): Promise<ServiceModelAvailability> {
+  const scope = runtimeServiceFailures.catalogScope('fish')
+  const assertCurrent = () => runtimeServiceFailures.assertCurrent('fish')
+  return fishCatalogCache.read(scope, () => {
+    // Public schema contains no account data. One read may serve independently
+    // owned callers; each scoped cache still rejects its own late response.
+    if (!fishPublicRead) {
+      const pending = readFishAdvertisedCatalog(fetch).finally(() => { if (fishPublicRead === pending) fishPublicRead = undefined })
+      fishPublicRead = pending
+    }
+    return fishPublicRead
+  }, assertCurrent)
+}
+
 async function listServiceModels(provider: ServiceProvider): Promise<ServiceModelAvailability> {
-  if (provider === 'fal') return { provider, verified: false, models: VIDEO_MODELS.map((model) => ({ id: model.id, label: model.label })) }
+  if (provider === 'higgsfield') {
+    const scope = runtimeServiceFailures.catalogScope(provider), assertCurrent = () => runtimeServiceFailures.assertCurrent(provider)
+    try { return await higgsfieldCatalogCache.read(scope, async () => (await higgsfieldPublicCatalog.read()).availability, assertCurrent) }
+    catch (error) {
+      assertCurrent()
+      const previous = higgsfieldCatalogCache.snapshot(scope)
+      const message = error instanceof Error ? error.message : 'Could not refresh public Higgsfield models.'
+      if (previous) return { ...previous, catalogStale: true, catalogError: message }
+      return { provider, verified: false, catalogStale: true, catalogComplete: false, catalogError: message, catalogSource: 'Retained native Higgsfield contracts; public discovery unavailable', catalogFingerprint: HIGGSFIELD_BUNDLED_CATALOG_REVISION, models: higgsfieldBundledCatalogModels() }
+    }
+  }
+
+  if (provider === 'elevenlabs') {
+    const key = await loadServiceCredential(provider)
+    const availability = await readElevenAvailability({ fetch, key })
+    runtimeServiceFailures.delete(provider)
+    return availability
+  }
+  if (provider === 'fal') {
+    const scope = runtimeServiceFailures.catalogScope(provider)
+    const assertCurrent = () => runtimeServiceFailures.assertCurrent(provider)
+    try {
+      return await falCatalogCache.read(scope, async () => {
+        const key = await loadServiceCredential(provider)
+        const models = await readFalModelCatalog({ request: (url) => fetchProviderModelCatalog(provider, url, { headers: { Authorization: `Key ${key}` } }), assertCurrent })
+        return { provider, verified: true, models, catalogCheckedAt: new Date().toISOString() }
+      }, assertCurrent)
+    } catch (error) {
+      assertCurrent()
+      const previous = falCatalogCache.snapshot(scope)
+      if (previous) return { ...previous, catalogStale: true, catalogError: error instanceof Error ? error.message : 'Could not refresh fal models.' }
+      throw error
+    }
+  }
   if (provider === 'byteplus') {
     const key = await loadServiceCredential(provider)
     const response = await fetchProviderModelCatalog(provider, `${BYTEPLUS_BASE_URL}/models`, { headers: { Authorization: 'Bearer ' + key } })
@@ -332,15 +449,32 @@ async function listServiceModels(provider: ServiceProvider): Promise<ServiceMode
     if (!response.ok) throw new Error(body.error?.message || 'Could not load the live OmniRoute model catalog.')
     return { provider, verified: true, models: omniRouteModelOptions(body.data || []) }
   }
-  if (provider === 'fish') return { provider, verified: false, models: [{ id: 's1', label: 'Fish Audio S1' }, { id: 's2-pro', label: 'Fish Audio S2 Pro' }] }
+  if (provider === 'fish') {
+    const scope = runtimeServiceFailures.catalogScope(provider)
+    try { return await readOwnedFishCatalog() }
+    catch (error) {
+      runtimeServiceFailures.assertCurrent(provider)
+      const previous = fishCatalogCache.snapshot(scope)
+      if (previous) return { ...previous, catalogStale: true, catalogError: error instanceof Error ? error.message : 'Could not refresh the official Fish Audio contract.' }
+      throw error
+    }
+  }
   const key = await loadServiceCredential(provider)
-  let response: Response
-  if (provider === 'openai') response = await fetchProviderModelCatalog(provider, 'https://api.openai.com/v1/models', { headers: { Authorization: 'Bearer ' + key } })
-  else if (provider === 'anthropic') response = await fetchProviderModelCatalog(provider, 'https://api.anthropic.com/v1/models?limit=1000', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' } })
-  else if (provider === 'google') response = await fetchProviderModelCatalog(provider, 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key } })
-  else response = await fetchProviderModelCatalog(provider, provider === 'deepseek' ? 'https://api.deepseek.com/models' : 'https://api.moonshot.ai/v1/models', { headers: { Authorization: 'Bearer ' + key } })
-  const body = await response.json() as Record<string, unknown>
-  if (!response.ok) throw new Error((body.error as { message?: string } | undefined)?.message || `Could not load ${provider} models.`)
+  let body: Record<string, unknown>
+  if (provider === 'anthropic' || provider === 'google') {
+    const initialUrl = provider === 'anthropic'
+      ? 'https://api.anthropic.com/v1/models?limit=1000'
+      : 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000'
+    const headers: Record<string, string> = provider === 'anthropic'
+      ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
+      : { 'x-goog-api-key': key }
+    body = await readProviderCatalogPages({ provider, initialUrl, request: (url) => fetchProviderModelCatalog(provider, url, { headers }) })
+  } else {
+    const response = await fetchProviderModelCatalog(provider, provider === 'openai' ? 'https://api.openai.com/v1/models'
+      : provider === 'deepseek' ? 'https://api.deepseek.com/models' : 'https://api.moonshot.ai/v1/models', { headers: { Authorization: 'Bearer ' + key } })
+    body = await response.json() as Record<string, unknown>
+    if (!response.ok) throw new Error((body.error as { message?: string } | undefined)?.message || `Could not load ${provider} models.`)
+  }
   const models = provider === 'openai'
     ? (body.data as Array<{ id: string }> | undefined || []).filter((item) => /^(gpt|o\d)/i.test(item.id)).map((item) => ({ id: item.id, label: modelDisplayName(item.id) }))
     : provider === 'anthropic'
@@ -376,7 +510,9 @@ async function serviceAccountStatus(provider: ServiceProvider): Promise<ServiceA
   if (remembered && (!remembered.expiresAt || remembered.expiresAt > Date.now()) && (provider !== 'fal' || !shouldRecheckFalBillingFailure(remembered.state))) return remembered
   if (remembered) runtimeServiceFailures.delete(provider)
   if (provider !== 'fal') {
-    const message = provider === 'byteplus'
+    const message = provider === 'elevenlabs'
+      ? 'ElevenLabs credential connected. View remaining usage and plan access in the ElevenLabs dashboard.'
+      : provider === 'byteplus'
       ? 'Connected to BytePlus ModelArk. Remaining quota and balance are not exposed by this provider API.'
       : provider === 'omniroute'
       ? 'Local OmniRoute gateway connected. Its live model catalog is available; upstream access remains owned by OmniRoute.'
@@ -421,7 +557,7 @@ async function serviceAccountStatus(provider: ServiceProvider): Promise<ServiceA
 }
 
 function estimateModelId(request: GenerationRequest): string | undefined {
-  if (request.kind === 'voiceover' && request.voiceEngine === 'fish-audio') return undefined
+  if (request.kind === 'voiceover' && request.voiceEngine === 'fish-audio' || isDirectElevenAudio(request)) return undefined
   if ((request.kind === 'image-generator' || request.kind === 'image-editor') && request.imageProvider && request.imageProvider !== 'fal') return request.imageModelId
   if (request.kind === 'video-generator') {
     const model = resolveVideoModel(request.videoEngine)
@@ -460,6 +596,11 @@ const PROJECT_FOLDERS = [
 ] as const
 
 async function scaffoldProject(root: string, existing?: ProjectWorkspace, documentPath?: string): Promise<ProjectWorkspace> {
+  return projectCommands.run(() => scaffoldProjectUnlocked(root, existing, documentPath))
+}
+
+async function scaffoldProjectUnlocked(root: string, existing?: ProjectWorkspace, documentPath?: string): Promise<ProjectWorkspace> {
+  await projectProfileRecovery.recover(dataRoot())
   generationLifecycle.activate(null)
   const resolvedRoot = resolve(root)
   for (const folder of PROJECT_FOLDERS) await mkdir(join(resolvedRoot, folder), { recursive: true })
@@ -476,6 +617,7 @@ async function scaffoldProject(root: string, existing?: ProjectWorkspace, docume
   const updated = { ...project, name: basename(resolvedRoot), rootPath: resolvedRoot, updatedAt: now }
   currentProject = updated
   currentProjectDocumentPath = documentPath ? resolve(documentPath) : defaultProjectDocumentPath(resolvedRoot)
+  activateProviderRequestProject()
   await recoverSemanticAssetTransactions(currentProject.rootPath)
   activateCurrentProject()
   const stored: StoredProjectWorkspace = { ...updated, documentPath: currentProjectDocumentPath }
@@ -486,16 +628,22 @@ async function scaffoldProject(root: string, existing?: ProjectWorkspace, docume
     ...recentProjects.filter((item) => resolve(item.rootPath) !== updated.rootPath),
   ].slice(0, 30))
   if (existing) await removeLegacyImport()
-  return updated
+  return { ...updated, documentPath: currentProjectDocumentPath }
 }
 
 async function restoreCurrentProject(): Promise<void> {
+  return projectCommands.run(() => restoreCurrentProjectUnlocked())
+}
+
+async function restoreCurrentProjectUnlocked(): Promise<void> {
+  await projectProfileRecovery.recover(dataRoot())
   const stored = await readJson<StoredProjectWorkspace | null>(workspacePointerPath(), null)
   if (!stored?.rootPath) return
   const manifest = await readJson<ProjectWorkspace | null>(projectManifestPath(stored.rootPath), null)
   if (manifest?.schemaVersion === 1) {
     currentProject = { ...manifest, rootPath: resolve(stored.rootPath) }
     currentProjectDocumentPath = stored.documentPath ? resolve(stored.documentPath) : defaultProjectDocumentPath(currentProject.rootPath)
+    activateProviderRequestProject()
     await recoverSemanticAssetTransactions(currentProject.rootPath)
     activateCurrentProject()
     try { await rmdir(join(currentProject.rootPath, '04. Styles')) } catch { /* Preserve a non-empty legacy folder for explicit migration. */ }
@@ -504,35 +652,33 @@ async function restoreCurrentProject(): Promise<void> {
 }
 
 async function selectCurrentProjectServiceProfile(provider: ServiceProvider, profileId?: string): Promise<ProjectWorkspace> {
-  if (!currentProject) throw new Error('Choose or open a project folder first.')
-  if (profileId) {
-    const registry = await serviceProfileStore().listProfiles(provider, false)
-    const profile = registry.profiles.find((candidate) => candidate.id === profileId && candidate.provider === provider)
-    if (!profile) throw new Error('That account profile no longer exists.')
-    if (profile.status !== 'connected') throw new Error('Reconnect or sign in to that account before selecting it.')
-  }
-  const original = currentProject
-  const updated: ProjectWorkspace = {
-    ...withProjectServiceProfileOverride(original, provider, profileId),
-    updatedAt: new Date().toISOString(),
-  }
-  currentProject = updated
-  const stored: StoredProjectWorkspace = { ...updated, documentPath: currentProjectDocumentPath || undefined }
-  try {
-    await atomicJson(projectManifestPath(updated.rootPath), updated)
-    await atomicJson(workspacePointerPath(), stored)
-    await projectJsonMutations.mutateArray<StoredProjectWorkspace>(recentProjectsPath(), (recent) => [
-      stored,
-      ...recent.filter((item) => resolve(item.rootPath) !== resolve(updated.rootPath)),
-    ].slice(0, 30))
-    await writeProjectDocument()
-    return updated
-  } catch (error) {
-    currentProject = original
-    await atomicJson(projectManifestPath(original.rootPath), original).catch(() => undefined)
-    await atomicJson(workspacePointerPath(), { ...original, documentPath: currentProjectDocumentPath || undefined }).catch(() => undefined)
-    throw error
-  }
+  if (!currentProject || !currentProjectDocumentPath) throw new Error('Choose or open a project folder first.')
+  const requestedOwner = currentProjectOwner()
+  return projectCommands.runForOwner(requestedOwner, currentProjectOwner, () => runtimeServiceFailures.change(provider, async () => {
+    await projectProfileRecovery.recover(dataRoot())
+    if (profileId) {
+      const registry = await serviceProfileStore().listProfiles(provider, false)
+      const profile = registry.profiles.find((candidate) => candidate.id === profileId && candidate.provider === provider)
+      if (!profile) throw new Error('That account profile no longer exists.')
+      if (profile.status !== 'connected') throw new Error('Reconnect or sign in to that account before selecting it.')
+    }
+    const original = currentProject!
+    const documentPath = resolve(currentProjectDocumentPath!)
+    return projectJsonMutations.run(documentPath, async () => {
+      const updated: ProjectWorkspace = { ...withProjectServiceProfileOverride(original, provider, profileId), updatedAt: new Date().toISOString() }
+      const stored: StoredProjectWorkspace = { ...updated, documentPath }
+      const recent = await readStrictJsonOr<StoredProjectWorkspace[]>(recentProjectsPath(), [], 'The recent projects index')
+      const document = await buildProjectDocument(updated)
+      await projectProfileRecovery.commit({ dataRoot: dataRoot(), rootPath: updated.rootPath, documentPath, writes: [
+        { path: projectManifestPath(updated.rootPath), value: updated },
+        { path: documentPath, value: document },
+        { path: workspacePointerPath(), value: stored },
+        { path: recentProjectsPath(), value: [stored, ...recent.filter((item) => resolve(item.rootPath) !== resolve(updated.rootPath))].slice(0, 30) },
+      ] })
+      currentProject = updated
+      return { ...updated, documentPath }
+    })
+  }))
 }
 
 function isDocumentsPath(path: string): boolean {
@@ -787,15 +933,9 @@ async function atomicJson(path: string, value: unknown): Promise<void> {
   await rename(candidate, path)
 }
 
-async function writeProjectDocument(): Promise<void> {
-  if (!currentProject) return
-  assertGenerationCommit()
-  const identity = generationContext.getStore()
-  const activeProject = currentProject
-  const documentPath = identity?.documentPath || currentProjectDocumentPath || defaultProjectDocumentPath(activeProject.rootPath)
-  await mkdir(dirname(documentPath), { recursive: true })
-  const workflow = await readStrictJsonOr<WorkflowDocument | null>(workflowPath(), null, 'The saved canvas')
-  const assets = await readStrictJsonOr<ImportedAsset[]>(assetsIndexPath(), [], 'The saved asset index')
+async function buildProjectDocument(activeProject: ProjectWorkspace): Promise<ProjectDocument> {
+  const workflow = await readStrictJsonOr<WorkflowDocument | null>(join(activeProject.rootPath, '05. Canvas', 'workflow.json'), null, 'The saved canvas')
+  const assets = await readStrictJsonOr<ImportedAsset[]>(join(activeProject.rootPath, '05. Canvas', 'assets.json'), [], 'The saved asset index')
   const portableAssets = assets.map((asset) => {
     const portablePath = relative(activeProject.rootPath, resolve(asset.path))
     return {
@@ -812,11 +952,32 @@ async function writeProjectDocument(): Promise<void> {
     updatedAt: new Date().toISOString(),
     serviceProfileOverrides: activeProject.serviceProfileOverrides,
   }
+  return { fileType: 'prism-foundry-project', schemaVersion: 1, project, workflow, assets: portableAssets }
+}
+
+async function writeProjectDocument(): Promise<void> {
+  if (!currentProject) return
+  projectProfileRecovery.assertReady()
   assertGenerationCommit()
-  await atomicJson(documentPath, { fileType: 'prism-foundry-project', schemaVersion: 1, project, workflow, assets: portableAssets } satisfies ProjectDocument)
+  const requestedOwner = currentProjectOwner()
+  const identity = generationContext.getStore()
+  const documentPath = resolve(identity?.documentPath || currentProjectDocumentPath || defaultProjectDocumentPath(currentProject.rootPath))
+  await projectJsonMutations.run(documentPath, async () => {
+    if (!currentProject || currentProjectOwner() !== requestedOwner) throw new DOMException('The project changed before its document could be saved.', 'AbortError')
+    const document = await buildProjectDocument(currentProject)
+    assertGenerationCommit()
+    if (currentProjectOwner() !== requestedOwner) throw new DOMException('The project changed before its document could be saved.', 'AbortError')
+    await mkdir(dirname(documentPath), { recursive: true })
+    await atomicJson(documentPath, document)
+  })
 }
 
 async function openProjectDocument(path: string): Promise<ProjectWorkspace> {
+  return projectCommands.run(() => openProjectDocumentUnlocked(path))
+}
+
+async function openProjectDocumentUnlocked(path: string): Promise<ProjectWorkspace> {
+  await projectProfileRecovery.recover(dataRoot())
   const documentPath = resolve(path)
   if (isDocumentsPath(documentPath)) throw new Error('Project documents under Documents are not supported. Move the project folder elsewhere first.')
   const document = await readStrictJson<ProjectDocument>(documentPath, 'The portable project document')
@@ -993,7 +1154,7 @@ async function normalizeManagedOrdinaryMediaAssets(): Promise<ImportedAsset[]> {
   return assetJsonMutations.run(assetsIndexPath(), normalizeManagedOrdinaryMediaAssetsUnlocked)
 }
 
-async function registerAssets(newAssets: ImportedAsset[]): Promise<ImportedAsset[]> {
+async function registerAssets(newAssets: ImportedAsset[], onIndexed?: () => void): Promise<ImportedAsset[]> {
   if (!newAssets.length) return []
   assertGenerationCommit()
   const indexPath = newAssets[0].category === 'style' ? globalStylesIndexPath() : assetsIndexPath()
@@ -1005,12 +1166,13 @@ async function registerAssets(newAssets: ImportedAsset[]): Promise<ImportedAsset
       ...assets.filter((candidate) => !newAssets.some((asset) => candidate.id === asset.id || candidate.path === asset.path)),
     ]
   })
+  onIndexed?.()
   if (newAssets[0].category !== 'style') await writeProjectDocument()
   return newAssets.map((asset) => ({ ...asset, url: localAssetUrl(asset.path) }))
 }
 
-async function registerAsset(asset: ImportedAsset): Promise<ImportedAsset> {
-  return (await registerAssets([asset]))[0]
+async function registerAsset(asset: ImportedAsset, onIndexed?: () => void): Promise<ImportedAsset> {
+  return (await registerAssets([asset], onIndexed))[0]
 }
 
 async function managedAssetStores() {
@@ -1044,7 +1206,7 @@ async function assertManagedMediaPath(path: string): Promise<string> {
   return source
 }
 
-async function registerGeneratedAsset(path: string, metadata?: ImportedAsset['metadata']): Promise<ImportedAsset> {
+async function registerGeneratedAsset(path: string, metadata?: ImportedAsset['metadata'], onIndexed?: () => void): Promise<ImportedAsset> {
   const category = mediaCategory(path)
   const fileSize = (await stat(path)).size
   return registerAsset({
@@ -1058,7 +1220,7 @@ async function registerGeneratedAsset(path: string, metadata?: ImportedAsset['me
     fileSize,
     createdAt: new Date().toISOString(),
     metadata,
-  })
+  }, onIndexed)
 }
 
 interface PrismAssetManifest {
@@ -1322,79 +1484,63 @@ async function relinkFromCandidates(scanRoot: string, forced?: { assetId: string
 }
 
 async function loadCredential(): Promise<string> {
-  return serviceProfileStore().loadCredentialForProject('fal', currentProject?.serviceProfileOverrides)
-}
-
-async function loadFishCredential(): Promise<string> {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure credential storage is unavailable on this Mac.')
-  try {
-    return safeStorage.decryptString(await readFile(fishCredentialPath()))
-  } catch {
-    throw new Error('Add your Fish Audio API key in Settings before using Fish Audio.')
-  }
+  return loadServiceCredential('fal')
 }
 
 async function runFishAudio(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
-  const text = request.prompt?.trim()
-  if (!text) throw new Error('Add voiceover text before generating audio.')
-  if (!request.fishReferenceId?.trim()) throw new Error('Fish Audio needs a voice Reference ID from fish.audio.')
-  const key = await loadFishCredential()
+  signal?.throwIfAborted()
+  compileFishAudioRequest(request)
+  const availability = await readOwnedFishCatalog()
+  const compiled = compileFishAudioRequest(request, availability)
+  if (!availability.nativeInputSchema) throw new Error('Load the current Fish Audio native input contract before generating.')
+  await validateFalContractValue(availability.nativeInputSchema, compiled.body, 'Fish Audio input')
+  const key = await loadServiceCredential('fish')
   mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Submitting securely to Fish Audio…', status: 'queued' })
-  const format = request.fishFormat || 'mp3'
-  const response = await net.fetch('https://api.fish.audio/v1/tts', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', model: request.fishModel || 's2-pro' },
-    body: JSON.stringify({
-      text,
-      reference_id: request.fishReferenceId.trim(),
-      temperature: Math.min(Math.max(request.fishTemperature ?? 0.7, 0), 1),
-      top_p: Math.min(Math.max(request.fishTopP ?? 0.7, 0), 1),
-      prosody: { speed: Math.min(Math.max(request.speed ?? 1, 0.5), 2), volume: Math.min(Math.max(request.fishVolume ?? 0, -20), 20), normalize_loudness: request.fishNormalizeLoudness !== false },
-      normalize: request.fishNormalize !== false,
-      chunk_length: Math.min(Math.max(Math.round(request.fishChunkLength ?? 200), 100), 300),
-      format,
-      sample_rate: request.fishSampleRate || (format === 'opus' ? 48000 : 44100),
-      ...(format === 'mp3' ? { mp3_bitrate: request.fishMp3Bitrate || 128 } : {}),
-      ...(format === 'opus' ? { opus_bitrate: request.fishOpusBitrate ?? 48 } : {}),
-      latency: request.fishLatency || 'normal',
-    }),
-    signal,
-  })
-  if (!response.ok) {
-    const detail = (await response.text()).slice(0, 500)
-    const error = new Error(`Fish Audio request failed (${response.status})${detail ? `: ${detail}` : ''}`)
-    ;(error as Error & { status: number }).status = response.status
-    rememberServiceFailure('fish', error)
-    throw error
-  }
-  runtimeServiceFailures.delete('fish')
-  const bytes = Buffer.from(await response.arrayBuffer())
-  assertGenerationCommit()
-  const extension = format === 'wav' ? '.wav' : format === 'pcm' ? '.pcm' : format === 'opus' ? '.opus' : '.mp3'
-  const outputPath = join(categoryFolder('audio', true), `${Date.now()}-${randomUUID().slice(0, 8)}-fish-audio${extension}`)
   try {
-    await writeFile(outputPath, bytes, { flag: 'wx' })
+    const response = await generateFishAudio({ fetch: (url, init) => net.fetch(url, init), key, availability, signal, assertSubmission: () => runtimeServiceFailures.assertCurrent('fish') }, request)
     assertGenerationCommit()
-    await registerGeneratedAsset(outputPath, { provider: 'Fish Audio', modelId: `fish-audio/${request.fishModel || 's2-pro'}`, prompt: request.prompt })
-    const requestId = randomUUID()
-    await appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId: `fish-audio/${request.fishModel || 's2-pro'}`, status: 'complete', createdAt: new Date().toISOString(), outputPath, outputUrl: localAssetUrl(outputPath) })
-    return { requestId, modelId: `fish-audio/${request.fishModel || 's2-pro'}`, outputPath, outputUrl: localAssetUrl(outputPath), outputType: 'audio' }
-  } catch (error) {
-    await rm(outputPath, { force: true })
-    throw error
-  }
+    const result = await persistFishAudio(request, response, {
+      outputStem: join(categoryFolder('audio', true), `${Date.now()}-${randomUUID().slice(0, 8)}-fish-audio`),
+      fallbackRequestId: randomUUID(), assertCommit: assertGenerationCommit, register: registerGeneratedAsset, localUrl: localAssetUrl,
+      history: (outputPath, modelId) => appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath, outputUrl: localAssetUrl(outputPath) }),
+    })
+    runtimeServiceFailures.delete('fish')
+    return result
+  } catch (error) { rememberServiceFailure('fish', error); throw error }
 }
 
-async function uploadLocalAsset(path: string): Promise<string> {
+async function runElevenLabsAudio(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+  const key = await loadServiceCredential('elevenlabs')
+  mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Submitting securely to ElevenLabs…', status: 'queued' })
+  try {
+    const response = await generateElevenAudio({ fetch, key, signal, assertSubmission: () => runtimeServiceFailures.assertCurrent('elevenlabs') }, request)
+    assertGenerationCommit()
+    const result = await persistElevenAudio(request, response, {
+      outputStem: join(categoryFolder('audio', true), `${Date.now()}-${randomUUID().slice(0, 8)}-elevenlabs`),
+      fallbackRequestId: randomUUID(), assertCommit: assertGenerationCommit, register: registerGeneratedAsset, localUrl: localAssetUrl,
+      history: (outputPath, modelId) => appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath, outputUrl: localAssetUrl(outputPath) }),
+    })
+    runtimeServiceFailures.delete('elevenlabs')
+    return result
+  } catch (error) { rememberServiceFailure('elevenlabs', error); throw error }
+}
+
+async function uploadLocalAsset(path: string, client: FalClient): Promise<string> {
   const resolved = await assertManagedMediaPath(path)
   const contents = await readFile(resolved)
   const file = new File([contents], basename(resolved), { type: mimeFor(resolved) })
-  return fal.storage.upload(file)
+  runtimeServiceFailures.assertCurrent('fal')
+  return client.storage.upload(file)
 }
 
-async function downloadResult(url: string, contentType: string | undefined, metadata?: ImportedAsset['metadata'], signal?: AbortSignal): Promise<string> {
+async function downloadResult(url: string, contentType: string | undefined, metadata?: ImportedAsset['metadata'], signal?: AbortSignal, expectedType?: 'image' | 'video' | 'audio'): Promise<string> {
   const response = await net.fetch(url, { signal })
   if (!response.ok) throw new Error(`Could not download generated media (${response.status}).`)
+  if (expectedType) {
+    const responseType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
+    contentType = responseType && responseType !== 'application/octet-stream' ? responseType : contentType
+    if (!contentType?.toLowerCase().startsWith(`${expectedType}/`)) throw new Error('Generated media download does not match the selected model flow.')
+  }
   const bytes = Buffer.from(await response.arrayBuffer())
   assertGenerationCommit()
   const inferred = contentType?.includes('video') ? '.mp4'
@@ -1428,10 +1574,11 @@ async function bytePlusMediaUrl(source: { path?: string; url?: string; mediaType
 async function runBytePlusGeneration(request: GenerationRequest, videoModel: VideoModelDefinition, signal?: AbortSignal): Promise<GenerationResult> {
   const modelId = videoModel.id
   try {
-    const key = await loadServiceCredential('byteplus')
     const payload = await compileBytePlusGenerationRequest(request, bytePlusMediaUrl)
+    runtimeServiceFailures.assertCurrent('byteplus')
+    const key = await loadServiceCredential('byteplus')
     const result = await runBytePlusTaskAndDownload({
-      fetch: (input, init) => net.fetch(input, init),
+      fetch: (input, init) => { if (init?.method === 'POST') runtimeServiceFailures.assertCurrent('byteplus'); return net.fetch(input, init) },
       apiKey: key,
       payload,
       signal,
@@ -1470,29 +1617,20 @@ async function saveGeneratedImage(bytes: Buffer, contentType: string, metadata: 
   }
 }
 
-async function directImagePaths(request: GenerationRequest): Promise<string[]> {
-  const paths: string[] = []
-  for (const reference of orderedProviderImageReferences(request)) {
-    if (!reference.path) continue
-    if (reference.role === 'style' && extname(reference.path).toLowerCase() === '.prismstyle') continue
-    paths.push(await assertManagedMediaPath(reference.path))
+async function directImageInputs(request: GenerationRequest, signal?: AbortSignal) {
+  const provider = request.imageProvider === 'openai' ? 'openai' : 'google'
+  const assertCurrent = () => {
+    if (signal?.aborted) throw new Error('Image generation was cancelled.')
+    runtimeServiceFailures.assertCurrent(provider)
   }
-  return paths
+  return prepareDirectImageInputs(orderedProviderImageReferences(request), imageReferenceLimit(request), {
+    managed: assertManagedMediaPath, size: async (path) => (await stat(path)).size, read: readFile, mime: mimeFor, assertCurrent,
+  })
 }
 
-function directImagePrompt(request: GenerationRequest, paths: string[]): string {
-  try {
-    const submitted = new Set(paths.map((path) => resolve(path)))
-    const orderedReferences = orderedProviderImageReferences(request).filter((reference) => Boolean(reference.path && submitted.has(resolve(reference.path))))
-    return providerNativeImagePrompt({ ...request, inputPath: undefined, inputUrl: undefined, references: orderedReferences }, orderedReferences)
-  }
-  catch { throw new Error('Add a prompt before generating an image.') }
-}
-
-function openAIImageSize(ratio?: string): '1024x1024' | '1536x1024' | '1024x1536' {
-  if (!ratio || ratio === 'auto' || ratio === '1:1') return '1024x1024'
-  const [width, height] = ratio.split(':').map(Number)
-  return Number.isFinite(width) && Number.isFinite(height) && width < height ? '1024x1536' : '1536x1024'
+function directImagePrompt(request: GenerationRequest, inputs: Awaited<ReturnType<typeof directImageInputs>>): string {
+  const orderedReferences = inputs.map((input) => input.reference)
+  return providerNativeImagePrompt({ ...request, inputPath: undefined, inputUrl: undefined, references: orderedReferences }, orderedReferences)
 }
 
 async function finishDirectImage(request: GenerationRequest, provider: 'openai' | 'google', modelId: string, bytes: Buffer, contentType: string): Promise<GenerationResult> {
@@ -1525,29 +1663,33 @@ async function directImageFailure(request: GenerationRequest, provider: 'openai'
 }
 
 async function runOpenAIImage(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
-  const key = await loadServiceCredential('openai')
-  const modelId = request.imageModelId || 'gpt-image-2'
+  const controls = directImageControls(request)
+  const modelId = controls.model as string
   const providerRequest = providerArtworkCarrierRequest(request)
-  const paths = await directImagePaths(providerRequest)
-  const prompt = directImagePrompt(providerRequest, paths)
+  const inputs = await directImageInputs(providerRequest, signal)
+  const prompt = directImagePrompt(providerRequest, inputs)
   mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Submitting securely to OpenAI…', status: 'queued' })
-  let response: Response
-  if (paths.length) {
-    const maximum = imageReferenceLimit(request)
-    if (paths.length > maximum) throw new Error(`GPT Image 2 accepts up to ${maximum} image references.`)
+  let requestBody: FormData | string
+  let endpoint = 'https://api.openai.com/v1/images/generations'
+  let json = true
+  if (inputs.length && inputs.every((input) => input.path)) {
     const form = new FormData()
-    form.append('model', modelId)
+    for (const [field, value] of Object.entries(controls)) form.append(field, String(value))
     form.append('prompt', prompt)
-    form.append('size', openAIImageSize(request.aspectRatio))
-    form.append('output_format', request.outputFormat || 'png')
-    for (const path of paths) form.append('image[]', new File([await readFile(path)], basename(path), { type: mimeFor(path) }))
-    response = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form, signal })
+    for (const input of inputs) form.append('image[]', new File([Buffer.from(input.bytes!)], basename(input.path!), { type: input.mimeType }))
+    requestBody = form; json = false; endpoint = 'https://api.openai.com/v1/images/edits'
   } else {
-    response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modelId, prompt, size: openAIImageSize(request.aspectRatio), output_format: request.outputFormat || 'png', n: 1 }), signal,
-    })
+    const images = inputs.map((input) => ({ image_url: input.url || `data:${input.mimeType};base64,${Buffer.from(input.bytes!).toString('base64')}` }))
+    if (images.some((image) => image.image_url.length > 20 * 1024 * 1024)) throw new Error('The mixed inline image exceeds the native image URL limit; import a smaller image.')
+    requestBody = JSON.stringify({ ...controls, prompt, ...(inputs.length ? { images } : {}) })
+    if (inputs.length) endpoint = 'https://api.openai.com/v1/images/edits'
   }
+  if (signal?.aborted) throw new Error('Image generation was cancelled.')
+  runtimeServiceFailures.assertCurrent('openai')
+  const key = await loadServiceCredential('openai')
+  if (signal?.aborted) throw new Error('Image generation was cancelled.')
+  runtimeServiceFailures.assertCurrent('openai')
+  const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, ...(json ? { 'Content-Type': 'application/json' } : {}) }, body: requestBody, signal, redirect: 'error' })
   if (!response.ok) return directImageFailure(request, 'openai', modelId, response)
   const body = await response.json() as { data?: Array<{ b64_json?: string; url?: string }> }
   const output = body.data?.[0]
@@ -1563,19 +1705,25 @@ async function runOpenAIImage(request: GenerationRequest, signal?: AbortSignal):
 }
 
 async function runGeminiImage(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
-  const key = await loadServiceCredential('google')
-  const modelId = request.imageModelId || 'gemini-3.1-flash-image'
+  const controls = directImageControls(request)
+  const modelId = controls.model as string
   const providerRequest = providerArtworkCarrierRequest(request)
-  const paths = await directImagePaths(providerRequest)
-  const prompt = directImagePrompt(providerRequest, paths)
-  const maximum = imageReferenceLimit(request)
-  if (paths.length > maximum) throw new Error(`The selected Google image model accepts up to ${maximum} image references.`)
+  const inputs = await directImageInputs(providerRequest, signal)
+  const prompt = directImagePrompt(providerRequest, inputs)
   const input: Array<Record<string, string>> = [{ type: 'text', text: prompt }]
-  for (const path of paths) input.push({ type: 'image', mime_type: mimeFor(path), data: (await readFile(path)).toString('base64') })
+  for (const source of inputs) input.push(source.bytes
+    ? { type: 'image', mime_type: source.mimeType!, data: Buffer.from(source.bytes).toString('base64') }
+    : { type: 'image', uri: source.url! })
+  const requestBody = JSON.stringify({ ...controls, input })
+  if (Buffer.byteLength(requestBody) > 20 * 1024 * 1024) throw new Error('Google inline image request exceeds Prism’s 20 MiB request limit; use smaller images or public image URLs.')
+  if (signal?.aborted) throw new Error('Image generation was cancelled.')
+  runtimeServiceFailures.assertCurrent('google')
+  const key = await loadServiceCredential('google')
+  if (signal?.aborted) throw new Error('Image generation was cancelled.')
+  runtimeServiceFailures.assertCurrent('google')
   mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Submitting securely to Google Gemini…', status: 'queued' })
   const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-    method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: modelId, input, response_format: { type: 'image', mime_type: `image/${request.outputFormat || 'png'}`, aspect_ratio: request.aspectRatio || '1:1', image_size: request.imageResolution || '1K' } }), signal,
+    method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: requestBody, signal, redirect: 'error',
   })
   if (!response.ok) return directImageFailure(request, 'google', modelId, response)
   const body = await response.json() as Record<string, unknown>
@@ -1625,10 +1773,237 @@ function fluxImageSize(ratio?: string): string | { width: number; height: number
   return custom[ratio || ''] || 'landscape_16_9'
 }
 
+async function readOwnedFalSchema(endpointId: string): Promise<FalSchemaContract> {
+  const id = falEndpointId(endpointId)
+  const scope = runtimeServiceFailures.catalogScope('fal')
+  const assertCurrent = () => runtimeServiceFailures.assertCurrent('fal')
+  return falSchemaCache.read(scope, id, async () => {
+    const key = await loadServiceCredential('fal')
+    return readFalModelSchema(id, { request: (url) => fetchProviderModelCatalog('fal', url, { headers: { Authorization: `Key ${key}` } }), assertCurrent })
+  }, assertCurrent)
+}
+
+async function runNativeFalGeneration(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+  assertVideoProviderPromptPreflight(request)
+  const timelineSeconds = authoredTimelineSeconds(request)
+  const promptOwnership = effectiveProviderPromptOwnership(request)
+  const native = { ...request.falNative!, ...(promptOwnership !== undefined ? { promptOwnership } : {}), requiresGeneratedSpeech: requiresGeneratedDialogueAudio(request), ...(timelineSeconds !== undefined ? { timelineSeconds } : {}) }
+  // The visible final prompt has one owner. No static adapter adds unseen instructions.
+  const finalPrompt = request.providerPromptOverride ?? request.prompt
+  if (finalPrompt !== undefined && (!native.promptField || native.values[native.promptField] !== finalPrompt)) throw new Error('The native model prompt must match the visible final prompt. Review its binding.')
+  const supplied = Object.values(native.media).flat()
+  const sources = [...(request.references || []), ...(request.inputPath || request.inputUrl ? [{ path: request.inputPath, url: request.inputUrl, mediaType: request.inputRole === 'source-video' ? 'video' as const : 'image' as const }] : [])]
+  for (const source of sources) {
+    if (!source.path && !source.url || source.path && extname(source.path).toLowerCase() === '.prismstyle') continue
+    if (!supplied.some(item => (source.path ? item.path === source.path : item.url === source.url) && item.mediaType === (source.mediaType || 'image'))) throw new Error('A connected reference is missing from the native model inputs. Review its field binding.')
+  }
+  try {
+    const result = await executeFalNativeGeneration(native, request.kind, {
+      contract: readOwnedFalSchema,
+      assertCurrent: () => { runtimeServiceFailures.assertCurrent('fal'); assertGenerationCommit() },
+      prepareSource: async (source, expectedType) => {
+        if (!source.path) return source
+        const path = await assertManagedMediaPath(source.path)
+        if (!mimeFor(path).startsWith(`${expectedType}/`)) throw new Error(`The connected file must be ${expectedType} media.`)
+        await stat(path)
+        return { ...source, path }
+      },
+      client: async () => createOwnedFalClient(await loadCredential(), falElectronFetch, () => runtimeServiceFailures.assertCurrent('fal')),
+      upload: (client, path) => uploadLocalAsset(path, client),
+      submit: async (client, endpointId, input, abortSignal) => {
+        mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Submitting securely to fal.ai…', status: 'queued' })
+        return subscribeOwnedFalClient(client, endpointId, { input, logs: true, abortSignal, onQueueUpdate: update => {
+          mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: queueMessage(update), status: update.status === 'IN_QUEUE' ? 'queued' : 'running' })
+        } })
+      },
+      persist: async (output, endpointId, abortSignal) => {
+        const path = await downloadResult(output.url, output.contentType, { provider: 'fal.ai', modelId: endpointId, prompt: finalPrompt }, abortSignal, output.type)
+        if (output.type === 'image') await enforceLockedArtwork(request, path)
+        const url = localAssetUrl(path)
+        await appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId: endpointId, status: 'complete', createdAt: new Date().toISOString(), outputPath: path, outputUrl: url })
+        return { path, url }
+      },
+    }, signal)
+    runtimeServiceFailures.delete('fal')
+    const primary = result.outputs[result.primaryIndex]
+    return { requestId: result.requestId, modelId: result.modelId, outputPath: primary.path, outputUrl: primary.url, outputType: primary.type, outputs: result.outputs }
+  } catch (error) {
+    if (signal?.aborted || error instanceof VideoDialogueAudioConflictError || error instanceof SeedancePromptIntegrityError) throw error
+    rememberServiceFailure('fal', error)
+    throw error
+  }
+}
+
+async function createCurrentHiggsfieldApi(observerFactory?: (identity: string) => HiggsfieldJobObserver): Promise<HiggsfieldApi> {
+  const key = await loadServiceCredential('higgsfield')
+  return new HiggsfieldApi({ fetch: (url, init) => net.fetch(url, init), key, observer: observerFactory?.(higgsfieldCredentialIdentity(key)), assertCurrent: () => runtimeServiceFailures.assertCurrent('higgsfield') })
+}
+async function readCurrentHiggsfieldPresets(refresh = false): Promise<HiggsfieldPreset[]> {
+  const assertCurrent = () => runtimeServiceFailures.assertCurrent('higgsfield')
+  const scope = runtimeServiceFailures.catalogScope('higgsfield')
+  assertCurrent()
+  if (refresh) higgsfieldPresetCache.invalidate(scope)
+  return higgsfieldPresetCache.read(scope, async () => (await createCurrentHiggsfieldApi()).presets(), assertCurrent)
+}
+async function prepareManagedHiggsfieldSource(source: HiggsfieldMediaSource, signal?: AbortSignal) {
+  signal?.throwIfAborted();runtimeServiceFailures.assertCurrent('higgsfield')
+  if (!source.path) return { source: { ...source } }
+  const path = await assertManagedMediaPath(source.path), contentType = mimeFor(path), maximum = source.mediaType === 'video' ? 200 * 1024 * 1024 : 64 * 1024 * 1024
+  const before = await stat(path)
+  if (!before.isFile() || before.size < 1 || before.size > maximum || (source.mediaType === 'video' ? contentType !== 'video/mp4' : !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(contentType))) throw new Error('Choose supported managed Higgsfield media within its file-size limit.')
+  const videoInfo = source.mediaType === 'video' ? await probeManagedMp4(path, signal) : undefined
+  signal?.throwIfAborted();runtimeServiceFailures.assertCurrent('higgsfield')
+  const bytes = await readFile(path), after = await stat(path)
+  if (bytes.length !== before.size || before.size !== after.size || before.ino !== after.ino || before.mtimeMs !== after.mtimeMs) throw new Error('The source changed during Higgsfield preparation. Try again after saving it.')
+  if (source.mediaType === 'image') await inspectHiggsfieldImage(bytes, contentType)
+  signal?.throwIfAborted();runtimeServiceFailures.assertCurrent('higgsfield')
+  return { source: { ...source, path }, contentType, bytes, videoInfo }
+}
+let higgsfieldJobStoreInstance: HiggsfieldJobStore | undefined
+function higgsfieldJobStore(): HiggsfieldJobStore {
+  return higgsfieldJobStoreInstance ||= new HiggsfieldJobStore(dataRoot(), undefined, undefined, {
+    encrypt: value => { if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure recovery storage is unavailable.'); return safeStorage.encryptString(value) },
+    decrypt: value => safeStorage.decryptString(value),
+  })
+}
+function higgsfieldJobScope(nodeId: string): HiggsfieldJobScope {
+  assertGenerationCommit()
+  const owner = generationContext.getStore() || (currentProject && currentProjectDocumentPath ? { projectId: currentProject.id, rootPath: resolve(currentProject.rootPath), documentPath: resolve(currentProjectDocumentPath) } : undefined)
+  if (!owner || typeof nodeId !== 'string' || !nodeId || nodeId.length > 160) throw new Error('Choose a current project and node for Higgsfield generation.')
+  return { projectId: owner.projectId, rootPath: owner.rootPath, documentPath: owner.documentPath, nodeId }
+}
+async function currentHiggsfieldProfileId(): Promise<string> {
+  runtimeServiceFailures.assertCurrent('higgsfield')
+  const registry = await serviceProfileStore().listProfiles('higgsfield', false)
+  runtimeServiceFailures.assertCurrent('higgsfield')
+  const selection = projectServiceProfileSelection(registry, { serviceProfileOverrides: runtimeServiceFailures.overrides('higgsfield', currentProject?.serviceProfileOverrides) }, 'higgsfield')
+  return selection.profile?.id || 'legacy'
+}
+const higgsfieldJobActions = new HiggsfieldJobActions()
+async function persistCurrentHiggsfieldOutput(scope: HiggsfieldJobScope, id: string, output?: { requestId: string; url: string; contentType?: string }, signal?: AbortSignal): Promise<GenerationResult> {
+  const assertCurrent = () => { signal?.throwIfAborted(); runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit() }
+  return persistHiggsfieldOutput(scope, id, output, {
+    store: higgsfieldJobStore(), assertCurrent, signal,
+    decrypt: bytes => safeStorage.decryptString(bytes),
+    encrypt: text => { if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure recovery storage is unavailable.'); return safeStorage.encryptString(text) },
+    fetch: (url, init) => net.fetch(url, init),
+    commit: async (record, original, receipt) => {
+      assertCurrent()
+      const id = `higgsfield-${record.id}`, path = receipt.path
+      const assets = await readStrictJsonOr<ImportedAsset[]>(assetsIndexPath(), [], 'The generated asset index')
+      assertCurrent()
+      const existing = assets.find(asset => asset.id === id)
+      if (existing && existing.path !== path) throw new Error('The existing Higgsfield asset identity points to another file. Preserve it for review.')
+      if (!existing) await registerAsset({ id, name: basename(path), path, mimeType: receipt.contentType, category: 'video', origin: 'generated', fileSize: receipt.bytes, createdAt: record.createdAt, metadata: { provider: 'Higgsfield', modelId: record.endpointId, prompt: original.values.prompt as string } })
+      assertCurrent()
+      await historyJsonMutations.mutateArray<HistoryEntry>(historyPath(), entries => {
+        assertCurrent()
+        const existing = entries.find(entry => entry.id === id)
+        if (existing) {
+          if (existing.nodeId !== record.nodeId || existing.modelId !== record.endpointId || existing.outputPath !== path || existing.status !== 'complete') throw new Error('The existing Higgsfield history identity changed. Preserve it for review.')
+          return entries
+        }
+        return [{ id, nodeId: record.nodeId, nodeTitle: 'video-generator', modelId: record.endpointId, status: 'complete' as const, createdAt: record.createdAt, outputPath: path, outputUrl: localAssetUrl(path) }, ...entries].slice(0, 200)
+      })
+      assertCurrent()
+      // Repair a projection interrupted after its asset index committed.
+      await writeProjectDocument()
+    },
+  })
+}
+async function listCurrentHiggsfieldJobs(): Promise<HiggsfieldJobView[]> {
+  const scope = higgsfieldJobScope('read')
+  runtimeServiceFailures.assertCurrent('higgsfield')
+  const records = await higgsfieldJobStore().list(scope)
+  runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit()
+  return records.map(record => ({ ...higgsfieldRecoveryView(record, bytes => safeStorage.decryptString(bytes)), ownerMatches: record.rootPath === scope.rootPath && record.documentPath === scope.documentPath, canRelocate: record.rootPath === scope.rootPath }))
+}
+async function recoverCurrentHiggsfieldJob(value: unknown, signal?: AbortSignal): Promise<{ job: HiggsfieldJobView; result?: GenerationResult }> {
+  const command = higgsfieldJobCommand(value), scope = higgsfieldJobScope(command.nodeId)
+  return higgsfieldJobActions.run(scope, () => performHiggsfieldJobAction(scope, command, {
+    store: higgsfieldJobStore(), signal,
+    assertCurrent: () => { signal?.throwIfAborted(); runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit() },
+    profileId: currentHiggsfieldProfileId,
+    decrypt: bytes => safeStorage.decryptString(bytes),
+    encrypt: value => { if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure recovery storage is unavailable.'); return safeStorage.encryptString(value) },
+    createApi: async expected => {
+      const key = await loadServiceCredential('higgsfield')
+      runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit()
+      if (higgsfieldCredentialIdentity(key) !== expected) throw new Error('Reconnect the original Higgsfield account; this key belongs to a different account.')
+      return new HiggsfieldApi({ key, fetch: (url, init) => net.fetch(url, init), assertCurrent: () => { signal?.throwIfAborted(); runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit() } })
+    },
+    persist: (record, _original, output) => persistCurrentHiggsfieldOutput(scope, record.id, output, signal),
+  }))
+}
+async function runNativeHiggsfieldGeneration(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+  assertGenerationRequirements(request)
+  assertVideoProviderPromptPreflight(request)
+  const native = structuredClone(request.higgsfieldNative!), finalPrompt = request.providerPromptOverride ?? request.prompt ?? ''
+  if ((Object.hasOwn(native.values,'prompt') ? native.values.prompt : '') !== finalPrompt) throw new Error('The Higgsfield body must match the visible authored prompt. Review its preserved text.')
+  // Current declared schema is checked before private journal/key/media preparation.
+  // Temporary public URI placeholders preserve exact media cardinality/order only.
+  const assertCurrentContract = () => { signal?.throwIfAborted(); runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit() }
+  const current = await resolveHiggsfieldCurrentInput(native, { assertCurrent: assertCurrentContract, readContract: (endpointId, owned) => higgsfieldPublicCatalog.readContract(endpointId, owned) })
+  const inputPlan = current.plan
+  if ((Object.hasOwn(inputPlan.values,'prompt') ? inputPlan.values.prompt : '') !== finalPrompt) throw new Error('The effective Higgsfield prompt must match the visible prompt. Review the current default or write explicit instructions; no hidden prompt was submitted.')
+  const schemaInput = inputPlan.preview
+  const currentInputSchema = current.schema
+  const validateSemanticControls=(schema:typeof currentInputSchema,input:unknown)=>{
+    if(inputPlan.kind!=='seedance')return
+    if(requiresGeneratedDialogueAudio(request)) {
+      const audio=schema.properties?.generate_audio,value=(input as Record<string,unknown>).generate_audio ?? audio?.default
+      if(!audio||audio.type!=='boolean'||value!==true)throw new VideoDialogueAudioConflictError()
+    }
+  }
+  assertCurrentContract();validateSemanticControls(currentInputSchema,schemaInput)
+  const boundMedia = Object.values(native.media).flat()
+  const expectedMedia = [...(request.references || []).filter(reference => Boolean(reference.path || reference.url) && !(reference.role === 'style' && reference.path?.endsWith('.prismstyle'))), ...(request.inputPath || request.inputUrl ? [{ path: request.inputPath, url: request.inputUrl }] : [])]
+  if (expectedMedia.some(reference => !boundMedia.some(source => reference.path ? source.path === reference.path : source.url === reference.url))) throw new Error('Connected media are not bound to the selected Higgsfield input. Review the preserved references.')
+  const scope = higgsfieldJobScope(request.nodeId)
+  const profileId = await currentHiggsfieldProfileId()
+  runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit(); signal?.throwIfAborted()
+  const lifecycle = await beginHiggsfieldJob(higgsfieldJobStore(), scope, profileId, native, value => {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure recovery storage is unavailable; generation was not submitted.')
+    return safeStorage.encryptString(value)
+  }, native.fingerprint !== undefined && inputPlan.kind === 'seedance' ? currentInputSchema : undefined)
+  try {
+    const generationDependencies = {
+      assertCurrent: () => { runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit() },
+      prepare: prepareManagedHiggsfieldSource,
+      validateInput: async (input:unknown) => { const latest=await current.validateInput(input);assertCurrentContract();validateSemanticControls(latest,input) },
+      api: () => createCurrentHiggsfieldApi(identity => lifecycle.observer(identity)),
+      persist: async (output:{requestId:string;url:string;contentType?:string}, endpointId:string, abortSignal?:AbortSignal) => {
+        abortSignal?.throwIfAborted()
+        const result = await persistCurrentHiggsfieldOutput(scope, lifecycle.record.id, output, abortSignal)
+        runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit(); abortSignal?.throwIfAborted()
+        await lifecycle.persisted(result.outputPath)
+        return { path: result.outputPath, url: result.outputUrl }
+      },
+    }
+    const result = inputPlan.kind==='seedance'
+      ? await executeHiggsfieldSeedanceGeneration(higgsfieldSeedanceRequest(native),{...generationDependencies,...higgsfieldSeedanceManagedMedia({assertCurrent:assertCurrentContract,assertManagedPath:assertManagedMediaPath,mimeFor}),...(native.fingerprint!==undefined?{inputSchema:currentInputSchema}:{})},signal)
+      : await executeHiggsfieldGeneration(native,generationDependencies,signal)
+    runtimeServiceFailures.delete('higgsfield');return result
+  } catch (error) {
+    try { await lifecycle.failed(error) } catch {
+      throw new HiggsfieldRemoteJobError('Higgsfield recovery status could not be recorded; remote work may continue. The original attempt remains protected. Check the provider dashboard before retrying.')
+    }
+    if (error instanceof HiggsfieldRemoteJobError) {
+      try { runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit(); mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: error.message, status: 'remote-unknown' }) } catch { /* A superseded owner cannot update another project's node. */ }
+    }
+    if (!signal?.aborted && !(error instanceof HiggsfieldRemoteJobError)) rememberServiceFailure('higgsfield', error)
+    throw error
+  }
+}
+
 async function runGeneration(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
   assertGenerationRequirements(request)
+  assertVideoProviderPromptPreflight(request)
   if (!currentProject) throw new Error('Choose or open a project folder first.')
+  if (request.higgsfieldNative) return runNativeHiggsfieldGeneration(request, signal)
+  if (request.falNative) return runNativeFalGeneration(request, signal)
   if (request.kind === 'voiceover' && request.voiceEngine === 'fish-audio') return runFishAudio(request, signal)
+  if (isDirectElevenAudio(request)) return runElevenLabsAudio(request, signal)
   if ((request.kind === 'image-generator' || request.kind === 'image-editor') && request.imageProvider === 'openai') return runOpenAIImage(request, signal)
   if ((request.kind === 'image-generator' || request.kind === 'image-editor') && request.imageProvider === 'google') return runGeminiImage(request, signal)
   if (request.kind === 'video-generator') {
@@ -1638,18 +2013,22 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
   let modelId = MODEL_IDS[request.kind]
   if (!modelId) throw new Error('This node does not run a fal.ai model.')
   const key = await loadCredential()
-  configureFalClient(key)
+  const client = createOwnedFalClient(key, falElectronFetch, () => runtimeServiceFailures.assertCurrent('fal'))
 
-  let inputUrl = request.inputUrl?.startsWith('http://') || request.inputUrl?.startsWith('https://')
+  const referenceModel = request.kind === 'video-generator' ? resolveVideoModel(request.videoEngine) : undefined
+  const seedanceReferenceMode = referenceModel?.family === 'seedance' && referenceModel.mode === 'reference'
+  // Reference mode resolves its one shared physical set; direct input is already represented there.
+  let inputUrl = !seedanceReferenceMode && (request.inputUrl?.startsWith('http://') || request.inputUrl?.startsWith('https://'))
     ? request.inputUrl
     : undefined
-  if (!inputUrl && request.inputPath) inputUrl = await uploadLocalAsset(request.inputPath)
+  if (!seedanceReferenceMode && !inputUrl && request.inputPath) inputUrl = await uploadLocalAsset(request.inputPath, client)
 
-  const references = await Promise.all((request.references || []).map(async (reference) => {
+  const uploadReferences = seedanceReferenceMode ? seedanceReferenceCandidates(request) : request.references || []
+  const references = await Promise.all(uploadReferences.map(async (reference) => {
     const remoteUrl = reference.url?.startsWith('http://') || reference.url?.startsWith('https://')
       ? reference.url
       : reference.path && !(reference.role === 'style' && extname(reference.path).toLowerCase() === '.prismstyle')
-        ? await uploadLocalAsset(reference.path)
+        ? await uploadLocalAsset(reference.path, client)
         : undefined
     return { ...reference, remoteUrl }
   }))
@@ -1748,9 +2127,7 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
         if (!inputUrl && startReference) inputUrl = startReference.remoteUrl
 
         if (videoModel.family === 'seedance') {
-          const numericDurations = videoModel.durations.filter((duration): duration is number => typeof duration === 'number')
-          const maximumDuration = numericDurations[numericDurations.length - 1] || 15
-          const seedanceDuration = request.autoDuration ? 'auto' : String(Math.min(Math.max(request.duration || 5, 4), maximumDuration))
+          const seedanceDuration = legacyVideoDurationPlan(request, videoModel).wire
           const common = {
             prompt: semanticPrompt,
             resolution: videoModel.resolutions.includes(request.resolution || '') ? request.resolution : '720p',
@@ -1811,7 +2188,7 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
         const klingMultiPrompt = klingStoryboardPrompts(providerRequest, klingReferenceGuide)
         const referenceCount = elements.length + appearanceReferences.length
         if (referenceCount > (videoModel.referenceLimit || referenceCount)) throw new Error(`${videoModel.label} accepts up to ${videoModel.referenceLimit} combined elements and appearance references.`)
-        const duration = String(Math.min(Math.max(request.duration || 5, 3), 15))
+        const duration = legacyVideoDurationPlan(request, videoModel).wire
         if (videoModel.mode === 'image' && !inputUrl) throw new Error(`${videoModel.label} needs a connected start image.`)
         if (videoModel.mode === 'text' && inputUrl) throw new Error(`${videoModel.label} is text-to-video. Choose its Image variant for a start frame.`)
         const imageKey = videoModel.id.includes('/o3/') ? 'image_url' : 'start_image_url'
@@ -1840,7 +2217,7 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
         }
 
         if (videoModel.family === 'veo') {
-          const veoDuration = `${videoModel.mode === 'extend' ? 7 : [4, 6, 8].includes(request.duration || 8) ? request.duration : 8}s`
+          const veoDuration = legacyVideoDurationPlan(request, videoModel).wire
           const common = { prompt: semanticPrompt, aspect_ratio: request.aspectRatio || 'auto', duration: veoDuration, resolution: videoModel.resolutions.includes(request.resolution || '') ? request.resolution : '720p', generate_audio: Boolean(request.generateAudio), negative_prompt: request.negativePrompt || undefined, ...(Number.isFinite(request.seed) ? { seed: request.seed } : {}), auto_fix: Boolean(request.autoFix), safety_tolerance: String(request.safetyTolerance || 4), ...providerNativeShutterFields(videoModel, request) }
           if (videoModel.mode === 'text') {
             if (inputUrl || validReferences.length) throw new Error(`${videoModel.label} is text-to-video. Choose an input-aware Veo mode.`)
@@ -1866,8 +2243,9 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
 
         if (videoModel.family === 'wan') {
         if (inputUrl || validReferences.length) throw new Error('Controlled FPS mode is text-to-video. Choose Kling 3 or Seedance 2 when using media references.')
-        const framesPerSecond = Math.min(Math.max(Math.round(request.frameRate || 24), 4), 60)
-        const numFrames = Math.min(Math.max(Math.round((request.duration || 5) * framesPerSecond), 17), 161)
+        const timing = legacyVideoDurationPlan(request, videoModel)
+        const framesPerSecond = timing.framesPerSecond!
+        const numFrames = timing.numFrames!
         modelId = 'fal-ai/wan/v2.2-5b/text-to-video/distill'
         input = {
           prompt: semanticPrompt,
@@ -1939,7 +2317,8 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
   })
 
   try {
-    const result = await fal.subscribe(modelId, {
+    runtimeServiceFailures.assertCurrent('fal')
+    const result = await subscribeOwnedFalClient(client, modelId, {
       input,
       logs: true,
       abortSignal: signal,
@@ -2010,8 +2389,15 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
 }
 
 function registerIpc(): void {
-  registerSemanticAssetSaveIpc(ipcMain, { currentProject: () => currentProject ? { rootPath: currentProject.rootPath, workflowPath: workflowPath(), assetsPath: assetsIndexPath(), projectDocumentPath: currentProject.documentPath } : null })
-  ipcMain.handle('services:list', async () => Promise.all(SERVICE_PROVIDERS.map(async (id): Promise<ServiceConnection> => ({ id, connected: await serviceConnected(id) }))))
+  registerSemanticAssetSaveIpc(ipcMain, {
+    currentProject: () => currentProject ? { projectId: currentProject.id, rootPath: currentProject.rootPath, workflowPath: workflowPath(), assetsPath: assetsIndexPath(), projectDocumentPath: currentProjectDocumentPath || defaultProjectDocumentPath(currentProject.rootPath) } : null,
+    runWithDocumentOwner: (context, action) => projectCommands.runForOwner(JSON.stringify([context.projectId, resolve(context.rootPath), resolve(context.projectDocumentPath!)]), currentProjectOwner,
+      () => { projectProfileRecovery.assertReady(); return projectJsonMutations.run(resolve(context.projectDocumentPath!), action) }),
+  })
+  ipcMain.handle('services:list', () => projectCommands.readWhenIdleForOwner(currentProjectOwner(), currentProjectOwner, () => {
+    activateProviderRequestProject()
+    return Promise.all(SERVICE_PROVIDERS.map(async (id): Promise<ServiceConnection> => ({ id, connected: await runtimeServiceFailures.readWhenIdle(id, () => withProviderRequest(id, () => serviceConnected(id))) })))
+  }))
   ipcMain.handle('services:save', async (_event, provider: unknown, raw: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
     await saveServiceCredential(provider as ServiceProvider, raw)
@@ -2020,34 +2406,53 @@ function registerIpc(): void {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
     await removeServiceCredential(provider as ServiceProvider)
   })
+  ipcMain.handle('services:higgsfield-presets', (_event, refresh?: boolean) => {
+    if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid Higgsfield preset refresh request.')
+    return withProviderRequest('higgsfield', () => readCurrentHiggsfieldPresets(refresh))
+  })
   ipcMain.handle('services:models', async (_event, provider: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
-    return listServiceModels(provider as ServiceProvider)
+    return withProviderRequest(provider as ServiceProvider, () => listServiceModels(provider as ServiceProvider))
   })
+  ipcMain.handle('services:fal-schema', async (_event, endpointId: unknown) => {
+    const id = falEndpointId(endpointId)
+    return withProviderRequest('fal', () => readOwnedFalSchema(id))
+  })
+  ipcMain.handle('services:higgsfield-schema', (_event, endpointId: unknown) => withProviderRequest('higgsfield', () => readHiggsfieldInputContract(endpointId, {
+    assertCurrent: () => runtimeServiceFailures.assertCurrent('higgsfield'),
+    readContract: (id, assertCurrent) => higgsfieldPublicCatalog.readContract(id, assertCurrent),
+  })))
   ipcMain.handle('services:account', async (_event, provider: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
-    return serviceAccountStatus(provider as ServiceProvider)
+    return withProviderRequest(provider as ServiceProvider, () => serviceAccountStatus(provider as ServiceProvider))
   })
   ipcMain.handle('services:profiles', async (_event, provider: unknown, refresh: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
     if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid profile refresh request.')
+    if (refresh === true) {
+      const registry = await serviceProfileStore().listProfiles(provider as ServiceProvider, false)
+      if (!registry.profiles.some((profile) => profile.provider === provider) && !registry.profileManagedProviders?.includes(provider as ServiceProvider)) {
+        return runtimeServiceFailures.change(provider as ServiceProvider, () => serviceProfileStore().listProfiles(provider as ServiceProvider, true))
+      }
+    }
     return serviceProfileStore().listProfiles(provider as ServiceProvider, refresh === true)
   })
   ipcMain.handle('services:add-profile', async (_event, provider: unknown, raw: unknown, expectedProfileId: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
     if (typeof raw !== 'string') throw new Error('Invalid API key.')
     if (expectedProfileId !== undefined && typeof expectedProfileId !== 'string') throw new Error('Invalid signed-out account.')
-    const registry = await serviceProfileStore().addProfile(provider as ServiceProvider, raw, expectedProfileId as string | undefined)
-    runtimeServiceFailures.delete(provider as ServiceProvider)
-    return registry
+    return runtimeServiceFailures.change(provider as ServiceProvider, () => serviceProfileStore().addProfile(provider as ServiceProvider, raw, expectedProfileId as string | undefined))
   })
   ipcMain.handle('services:transition-profile', async (_event, profileId: unknown, transition: unknown) => {
     if (typeof profileId !== 'string' || !['disconnect', 'reconnect', 'sign-out', 'delete'].includes(String(transition))) throw new Error('Invalid account action.')
-    return serviceProfileStore().transitionProfile(profileId, transition as 'disconnect' | 'reconnect' | 'sign-out' | 'delete')
+    const registry = await serviceProfileStore().listProfiles('fal', false)
+    const profile = registry.profiles.find((item) => item.id === profileId)
+    if (!profile) throw new Error('That account profile no longer exists.')
+    return runtimeServiceFailures.change(profile.provider, () => serviceProfileStore().transitionProfile(profileId, transition as 'disconnect' | 'reconnect' | 'sign-out' | 'delete'))
   })
   ipcMain.handle('services:set-default-profile', async (_event, provider: unknown, profileId: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider) || (profileId !== undefined && typeof profileId !== 'string')) throw new Error('Invalid default account selection.')
-    return serviceProfileStore().setDefault(provider as ServiceProvider, profileId as string | undefined)
+    return runtimeServiceFailures.change(provider as ServiceProvider, () => serviceProfileStore().setDefault(provider as ServiceProvider, profileId as string | undefined))
   })
   ipcMain.handle('services:rename-profile', async (_event, profileId: unknown, displayName: unknown) => {
     if (typeof profileId !== 'string' || typeof displayName !== 'string') throw new Error('Invalid account profile name.')
@@ -2060,7 +2465,7 @@ function registerIpc(): void {
   })
   ipcMain.handle('assistant:rewrite', async (_event, provider: unknown, text: unknown, instruction?: unknown, model?: unknown) => {
     if (!isAssistantProvider(provider)) throw new Error('Choose a supported assistant service.')
-    return rewriteWithAssistant(provider, text, instruction, model)
+    return withProviderRequest(provider, () => rewriteWithAssistant(provider, text, instruction, model))
   })
   ipcMain.handle('credentials:status', async () => {
     try {
@@ -2106,7 +2511,7 @@ function registerIpc(): void {
       // Already absent.
     }
   })
-  ipcMain.handle('projects:current', () => currentProject)
+  ipcMain.handle('projects:current', () => currentProject ? { ...currentProject, documentPath: currentProjectDocumentPath || defaultProjectDocumentPath(currentProject.rootPath) } : null)
   ipcMain.handle('projects:recent', async () => {
     const recentProjects = await readJson<StoredProjectWorkspace[]>(recentProjectsPath(), [])
     const probed = await Promise.all(recentProjects.map(async (project) => {
@@ -2116,33 +2521,40 @@ function registerIpc(): void {
     return probed.filter(Boolean) as ProjectWorkspace[]
   })
   ipcMain.handle('projects:rename-document', async (_event, rawRootPath: unknown, rawName: unknown): Promise<ProjectWorkspace> => {
-    if (typeof rawRootPath !== 'string' || typeof rawName !== 'string') throw new Error('Invalid project document rename.')
-    const rootPath = resolve(rawRootPath)
-    const recent = await readStrictJsonOr<StoredProjectWorkspace[]>(recentProjectsPath(), [], 'The recent projects index')
-    const item = recent.find((project) => resolve(project.rootPath) === rootPath)
-    if (!item) throw new Error('This project is no longer in Prism’s project library.')
-    const currentPath = item.documentPath || defaultProjectDocumentPath(rootPath)
-    if (extname(currentPath).toLocaleLowerCase('en-US') !== '.prismflow') throw new Error('Only a .prismflow project document can be renamed here.')
-    const name = safeFolderName(normalizeLogicalAssetName(rawName.replace(/\.prismflow$/i, '')), 'Untitled Project')
-    const nextPath = join(dirname(currentPath), `${name}.prismflow`)
-    if (resolve(nextPath) !== resolve(currentPath)) {
-      if (await pathExists(nextPath)) throw new Error(`A project document named “${name}.prismflow” already exists.`)
-      await rename(currentPath, nextPath)
-    }
-    const updatedRecent = recent.map((project) => resolve(project.rootPath) === rootPath ? { ...project, documentPath: nextPath } : project)
-    await atomicJson(recentProjectsPath(), updatedRecent)
-    if (currentProject && resolve(currentProject.rootPath) === rootPath) {
-      currentProjectDocumentPath = nextPath
-      await atomicJson(workspacePointerPath(), { ...currentProject, documentPath: nextPath })
-    }
-    return { ...item, documentPath: nextPath }
+    return projectCommands.run(async () => {
+      if (typeof rawRootPath !== 'string' || typeof rawName !== 'string') throw new Error('Invalid project document rename.')
+      const rootPath = resolve(rawRootPath)
+      const recent = await readStrictJsonOr<StoredProjectWorkspace[]>(recentProjectsPath(), [], 'The recent projects index')
+      const item = recent.find((project) => resolve(project.rootPath) === rootPath)
+      if (!item) throw new Error('This project is no longer in Prism’s project library.')
+      const currentPath = item.documentPath || defaultProjectDocumentPath(rootPath)
+      if (extname(currentPath).toLocaleLowerCase('en-US') !== '.prismflow') throw new Error('Only a .prismflow project document can be renamed here.')
+      const name = safeFolderName(normalizeLogicalAssetName(rawName.replace(/\.prismflow$/i, '')), 'Untitled Project')
+      const nextPath = join(dirname(currentPath), `${name}.prismflow`)
+      return projectJsonMutations.run(resolve(currentPath), async () => {
+        if (resolve(nextPath) !== resolve(currentPath)) {
+          if (await pathExists(nextPath)) throw new Error(`A project document named “${name}.prismflow” already exists.`)
+          await rename(currentPath, nextPath)
+        }
+        const updatedRecent = recent.map((project) => resolve(project.rootPath) === rootPath ? { ...project, documentPath: nextPath } : project)
+        await atomicJson(recentProjectsPath(), updatedRecent)
+        if (currentProject && resolve(currentProject.rootPath) === rootPath) {
+          currentProjectDocumentPath = nextPath
+          activateProviderRequestProject()
+          await atomicJson(workspacePointerPath(), { ...currentProject, documentPath: nextPath })
+        }
+        return { ...item, documentPath: nextPath }
+      })
+    })
   })
   ipcMain.handle('projects:forget', async (_event, rawRootPath: unknown): Promise<void> => {
-    if (typeof rawRootPath !== 'string') throw new Error('Invalid project removal.')
-    const rootPath = resolve(rawRootPath)
-    await projectJsonMutations.mutateArray<StoredProjectWorkspace>(recentProjectsPath(), (recent) => recent.filter((project) => resolve(project.rootPath) !== rootPath))
-    const pointer = await readJson<StoredProjectWorkspace | null>(workspacePointerPath(), null)
-    if (pointer && resolve(pointer.rootPath) === rootPath) await unlink(workspacePointerPath()).catch(() => undefined)
+    return projectCommands.run(async () => {
+      if (typeof rawRootPath !== 'string') throw new Error('Invalid project removal.')
+      const rootPath = resolve(rawRootPath)
+      await projectJsonMutations.mutateArray<StoredProjectWorkspace>(recentProjectsPath(), (recent) => recent.filter((project) => resolve(project.rootPath) !== rootPath))
+      const pointer = await readJson<StoredProjectWorkspace | null>(workspacePointerPath(), null)
+      if (pointer && resolve(pointer.rootPath) === rootPath) await unlink(workspacePointerPath()).catch(() => undefined)
+    })
   })
   ipcMain.handle('projects:legacy-import-status', async () => {
     const matches = await legacyImportMatches()
@@ -2156,11 +2568,13 @@ function registerIpc(): void {
       buttonLabel: 'Create Project Here',
     })
     if (result.canceled || !result.filePaths[0]) return null
-    const root = resolve(result.filePaths[0])
-    if (isDocumentsPath(root)) throw new Error('Choose a working folder outside Documents.')
-    const project = await scaffoldProject(root)
-    await writeProjectDocument()
-    return project
+    return projectCommands.run(async () => {
+      const root = resolve(result.filePaths[0])
+      if (isDocumentsPath(root)) throw new Error('Choose a working folder outside Documents.')
+      const project = await scaffoldProject(root)
+      await writeProjectDocument()
+      return project
+    })
   })
   ipcMain.handle('projects:open', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
@@ -2169,15 +2583,18 @@ function registerIpc(): void {
       buttonLabel: 'Open Project',
     })
     if (result.canceled || !result.filePaths[0]) return null
-    const root = resolve(result.filePaths[0])
-    if (isDocumentsPath(root)) throw new Error('Choose a project folder outside Documents.')
-    const portableDocument = await findProjectDocument(root)
-    if (portableDocument) return openProjectDocument(portableDocument)
-    const manifest = await readJson<ProjectWorkspace | null>(projectManifestPath(root), null)
-    if (!manifest || manifest.schemaVersion !== 1) throw new Error('That folder is not a Prism Foundry project. Use New Project to prepare it first.')
-    const project = await scaffoldProject(root, manifest)
-    await writeProjectDocument()
-    return project
+    return projectCommands.run(async () => {
+      const root = resolve(result.filePaths[0])
+      if (isDocumentsPath(root)) throw new Error('Choose a project folder outside Documents.')
+      await projectProfileRecovery.recover(dataRoot())
+      const portableDocument = await findProjectDocument(root)
+      if (portableDocument) return openProjectDocument(portableDocument)
+      const manifest = await readJson<ProjectWorkspace | null>(projectManifestPath(root), null)
+      if (!manifest || manifest.schemaVersion !== 1) throw new Error('That folder is not a Prism Foundry project. Use New Project to prepare it first.')
+      const project = await scaffoldProject(root, manifest)
+      await writeProjectDocument()
+      return project
+    })
   })
   ipcMain.handle('projects:open-document', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
@@ -2190,30 +2607,39 @@ function registerIpc(): void {
     return openProjectDocument(result.filePaths[0])
   })
   ipcMain.handle('projects:open-recent', async (_event, rootPath: string) => {
-    const root = resolve(rootPath)
-    if (isDocumentsPath(root)) throw new Error('Projects inside Documents are not supported.')
-    const portableDocument = await findProjectDocument(root)
-    if (portableDocument) return openProjectDocument(portableDocument)
-    const manifest = await readStrictJsonOr<ProjectWorkspace | null>(projectManifestPath(root), null, 'The project manifest')
-    if (!manifest || manifest.schemaVersion !== 1) throw new Error('This project is missing. Import its folder to relink it.')
-    const project = await scaffoldProject(root, manifest)
-    await writeProjectDocument()
-    return project
+    return projectCommands.run(async () => {
+      const root = resolve(rootPath)
+      if (isDocumentsPath(root)) throw new Error('Projects inside Documents are not supported.')
+      await projectProfileRecovery.recover(dataRoot())
+      const portableDocument = await findProjectDocument(root)
+      if (portableDocument) return openProjectDocument(portableDocument)
+      const manifest = await readStrictJsonOr<ProjectWorkspace | null>(projectManifestPath(root), null, 'The project manifest')
+      if (!manifest || manifest.schemaVersion !== 1) throw new Error('This project is missing. Import its folder to relink it.')
+      const project = await scaffoldProject(root, manifest)
+      await writeProjectDocument()
+      return project
+    })
   })
   ipcMain.handle('projects:close', async () => {
-    generationLifecycle.activate(null)
-    currentProject = null
-    currentProjectDocumentPath = null
-    try { await unlink(workspacePointerPath()) } catch { /* Already disconnected. */ }
+    return projectCommands.run(async () => {
+      generationLifecycle.activate(null)
+      currentProject = null
+      currentProjectDocumentPath = null
+      activateProviderRequestProject()
+      try { await unlink(workspacePointerPath()) } catch { /* Already disconnected. */ }
+    })
   })
-  ipcMain.handle('workflows:load', () => loadWorkflowDocument())
-  ipcMain.handle('workflows:save', async (_event, document: WorkflowDocument) => {
-    if (document.schemaVersion !== 1 || !Array.isArray(document.nodes) || !Array.isArray(document.edges)) {
-      throw new Error('Invalid workflow document.')
-    }
-    await atomicJson(workflowPath(), document)
-    await writeProjectDocument()
-  })
+  ipcMain.handle('workflows:load', (_event, owner: WorkflowSaveOwner) => loadOwnedWorkflow(owner, {
+    currentOwner: () => currentProject && currentProjectDocumentPath ? { projectId: currentProject.id, rootPath: currentProject.rootPath, documentPath: currentProjectDocumentPath } : null,
+    runForOwner: (key, action) => projectCommands.runForOwner(key, currentProjectOwner, action),
+    load: loadWorkflowDocument,
+  }))
+  ipcMain.handle('workflows:save', (_event, document: WorkflowDocument, owner: WorkflowSaveOwner) => saveOwnedWorkflow(document, owner, {
+    currentOwner: () => currentProject && currentProjectDocumentPath ? { projectId: currentProject.id, rootPath: currentProject.rootPath, documentPath: currentProjectDocumentPath } : null,
+    runForOwner: (key, action) => projectCommands.runForOwner(key, currentProjectOwner, action),
+    saveCanonical: saved => atomicJson(workflowPath(), saved),
+    savePortable: writeProjectDocument,
+  }))
 
   ipcMain.handle('assets:list', async () => {
     await normalizeManagedOrdinaryMediaAssets()
@@ -2917,12 +3343,24 @@ function registerIpc(): void {
   ipcMain.handle('history:list', async () => currentProject
     ? (await readJson<HistoryEntry[]>(historyPath(), [])).map((entry) => entry.outputPath ? { ...entry, outputUrl: localAssetUrl(entry.outputPath) } : entry)
     : [])
+  ipcMain.handle('generation:higgsfield-jobs', () => withProviderRequest('higgsfield', listCurrentHiggsfieldJobs))
+  ipcMain.handle('generation:higgsfield-action', async (_event, value: unknown) => {
+    const command = higgsfieldJobCommand(value)
+    if (generationLifecycle.isRunning(command.nodeId)) throw new Error('Stop the current local run before operating its remote job.')
+    const { identity, controller } = generationLifecycle.begin(command.nodeId)
+    try {
+      return await generationContext.run(identity, () => withProviderRequest('higgsfield', () => recoverCurrentHiggsfieldJob(command, controller.signal)))
+    } finally { generationLifecycle.complete(command.nodeId, controller) }
+  })
   ipcMain.handle('generation:run', async (_event, request: GenerationRequest) => {
+    assertGenerationRequirements(request)
+    assertVideoProviderPromptPreflight(request)
+    higgsfieldJobActions.assertIdle(higgsfieldJobScope(request.nodeId))
     const { identity, controller } = generationLifecycle.begin(request.nodeId)
     const startedAt = Date.now()
     try {
       return await generationContext.run(identity, async () => {
-        const result = await runGeneration(request, controller.signal)
+        const result = await withProviderRequest(generationServiceProvider(request), () => runGeneration(request, controller.signal), false)
         generationLifecycle.assertActive(identity)
         const entries = await readJson<HistoryEntry[]>(historyPath(), [])
         const match = entries.findIndex((entry) => entry.outputPath === result.outputPath)

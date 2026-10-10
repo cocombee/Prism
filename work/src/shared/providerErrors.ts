@@ -47,6 +47,7 @@ export function providerErrorDetail(error: unknown, fallback = 'Generation faile
 }
 
 export function providerDisplayName(provider: ServiceProvider): string {
+  if (provider === 'elevenlabs') return 'ElevenLabs'
   return provider === 'fal' ? 'fal.ai'
     : provider === 'byteplus' ? 'BytePlus Seedance'
       : provider === 'omniroute' ? 'OmniRoute'

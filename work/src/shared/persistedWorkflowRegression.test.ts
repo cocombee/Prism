@@ -61,7 +61,7 @@ describe('persisted Misi Delivery prompt regression', () => {
     const camera = prompt.split('\nCAMERA\n')[1]?.split('\n\n')[0] || ''
     expect(camera).not.toMatch(/HARD CUT|Overall action|FRAMING:|selected motion cadence/)
     expect(prompt).not.toContain('Overall action: Storyboard sequence:')
-    for (const heading of ['ASSISTANT TASK', 'REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'CAMERA', 'NEGATIVE PROMPT']) expect(prompt).toContain(heading)
+    for (const heading of ['REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'CAMERA', 'NEGATIVE PROMPT']) expect(prompt).toContain(heading)
   })
 
   it('keeps blank saved Storyboard panels as draft previews while blocking generation until action returns', () => {
@@ -100,14 +100,14 @@ describe('persisted Misi Delivery prompt regression', () => {
     expect(generationRequirementFailures(buildGenerationRequest(draftVideo, draftNodes, fixture.edges))).not.toContain('Storyboard panel 1 is blank — describe its action')
   })
 
-  it('keeps Locked/User byte ownership and dynamic EDIT CONTROL independent', () => {
+  it('keeps Locked/User byte ownership independent of native output control changes', () => {
     expect(typeof video.data.manualPromptDraft).toBe('string')
     expect(visibleProviderPromptBody(buildGenerationRequest(video, fixture.nodes, fixture.edges))).toBe(video.data.manualPromptDraft)
 
     const lockedVideo: StudioNode = { ...video, data: { ...video.data, promptMode: 'auto' } }
     const lockedNodes = fixture.nodes.map((node) => node.id === video.id ? lockedVideo : node)
     const locked = visibleProviderPromptBody(buildGenerationRequest(lockedVideo, lockedNodes, fixture.edges))
-    expect(locked).toContain('EDIT CONTROL')
+    expect(locked).not.toContain('EDIT CONTROL')
     const unseededVideo: StudioNode = { ...lockedVideo, data: { ...lockedVideo.data, manualPromptDraft: undefined, manualPromptSeeded: false, manualPromptSeedVersion: undefined } }
     const seeded = switchVideoPromptMode(unseededVideo, 'manual', locked)
     expect(seeded.manualPromptDraft).toBe(locked)
@@ -116,15 +116,15 @@ describe('persisted Misi Delivery prompt regression', () => {
     const changedVideo: StudioNode = { ...lockedVideo, data: { ...lockedVideo.data, duration: 10, aspectRatio: '9:16', resolution: '720p' } }
     const changedNodes = lockedNodes.map((node) => node.id === video.id ? changedVideo : node)
     const changedLocked = visibleProviderPromptBody(buildGenerationRequest(changedVideo, changedNodes, fixture.edges))
-    expect(changedLocked).not.toBe(locked)
-    expect(changedLocked).toContain('Requested output: 10s')
-    expect(changedLocked).toContain('9:16')
+    expect(changedLocked).toBe(locked)
+    expect(buildGenerationRequest(changedVideo, changedNodes, fixture.edges)).toMatchObject({ duration: 10, aspectRatio: '9:16', resolution: '720p' })
+    expect(changedLocked).toContain('10s TOTAL')
     expect(userEdited).toBe(editedVideo.data.manualPromptDraft)
     const autoSwitch = switchVideoPromptMode(editedVideo, 'auto', changedLocked)
     expect(autoSwitch.manualPromptDraft).toBe(userEdited)
     expect(switchVideoPromptMode({ ...editedVideo, data: { ...editedVideo.data, ...autoSwitch } }, 'manual', changedLocked).manualPromptDraft).toBe(userEdited)
     expect(resetManualPrompt(editedVideo, changedLocked).manualPromptDraft).toBe(changedLocked)
-    for (const heading of ['ASSISTANT TASK', 'EDIT CONTROL', 'REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'NEGATIVE PROMPT']) expect(changedLocked).toContain(heading)
+    for (const heading of ['REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'NEGATIVE PROMPT']) expect(changedLocked).toContain(heading)
   })
 
   it('finds every recursively connected semantic tag and excludes unrelated tags', () => {

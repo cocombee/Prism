@@ -476,17 +476,19 @@ Every peer row establishes shared painted left/right bounds and one fixed inter-
 
 ### Typography
 
-Use the existing Prism application tokens and enlarged global scale outside classified compact node exceptions:
+The latest user direction defines exactly three semantic font-size roles. It supersedes the previous enlarged tiers and separate node title/control/support keys:
 
-- application title/plan name: `16px`, `600`;
-- page/section heading: `14px`, `600`;
-- body and selected values: `13px`, `400`;
-- field labels and status text: `12px`, `400`;
-- helper/diagnostic support text: `11px`, `400`;
-- stable IDs, diagnostic codes, and prompt artifacts: `12px` monospace, `400`;
-- numeric confidence and timing values may use tabular numerals, but do not become bold by default.
+- **Heading** (`--font-smaller-title`, 18px): Project Library and comparable page titles. The unused 32px `--font-title` token is removed. Continue Working, All Projects and comparable section headings now use Text.
+- **Text** (`--font-text`, 14px): section headings and primary names; node names retain their accepted compact 12px size through the same role.
+- **Smaller text** (`--font-smaller-text`, 12px): selected/default values, fields, hints, subtitles, metadata and labels such as Multi, Sheets and PNG. Existing compact node/control groups resolve this same role to 8px.
 
-Only names/headings are semibold. Labels, values, controls, body text, badges, statuses, and diagnostics remain regular. Do not import the node-local `8px` compact rollback into this application-level workspace unless an existing component is explicitly reused.
+Project and canvas names use the same Smaller text token as navigation menus (12px in the application shell), including library cards, breadcrumbs, project sidebar names, and inline rename fields. The purple CANVAS section label also uses Smaller text, preserving its tracking. The white Canvas page heading retains the 18px Heading role.
+
+There are two base font weights: **Normal** (`--font-weight-normal`, 400) and **Medium** (`--font-weight-medium`, 500). Names and headings may use Medium; field values, selectors and hints use Normal. Existing node regular-weight overrides remain intentional. Browser default bold headings/strong text must resolve to Medium rather than introducing another weight. The user's final 500 instruction supersedes the provisional 550.
+
+Floating menu fonts derive from the actual trigger font and ancestor zoom; they are measured geometry, not additional design roles. Preserve glyph measurement, default selector tracks, row allocation, chevron clearance, intrinsic Quantity and fixed action sizes. FluidControlGroup owns one full-width column of measured rows; an older caller's two-column field grid must not squeeze those rows into one cell.
+
+Emoji stickers and the OpenAI font glyph are artwork; their silhouette sizes are explicit exceptions, not text roles. Stable IDs/prompt artifacts may retain their monospace family, and timing/confidence values may use tabular numerals without adding size or weight tiers.
 
 ### Surfaces, borders, and radii
 
@@ -641,3 +643,5 @@ Source/tests can prove semantic wiring but cannot alone prove visual balance. Fi
 ## 16. Handoff
 
 Developer owns implementation, tests, build, and packaging. Designer owns this contract and bounded visual acceptance. Implement the smallest surface that satisfies these criteria, preserve the existing Prism identity, and stop for user visual inspection after one verified candidate rather than expanding into a general dashboard redesign.
+
+Latest creation-action correction: compact page creation buttons (New Project in Home/Projects/Recent and empty states, New Canvas, and the asset-page Create action) share the `creation-action` owner. They use the existing Smaller text size (12px in page context), with one `--creation-action-weight` token at Semibold 600. This user-requested action exception supersedes the two-weight restriction for this family only. Navigation, headings, selectors, node controls, secondary/import actions and large Add Canvas cards retain their existing roles and weights. Font size is not enlarged to the navigation Text role. Frames, padding, colors and interaction behavior remain with their existing owners.

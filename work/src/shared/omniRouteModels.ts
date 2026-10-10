@@ -1,4 +1,4 @@
-import { isTextAssistantModelEligible, latestModelReleases, type AssistantModelOption } from './assistantModels'
+import { availableAssistantModels, isTextAssistantModelEligible, type AssistantModelOption } from './assistantModels'
 
 export interface OmniRouteModelRecord {
   id?: string
@@ -47,7 +47,7 @@ export function omniRouteModelOptions(models: OmniRouteModelRecord[]): Assistant
     .filter((model) => !model.output_modalities?.some((modality) => modality.toLowerCase() === 'audio')
       && isTextAssistantModelEligible({ id: model.id, label: omniRouteModelLabel(model) }))
     .forEach((model) => byOwner.set(model.owned_by, [...(byOwner.get(model.owned_by) || []), { id: model.id, label: omniRouteModelLabel(model) }]))
-  return [...byOwner.values()].flatMap((ownerModels) => latestModelReleases(ownerModels, 3))
+  return [...byOwner.values()].flatMap((ownerModels) => availableAssistantModels(ownerModels))
 }
 
 export function omniRouteChatRequest(model: string, prompt: string) {

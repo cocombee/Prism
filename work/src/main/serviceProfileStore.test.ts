@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServiceProfileStore } from './serviceProfileStore'
 
 const encryption = {
@@ -9,8 +9,12 @@ const encryption = {
   decryptString: (value: Buffer) => value.toString().replace(/^encrypted:/, ''),
 }
 
+const fixtureRoots: string[] = []
+afterEach(async () => { await Promise.all(fixtureRoots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
+
 async function fixtureStore() {
   const root = await mkdtemp(join(tmpdir(), 'prism-service-profile-'))
+  fixtureRoots.push(root)
   let id = 0
   return {
     root,
@@ -106,4 +110,83 @@ describe('ServiceProfileStore', () => {
     expect(registry.defaults.moonshot).toBeUndefined()
     await expect(store.loadCredentialForProject('moonshot', { moonshot: 'profile-1' })).rejects.toThrow('no longer exists')
   })
+  it('does not bypass an explicit missing project profile with a legacy key', async () => {
+    const { root, store } = await fixtureStore()
+    await writeFile(join(root, 'credential.enc'), encryption.encryptString('fixture-legacy-fal-key-1234567890'))
+    await expect(store.loadCredentialForProject('fal', { fal: 'missing-profile' })).rejects.toThrow('no longer exists')
+  })
+
+  it('loads and explicitly migrates the historical flat Fish key through the same owner', async () => {
+    const { root, store } = await fixtureStore()
+    await writeFile(join(root, 'fish-credential.enc'), encryption.encryptString('fixture-flat-fish-key-1234567890'))
+    await expect(store.loadCredentialForProject('fish')).resolves.toBe('fixture-flat-fish-key-1234567890')
+    const registry = await store.listProfiles('fish', true)
+    expect(registry.defaults.fish).toBe('profile-1')
+    await expect(store.loadCredentialForProject('fish')).resolves.toBe('fixture-flat-fish-key-1234567890')
+    await expect(stat(join(root, 'fish-credential.enc'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('keeps active Fish and native ElevenLabs overrides independent', async () => {
+    const { store } = await fixtureStore()
+    await store.addProfile('fish', 'fixture-fish-a-key-1234567890')
+    await store.addProfile('fish', 'fixture-fish-b-key-1234567890')
+    await store.addProfile('elevenlabs', 'fixture-eleven-key-1234567890')
+    await expect(store.loadCredentialForProject('fish', { fish: 'profile-2', elevenlabs: 'profile-3' })).resolves.toBe('fixture-fish-b-key-1234567890')
+    await expect(store.loadCredentialForProject('elevenlabs', { fish: 'profile-2', elevenlabs: 'profile-3' })).resolves.toBe('fixture-eleven-key-1234567890')
+    await expect(store.loadCredentialForProject('fish', { fish: 'profile-3' })).rejects.toThrow('no longer exists')
+  })
+
+  it('reports only the selected default or override rather than any connected account', async () => {
+    const { store } = await fixtureStore()
+    await store.addProfile('fish', 'fixture-fish-a-key-1234567890')
+    await store.addProfile('fish', 'fixture-fish-b-key-1234567890')
+    await store.transitionProfile('profile-1', 'disconnect')
+    await expect(store.isConnectedForProject('fish')).resolves.toBe(false)
+    await expect(store.isConnectedForProject('fish', { fish: 'profile-2' })).resolves.toBe(true)
+    await expect(store.isConnectedForProject('fish', { fish: 'missing' })).resolves.toBe(false)
+    await store.setDefault('fish')
+    await expect(store.isConnectedForProject('fish')).resolves.toBe(false)
+    await store.transitionProfile('profile-2', 'sign-out')
+    await expect(store.isConnectedForProject('fish', { fish: 'profile-2' })).resolves.toBe(false)
+  })
+
+  it('checks connection metadata and key existence without decrypting or migrating at startup', async () => {
+    const { root, store } = await fixtureStore()
+    await store.addProfile('fish', 'fixture-fish-a-key-1234567890')
+    const decryptString = vi.fn(encryption.decryptString)
+    const readOnly = new ServiceProfileStore({ dataRoot: root, encryptString: encryption.encryptString, decryptString })
+    const before = await readFile(join(root, 'service-profiles.json'))
+    await expect(readOnly.isConnectedForProject('fish')).resolves.toBe(true)
+    await expect(readOnly.isConnectedForProject('elevenlabs')).resolves.toBe(false)
+    expect(decryptString).not.toHaveBeenCalled()
+    expect(await readFile(join(root, 'service-profiles.json'))).toEqual(before)
+    await unlink(join(root, 'service-profiles', 'fish', 'profile-1.enc'))
+    await expect(readOnly.isConnectedForProject('fish')).resolves.toBe(false)
+  })
+
+  it('blocks ambiguous legacy layouts and leaves both encrypted files untouched', async () => {
+    const { root, store } = await fixtureStore()
+    const flat = join(root, 'fish-credential.enc'), nested = join(root, 'service-credentials', 'fish.enc')
+    await mkdir(join(root, 'service-credentials'), { recursive: true })
+    await writeFile(flat, encryption.encryptString('fixture-flat-key-123456789012'))
+    await writeFile(nested, encryption.encryptString('fixture-nested-key-1234567890'))
+    await expect(store.isConnectedForProject('fish')).resolves.toBe(false)
+    await expect(store.loadCredentialForProject('fish')).rejects.toThrow(/multiple legacy/i)
+    await expect(store.listProfiles('fish', true)).rejects.toThrow(/multiple legacy/i)
+    expect((await readFile(flat)).toString()).toBe('encrypted:fixture-flat-key-123456789012')
+    expect((await readFile(nested)).toString()).toBe('encrypted:fixture-nested-key-1234567890')
+    expect((await store.listProfiles('fish', false)).profiles).toEqual([])
+  })
+
+  it('does not revive an old legacy key after deleting the last modern profile', async () => {
+    const { root, store } = await fixtureStore()
+    await store.addProfile('fish', 'fixture-modern-fish-key-1234567890')
+    await writeFile(join(root, 'fish-credential.enc'), encryption.encryptString('fixture-old-fish-key-1234567890'))
+    await store.transitionProfile('profile-1', 'delete')
+    await expect(store.isConnectedForProject('fish')).resolves.toBe(false)
+    await expect(store.loadCredentialForProject('fish')).rejects.toThrow(/Choose/)
+    expect((await store.listProfiles('fish', true)).profiles).toEqual([])
+    expect(await stat(join(root, 'fish-credential.enc'))).toBeTruthy()
+  })
+
 })

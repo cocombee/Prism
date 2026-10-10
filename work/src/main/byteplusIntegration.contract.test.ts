@@ -20,10 +20,10 @@ describe('BytePlus completed integration contracts', () => {
     expect(main).toContain("import { runBytePlusTaskAndDownload }")
     expect(main).toContain("if (videoModel.provider === 'byteplus') return runBytePlusGeneration(request, videoModel, signal)")
     expect(main).toContain("loadServiceCredential('byteplus'")
-    expect(main).toContain('fetch: (input, init) => net.fetch(input, init)')
+    expect(main).toContain("fetch: (input, init) => { if (init?.method === 'POST') runtimeServiceFailures.assertCurrent('byteplus'); return net.fetch(input, init) }")
     expect(main).toContain("downloadResult(url, 'video/mp4'")
     expect(main).toContain("rememberServiceFailure('byteplus'")
-    expect(main).toContain('const result = await fal.subscribe(modelId, {')
+    expect(main).toContain('const result = await subscribeOwnedFalClient(client, modelId, {')
     expect(main).toContain("message: 'Submitting securely to fal.ai…'")
   })
 
@@ -34,7 +34,7 @@ describe('BytePlus completed integration contracts', () => {
     expect(nodeNext).toContain('const billingProvider: ServiceProvider = generationServiceProvider(data)')
     expect(appNext).toContain('const providerName = providerDisplayName(provider)')
     expect(appNext).toContain('const providerName = providerDisplayName(generationProvider)')
-    expect(nodeNext).toContain("billingProvider === 'byteplus' ? 'BytePlus Seedance'")
+    expect(nodeNext).toContain('const providerName = providerDisplayName(billingProvider)')
   })
 
   it('keeps BytePlus cost unavailable and direct menu groups distinct', () => {

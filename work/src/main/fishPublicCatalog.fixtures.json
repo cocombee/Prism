@@ -1,0 +1,37 @@
+{
+  "source": {
+    "url": "https://docs.fish.audio/api-reference/openapi.json",
+    "sha256": "3eabe03344ccf613e5c370511ae9a536a715fdafbb239c36fd9f1f3eb3f2aebe",
+    "capturedAt": "2026-10-09"
+  },
+  "document": {
+    "openapi": "3.1.0",
+    "paths": {
+      "/v1/tts": {
+        "post": {
+          "parameters": [
+            {
+              "in": "header",
+              "name": "model",
+              "description": "Specify which TTS model to use. Use `s2.1-pro-free` for the free developer tier. `drama-3-preview` is a preview model; its behavior and availability may change. If omitted or set to an unrecognized value, the request falls back to `s2.1-pro`.",
+              "required": false,
+              "schema": {
+                "default": "s2.1-pro",
+                "enum": [
+                  "s1",
+                  "s2-pro",
+                  "s2.1-pro",
+                  "s2.1-pro-free",
+                  "drama-3-preview"
+                ],
+                "title": "Model",
+                "type": "string"
+              },
+              "deprecated": false
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,3 +1,21 @@
+import { ProviderAvailabilityContext } from './ProviderAvailabilityContext'
+import { higgsfieldJobReadinessFailures, type HiggsfieldJobsView, type HiggsfieldJobCommand } from '../../shared/higgsfieldJobs'
+import { selectHiggsfieldBinding, preserveHiggsfieldSelection, higgsfieldPresetReadinessFailures, higgsfieldInputReadinessFailures, reconcileHiggsfieldNodeBinding, resetHiggsfieldBinding } from '../../shared/higgsfieldNodeBinding'
+import type { HiggsfieldPreset } from '../../shared/higgsfieldNative'
+import { isHiggsfieldRemoteUncertainty, higgsfieldModel } from '../../shared/higgsfieldNative'
+import type { HiggsfieldContractView } from '../../shared/higgsfieldInputContract'
+import { HiggsfieldContractStore } from './higgsfieldContractStore'
+import { workflowSaveOwner } from '../../shared/workflowSaveOwnership'
+import { createWorkflowSaveCoordinator, type WorkflowSaveSnapshot } from './workflowSaveCoordinator'
+import { loadProjectActivationState } from './projectActivationState'
+import { fishAvailabilityError, fishSampleRateOptions, fishBitrateOptions } from '../../shared/fishAudio'
+import { isElevenDialogue } from '../../shared/elevenDialogue'
+import { generationCallCount, generationResultMedia } from '../../shared/generationResultMedia'
+import { FalContractStore } from './falContractStore'
+import { reconcileFalNodeBinding, preserveFalNativeSelection, type FalNativeNodeState } from '../../shared/falNodeBinding'
+import { falNativeFlowForKind } from '../../shared/falNativeExecution'
+import { falProductionFlow } from '../../shared/falModelFlow'
+import type { FalSchemaContract } from '../../shared/falSchemaBinding'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import {
   addEdge,
@@ -110,7 +128,7 @@ import type {
   ElementView,
 } from '../../shared/types'
 import type { AssetBatchInspection, AssetBatchKind } from '../../shared/assetBatch'
-import { CompanyIcon, GeneratorInputIcon, generatorInputLabel, GroupedMenuSelect, hasMaterializedAsset, IMAGE_RATIOS, modelCompanyFor, NANO_IMAGE_RATIOS, NodeCard, NodeRuntimeContext, normalizedImageRatio, normalizedVideoDuration, PlayTooltip, RerunIcon, SimpleMenuSelect, StopIcon, videoDurationOptions, VIDEO_MODEL_MENU_GROUPS } from './NodeCardNext'
+import { HiggsfieldRecoveryControls, HiggsfieldFields, videoModelGroups, type HiggsfieldPresetView, FalNativeFields, liveFalModelGroups, CompanyIcon, GeneratorInputIcon, generatorInputLabel, GroupedMenuSelect, hasMaterializedAsset, IMAGE_RATIOS, modelCompanyFor, NANO_IMAGE_RATIOS, NodeCard, NodeRuntimeContext, normalizedImageRatio, normalizedVideoDuration, PlayTooltip, RerunIcon, SimpleMenuSelect, StopIcon, videoDurationOptions, videoDurationMenuOptions, VIDEO_MODEL_MENU_GROUPS, VoiceModelSelect, SoundModelSelect, DirectElevenVoiceSelect, DirectElevenLanguageSelect, directAudioFormatLabel } from './NodeCardNext'
 import { PortRouteContext } from './NodePort'
 import { ProviderPromptPreview } from './ProviderPromptPreview'
 import { TaggedPromptTextarea } from './TaggedPromptTextarea'
@@ -122,7 +140,7 @@ import { generationTimingKey, learnedGenerationSeconds } from '../../shared/gene
 import { defaultVideoRatio, knownOutputFrameRate, motionCadenceOptions, normalizedMotionCadence, referenceCapableVideoEngine, resolvedVideoRatio, resolveVideoModel, VIDEO_MODELS } from '../../shared/videoModels'
 import { generationServiceProvider } from '../../shared/generationServiceProvider'
 import { modelDisplayName } from '../../shared/modelNames'
-import { curatedAssistantModels, type AssistantProvider } from '../../shared/assistantModels'
+import type { AssistantProvider } from '../../shared/assistantModels'
 import { ASSISTANT_PROVIDER_GROUPS, assistantCatalogsWithSavedSelection, resolveAssistantSelection, type AssistantCatalogs } from '../../shared/assistantProviderSelection'
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, canvasPanButtons, EDGE_ACTION_HOVER_DELAY_MS, isMiddleMouseButton, isMiddleMousePressed, isTextEntryTarget, optionWheelZoomViewport, shouldEndMiddleMousePan, shouldZoomCanvasFromWheel, type CanvasInteractionTool } from '../../shared/canvasInteractions'
 import { nativeTextHistoryAction } from '../../shared/textEditorSelection'
@@ -144,7 +162,7 @@ import { migrateSemanticAssetLifecycleMetadata, semanticAssetGenerationPatch, se
 import { reusableSaveMustCopyReference } from '../../shared/reusableEditorDraft'
 import { ELEVEN_V3_LANGUAGES, normalizedElevenV3LanguageCode } from '../../shared/voiceLanguages'
 import { magneticNodePosition, placeEqualGapLabels, type MagneticGuide } from '../../shared/magneticGuides'
-import { ELEVEN_AUDIO_OUTPUT_FORMATS, ELEVEN_TEXT_NORMALIZATION_OPTIONS, ELEVEN_V3_BUILT_IN_VOICES, FISH_AUDIO_FORMATS, FISH_LATENCY_OPTIONS, FISH_MP3_BITRATES, FISH_OPUS_BITRATES, FISH_SAMPLE_RATES, FISH_TTS_MODELS } from '../../shared/providerOptions'
+import { ELEVEN_AUDIO_OUTPUT_FORMATS, ELEVEN_TEXT_NORMALIZATION_OPTIONS, ELEVEN_V3_BUILT_IN_VOICES, FISH_AUDIO_FORMATS, FISH_LATENCY_OPTIONS } from '../../shared/providerOptions'
 import { compatibleNodeSources, compatibleNodeTargets, compatibleSourceHandle, compatibleTargetHandle, connectionCompatibilityError, inputCardinalityError, nodeConnectionError, outputCardinalityError, outputSignalFor, pruneSurplusInputEdges, recommendedVideoEngineForSource, reconcileDynamicInputEdges, sourceConnectionDataForInput } from '../../shared/nodeConnections'
 import { connectedInputRule, workflowTag } from '../../shared/inputRules'
 import type { InputFidelity } from '../../shared/inputRules'
@@ -155,6 +173,7 @@ import { applyStoryboardBatchResponse, applyStoryboardRewrites, buildStoryboardC
 import { applySuccessfulStoryboardRevamps, migrateStoryboardPromptVersions, selectedStoryboardPrompt } from '../../shared/storyboardPromptVersions'
 import { applyGeneratorLocalDurationPatch } from '../../shared/storyboardDurationMutation'
 import { providerDisplayName } from '../../shared/providerErrors'
+import { audioGenerationLabel, directElevenAvailabilityError, elevenSupportsSpeed, ELEVEN_DIRECT_OUTPUT_FORMATS, isDirectElevenAudio } from '../../shared/elevenLabsAudio'
 import { bytePlusActivationMessage } from '../../shared/byteplusAvailability'
 import { mergeLiveGeneratedResults, recoverInterruptedGenerationNodes } from '../../shared/workflowRunRecovery'
 import { effectiveFalImageModel, FAL_REFERENCE_IMAGE_MODELS, generationMediaInputCount, semanticImageRequestControls } from '../../shared/imageModels'
@@ -187,6 +206,9 @@ import { projectServiceProfileSelection } from '../../shared/serviceProfiles'
 import { recoverCharacterSemanticConnectionAtEnd } from './characterSemanticConnectEnd'
 import { activeVideoPromptMode, migrateVideoUserSeed, resetManualPrompt as resetManualPromptState, switchVideoPromptMode, videoPromptCompileFingerprint, type VideoPromptMode } from '../../shared/videoPromptMode'
 import { startStartupHydration } from './startupHydration'
+import { startServiceAvailabilityRefresh } from './serviceAvailabilityRefresh'
+import { createServiceResponseScope } from './serviceResponseScope'
+import { createProviderProfileReadiness } from './providerProfileReadiness'
 
 const EQUAL_GAP_ARROW_EDGE_GAP_PX = 2
 const EQUAL_GAP_ARROW_SIZE_PX = 4
@@ -455,6 +477,7 @@ function replaceRenamedAssetInNode(node: StudioNode, previousPath: string, asset
 }
 
 const SERVICE_CATALOG: Array<{ id: ServiceProvider; name: string; company: string; description: string; capabilities: string[]; placeholder: string }> = [
+  { id: 'higgsfield', name: 'Higgsfield', company: 'Direct visual generation', description: 'Native Genjutsu source-video transformation with ordered image references and current style presets.', capabilities: ['Video', 'Genjutsu', 'References'], placeholder: 'Paste KEY_ID:KEY_SECRET' },
   { id: 'fal', name: 'fal.ai', company: 'Generative media', description: 'Image, video and audio generation models used by canvas generator nodes.', capabilities: ['Image', 'Video', 'Audio'], placeholder: 'Paste fal.ai API key' },
   { id: 'byteplus', name: 'ByteDance Seedance · BytePlus', company: 'Direct video generation', description: 'Direct Seedance video generation through the international BytePlus ModelArk API.', capabilities: ['Video', 'Seedance', 'Multimodal'], placeholder: 'Paste BytePlus API key' },
   { id: 'omniroute', name: 'OmniRoute', company: 'Local AI gateway', description: 'Local live text-model catalog for Storyboard and prompt enhancement. Provider credentials remain inside OmniRoute.', capabilities: ['Prompt rewrite', 'Live models'], placeholder: '' },
@@ -463,6 +486,7 @@ const SERVICE_CATALOG: Array<{ id: ServiceProvider; name: string; company: strin
   { id: 'google', name: 'Google Gemini', company: 'Images and intelligence', description: 'Gemini image generation and editing, plus multimodal prompt enhancement without routing through fal.ai.', capabilities: ['Gemini Image', 'Image edit', 'Multimodal'], placeholder: 'Paste Google AI API key' },
   { id: 'deepseek', name: 'DeepSeek', company: 'Prompt intelligence', description: 'Live DeepSeek API models for prompt enhancement and storyboard rewriting.', capabilities: ['Prompt rewrite', 'Reasoning'], placeholder: 'Paste DeepSeek API key' },
   { id: 'moonshot', name: 'Kimi', company: 'Moonshot AI intelligence', description: 'Live Kimi API models for prompt enhancement and storyboard rewriting.', capabilities: ['Prompt rewrite', 'Long context'], placeholder: 'Paste Moonshot API key' },
+  { id: 'elevenlabs', name: 'ElevenLabs', company: 'Direct voice and sound', description: 'Live speech models and voice IDs, plus direct Sound Effects v2 generation.', capabilities: ['Voice', 'Sound effects', 'Live models'], placeholder: 'Paste ElevenLabs API key' },
   { id: 'fish', name: 'Fish Audio', company: 'Voice and speech', description: 'Voice cloning and expressive S1/S2 Pro text-to-speech for Voiceover nodes.', capabilities: ['Voice clone', 'TTS'], placeholder: 'Paste Fish Audio API key' },
 ]
 
@@ -484,8 +508,8 @@ function AssetTypeGlyph({ type, size = 18 }: { type: AssetTypeFilter; size?: num
   return <Icon size={size} />
 }
 
-const emptyServiceStatus: Record<ServiceProvider, boolean> = { fal: false, byteplus: false, fish: false, omniroute: false, openai: false, anthropic: false, google: false, deepseek: false, moonshot: false }
-const emptyServiceDrafts: Record<ServiceProvider, string> = { fal: '', byteplus: '', fish: '', omniroute: '', openai: '', anthropic: '', google: '', deepseek: '', moonshot: '' }
+const emptyServiceStatus: Record<ServiceProvider, boolean> = { higgsfield: false, fal: false, byteplus: false, fish: false, omniroute: false, openai: false, anthropic: false, google: false, deepseek: false, moonshot: false, elevenlabs: false }
+const emptyServiceDrafts: Record<ServiceProvider, string> = { higgsfield: '', fal: '', byteplus: '', fish: '', omniroute: '', openai: '', anthropic: '', google: '', deepseek: '', moonshot: '', elevenlabs: '' }
 
 const AUDIO_OUTPUT_FORMATS = ELEVEN_AUDIO_OUTPUT_FORMATS
 
@@ -525,9 +549,10 @@ function initialData(kind: NodeKind): StudioNodeData {
     resolution: kind === 'video-generator' ? '720p' : undefined,
     bitrateMode: 'standard',
     videoQuality: 'high',
-    voice: kind === 'voiceover' ? 'Rachel' : undefined,
-    voiceEngine: kind === 'voiceover' ? 'elevenlabs' : undefined,
-    languageCode: kind === 'voiceover' ? 'eng' : undefined,
+    voice: undefined,
+    voiceEngine: kind === 'voiceover' ? 'elevenlabs-direct' : undefined,
+    audioProvider: kind === 'sound-effects' ? 'elevenlabs' : undefined,
+    languageCode: undefined,
     fishModel: kind === 'voiceover' ? 's2-pro' : undefined,
     fishTemperature: kind === 'voiceover' ? 0.7 : undefined,
     fishTopP: kind === 'voiceover' ? 0.7 : undefined,
@@ -571,6 +596,7 @@ const RESETTABLE_NODE_SETTING_KEYS = [
 ] as const satisfies readonly (keyof StudioNodeData)[]
 
 function resetNodeSettingsPatch(data: StudioNodeData): Partial<StudioNodeData> {
+  if (data.higgsfieldNative) return { higgsfieldNative: resetHiggsfieldBinding(data.higgsfieldNative), runState: 'idle', progress: undefined, error: undefined }
   const defaults = initialData(data.kind)
   const patch: Partial<StudioNodeData> = { runState: 'idle', progress: undefined, error: undefined }
   for (const key of RESETTABLE_NODE_SETTING_KEYS) patch[key] = defaults[key] as never
@@ -718,7 +744,24 @@ export function App() {
   const [hasCredential, setHasCredential] = useState(false)
   const [hasFishCredential, setHasFishCredential] = useState(false)
   const [serviceConnections, setServiceConnections] = useState<Record<ServiceProvider, boolean>>(emptyServiceStatus)
+  const mediaProviderAvailable = useCallback((provider: ServiceProvider) => serviceConnections[provider], [serviceConnections])
+  const serviceAvailabilityStop = useRef<(() => void) | undefined>(undefined)
+  const serviceReadiness = useRef(createProviderProfileReadiness())
+  const serviceBusyOperations = useRef({ count: 0 })
+  const serviceResponseScope = useRef<ReturnType<typeof createServiceResponseScope> | null>(null)
+  if (!serviceResponseScope.current) serviceResponseScope.current = createServiceResponseScope()
   const [serviceModels, setServiceModels] = useState<Partial<Record<ServiceProvider, ServiceModelAvailability>>>({})
+  const falContractStore = useRef<FalContractStore | null>(null)
+  if (!falContractStore.current) falContractStore.current = new FalContractStore()
+  const higgsfieldContractStore = useRef<HiggsfieldContractStore | null>(null)
+  if (!higgsfieldContractStore.current) higgsfieldContractStore.current = new HiggsfieldContractStore()
+  const higgsfieldContractRevisions = useRef(new Map<string, number>())
+  const [higgsfieldContracts, setHiggsfieldContracts] = useState<Record<string, HiggsfieldContractView & { current: () => boolean }>>({})
+  const [higgsfieldJobState, setHiggsfieldJobState] = useState<HiggsfieldJobsView & { current?: () => boolean }>({})
+  const higgsfieldJobRevision = useRef(0)
+  const higgsfieldJobOwner = useRef('')
+  const [higgsfieldPresetState, setHiggsfieldPresetState] = useState<HiggsfieldPresetView & { current?: () => boolean }>({})
+  const [falContracts, setFalContracts] = useState<Record<string, { contract?: FalSchemaContract; error?: string; loading?: boolean; current: () => boolean }>>({})
   const [serviceAccounts, setServiceAccounts] = useState<Partial<Record<ServiceProvider, ServiceAccountStatus>>>({})
   const [serviceProfiles, setServiceProfiles] = useState<ServiceProfileRegistry>({ schemaVersion: 1, profiles: [], defaults: {} })
   const [serviceDrafts, setServiceDrafts] = useState<Record<ServiceProvider, string>>(emptyServiceDrafts)
@@ -746,14 +789,71 @@ export function App() {
   const [canvases, setCanvases] = useState<WorkspaceCanvas[]>([])
   const [activeCanvasId, setActiveCanvasId] = useState('')
 
-  const applyServiceProfiles = useCallback((registry: ServiceProfileRegistry, provider: ServiceProvider, selectedProject = project) => {
-    setServiceProfiles(registry)
-    const selection = projectServiceProfileSelection(registry, selectedProject || undefined, provider)
-    setServiceConnections((current) => ({ ...current, [provider]: selection.available }))
-    if (provider === 'fal') setHasCredential(selection.available)
-    if (provider === 'fish') setHasFishCredential(selection.available)
+  const refreshServiceAccount = useCallback(async (provider: ServiceProvider, ownsOperation: () => boolean) => {
+    if (!ownsOperation()) return
+    const acceptsAccount = serviceResponseScope.current!.begin(provider, 'account')
+    try {
+      const account = await window.prism.services.account(provider)
+      if (ownsOperation() && acceptsAccount()) setServiceAccounts((current) => ({ ...current, [provider]: account }))
+    } catch { /* Read-only diagnostics must not create an unhandled rejection. */ }
+  }, [])
+
+  useEffect(() => () => { serviceResponseScope.current!.invalidate(); serviceAvailabilityStop.current?.() }, [])
+
+  const refreshServiceConnections = useCallback(async (ownsOperation: () => boolean = () => true) => {
+    const activation = projectActivation.current
+    return serviceReadiness.current.refresh(
+      () => projectActivation.current === activation && ownsOperation(),
+      () => window.prism.services.list(),
+      (connections) => {
+        const status = { ...emptyServiceStatus }
+        connections.forEach((connection) => { status[connection.id] = connection.connected })
+        setServiceConnections(status)
+        setHasCredential(status.fal)
+        setHasFishCredential(status.fish)
+      },
+    )
+  }, [])
+
+  const beginServiceBusyOperation = useCallback(() => {
+    const owner = serviceBusyOperations.current
+    owner.count += 1
+    setServiceBusy(true)
+    let complete = false
+    return () => {
+      if (complete) return
+      complete = true
+      owner.count -= 1
+      if (serviceBusyOperations.current === owner) setServiceBusy(owner.count > 0)
+    }
+  }, [])
+
+  const restoreServiceConnectionsAfterFailure = useCallback(async (ownsOperation: () => boolean) => {
+    // Keep the original action error if a current read also fails.
+    try { await refreshServiceConnections(ownsOperation) } catch { /* Last verified fail-closed readiness remains. */ }
+  }, [refreshServiceConnections])
+
+  const beginServiceProfileOperation = useCallback((provider: ServiceProvider) => {
+    serviceReadiness.current.invalidate()
+    serviceResponseScope.current!.invalidate(provider)
+    serviceAvailabilityStop.current?.()
+    setServiceConnections((current) => ({ ...current, [provider]: false }))
+    if (provider === 'fal') setHasCredential(false)
+    if (provider === 'fish') setHasFishCredential(false)
+    setServiceModels((current) => ({ ...current, [provider]: undefined }))
     setServiceAccounts((current) => ({ ...current, [provider]: undefined }))
-  }, [project])
+    return serviceResponseScope.current!.capture(provider)
+  }, [])
+
+  const applyServiceProfiles = useCallback(async (registry: ServiceProfileRegistry, provider: ServiceProvider, ownsOperation: () => boolean) => {
+    if (!ownsOperation()) return false
+    setServiceProfiles((current) => ({
+      ...current,
+      profiles: [...current.profiles.filter((profile) => profile.provider !== provider), ...registry.profiles.filter((profile) => profile.provider === provider)],
+      defaults: { ...current.defaults, [provider]: registry.defaults[provider] },
+    }))
+    return refreshServiceConnections(ownsOperation)
+  }, [refreshServiceConnections])
 
   useEffect(() => {
     if (!Object.values(assetRelinkStates).includes('finding')) return
@@ -906,6 +1006,8 @@ export function App() {
         const source = nodes.find((node) => node.id === edge.source)
         const target = nodes.find((node) => node.id === edge.target)
         if (!source || !target) return edge
+        // A live/native contract owns its sockets. Never remap or discard an unavailable saved binding.
+        if (target.data.falNative || target.data.higgsfieldNative) return edge
 
         const signal = outputSignalFor(source.data, edge.sourceHandle)
         const expectedSourceHandle = compatibleSourceHandle(source.data.kind, signal)
@@ -1010,9 +1112,11 @@ export function App() {
   const [skipDeleteReminder, setSkipDeleteReminder] = useState(false)
   const skippedDeleteCategories = useRef(new Set<DeleteCategory>())
   const loaded = useRef(false)
+  const projectActivation = useRef(0)
   const saveTimer = useRef<number | null>(null)
   const lastAutosaveAt = useRef(Date.now())
-  const savePromise = useRef<Promise<boolean> | null>(null)
+  const saveSnapshot = useRef<(() => WorkflowSaveSnapshot | null) | null>(null)
+  const saveCoordinator = useRef<ReturnType<typeof createWorkflowSaveCoordinator> | null>(null)
   const mutationVersion = useRef(0)
   const lastPersistedMutationVersion = useRef(0)
   const suppressNextDirtyMark = useRef(false)
@@ -1288,8 +1392,35 @@ export function App() {
   }, [deleteRequest, skipDeleteReminder])
 
   const activateProject = useCallback(async (selectedProject: ProjectWorkspace, refreshRecentProjects = true) => {
+        const activation = ++projectActivation.current
+        serviceReadiness.current.invalidate()
+        serviceBusyOperations.current = { count: 0 }
+        setServiceBusy(false)
+        const ownsConnections = serviceReadiness.current.capture()
+        try {
+        serviceResponseScope.current!.invalidate()
+        serviceAvailabilityStop.current?.()
+        setServiceModels({})
+        setServiceAccounts({})
         loaded.current = false
-        const [stored, entries, assetStatus, legacyStatus] = await Promise.all([window.prism.workflows.load(), window.prism.history.list(), window.prism.assets.status(), window.prism.projects.legacyImportStatus()])
+        const activationState = await loadProjectActivationState({
+          isCurrent: () => projectActivation.current === activation,
+          loadWorkflow: () => window.prism.workflows.load(workflowSaveOwner(selectedProject)),
+          readEntries: () => window.prism.history.list(),
+          readAssets: () => window.prism.assets.status(),
+          readLegacyStatus: () => window.prism.projects.legacyImportStatus(),
+          readConnections: () => window.prism.services.list(),
+        })
+        if (!activationState) return
+        const { stored, entries, assetStatus, legacyStatus, connections } = activationState
+        if (projectActivation.current !== activation) return
+        const status = { ...emptyServiceStatus }
+        connections.forEach((connection) => { status[connection.id] = connection.connected })
+        if (ownsConnections()) {
+          setServiceConnections(status)
+          setHasCredential(status.fal)
+          setHasFishCredential(status.fish)
+        }
         const document = stored || freshWorkflow()
         const sourcePages: CanvasPage[] = document.pages?.length ? document.pages : [{
           id: crypto.randomUUID(),
@@ -1313,6 +1444,7 @@ export function App() {
           const canonicalName = normalizeLogicalAssetName(asset.metadata?.assetName || asset.name)
           if (!canonicalName || asset.metadata?.assetName === canonicalName) continue
           migratedAssetRecords.set(asset.id, await window.prism.assets.updateMetadata(asset.id, { ...asset.metadata, assetName: canonicalName }))
+          if (projectActivation.current !== activation) return
         }
         const legacyLogicalAssetMigrations = new Map<string, { name: string; assetIds: Set<string> }>()
         const slug = normalizeLogicalAssetName
@@ -1330,6 +1462,7 @@ export function App() {
             const record = migratedAssetRecords.get(assetId) || assetStatus.find((item) => item.asset.id === assetId)?.asset
             if (!record || record.metadata?.assetName === migration.name) continue
             migratedAssetRecords.set(assetId, await window.prism.assets.updateMetadata(assetId, { ...record.metadata, assetName: migration.name }))
+            if (projectActivation.current !== activation) return
           }
         }
         const migrateLegacyNode = (node: StudioNode): StudioNode => {
@@ -1371,7 +1504,7 @@ export function App() {
         lastObservedViewport.current = selectedPage.viewport
         setWorkflow(document)
         setProject(selectedProject)
-        if (refreshRecentProjects) void window.prism.projects.recent().then(setRecentProjects).catch(() => undefined)
+        if (refreshRecentProjects) void window.prism.projects.recent().then((projects) => { if (projectActivation.current === activation) setRecentProjects(projects) }).catch(() => undefined)
         setPages(migratedPages)
         setCanvases(migratedCanvases)
         setActiveCanvasId(selectedCanvas.id)
@@ -1390,40 +1523,47 @@ export function App() {
         saveLifecycle.current?.replaceClean()
         lastAutosaveAt.current = Date.now()
         loaded.current = true
-        window.setTimeout(() => { void setViewport(selectedPage.viewport, { duration: 0 }) }, 50)
+        window.setTimeout(() => { if (projectActivation.current === activation) void setViewport(selectedPage.viewport, { duration: 0 }) }, 50)
+        } catch (error) {
+          if (projectActivation.current !== activation) return
+          throw error
+        }
   }, [setEdges, setNodes, setViewport])
 
   useEffect(() => {
+    let active = true
+    let startupActivation = projectActivation.current
+    const isCurrent = () => active && projectActivation.current === startupActivation
+    const stopProgress = window.prism.generation.onProgress(({ nodeId, message, status }) => {
+      setNodes((current) => current.map((node) => node.id === nodeId
+        ? { ...node, data: { ...node.data, progress: status === 'remote-unknown' ? undefined : message, ...(status === 'remote-unknown' ? { error: message } : {}), runState: status === 'remote-unknown' ? 'error' : status === 'queued' ? 'queued' : 'running' } }
+        : node))
+    })
     void startStartupHydration({
+      isCurrent,
       currentProject: () => window.prism.projects.current(),
       recentProjects: () => window.prism.projects.recent(),
       services: () => window.prism.services.list(),
       profileRegistries: () => Promise.all(SERVICE_CATALOG.map((service) => window.prism.services.profiles(service.id, false))),
       onRecentProjects: (projects) => setRecentProjects([...projects]),
-      onEssentialState: async ({ currentProject: storedProject, services: connections, profileRegistries }) => {
-        const status = { ...emptyServiceStatus }
-        connections.forEach((connection) => { status[connection.id] = connection.connected })
-        const profiles = profileRegistries[profileRegistries.length - 1] || { schemaVersion: 1 as const, profiles: [], defaults: {} }
-        for (const service of SERVICE_CATALOG) {
-          if (profiles.profiles.some((profile) => profile.provider === service.id)) status[service.id] = projectServiceProfileSelection(profiles, storedProject || undefined, service.id).available
+      onEssentialState: async ({ currentProject: storedProject, profileRegistries }) => {
+        setServiceProfiles(profileRegistries[profileRegistries.length - 1] || { schemaVersion: 1 as const, profiles: [], defaults: {} })
+        if (storedProject) {
+          const activation = activateProject(storedProject, false)
+          startupActivation = projectActivation.current
+          await activation
+        } else {
+          await refreshServiceConnections(isCurrent)
         }
-        setServiceProfiles(profiles)
-        setServiceConnections(status)
-        setHasCredential(status.fal)
-        setHasFishCredential(status.fish)
-        if (storedProject) await activateProject(storedProject, false)
-        setProjectReady(true)
+        if (isCurrent()) setProjectReady(true)
       },
     }).catch((error) => {
+      if (!isCurrent()) return
       setProjectError(error instanceof Error ? error.message : String(error))
       setProjectReady(true)
     })
-    return window.prism.generation.onProgress(({ nodeId, message, status }) => {
-      setNodes((current) => current.map((node) => node.id === nodeId
-        ? { ...node, data: { ...node.data, progress: message, runState: status === 'queued' ? 'queued' : 'running' } }
-        : node))
-    })
-  }, [activateProject, setNodes])
+    return () => { active = false; stopProgress() }
+  }, [activateProject, refreshServiceConnections, setNodes])
 
   useEffect(() => window.prism.projects.onOpened((openedProject) => { void activateProject(openedProject) }), [activateProject])
 
@@ -1443,28 +1583,50 @@ export function App() {
 
   useEffect(() => {
     if (!settingsOpen) return
+    let active = true
+    const activation = projectActivation.current
+    const ownsReadiness = serviceReadiness.current.capture()
+    let refreshStarted = false
+    const isCurrent = () => active && projectActivation.current === activation && ownsReadiness()
     void (async () => {
       try {
         let registry = serviceProfiles
-        for (const service of SERVICE_CATALOG) registry = await window.prism.services.profiles(service.id, true)
-        for (const service of SERVICE_CATALOG) applyServiceProfiles(registry, service.id)
-      } catch (error) { setServiceError(error instanceof Error ? error.message : String(error)) }
+        for (const service of SERVICE_CATALOG) {
+          if (!isCurrent()) return
+          registry = await window.prism.services.profiles(service.id, true)
+        }
+        if (!isCurrent()) return
+        setServiceProfiles(registry)
+        // The refresh owns a new revision and suppresses any superseded failure.
+        refreshStarted = true
+        await refreshServiceConnections(() => active && projectActivation.current === activation)
+      } catch (error) { if (active && projectActivation.current === activation && (refreshStarted || ownsReadiness())) setServiceError(error instanceof Error ? error.message : String(error)) }
     })()
-  }, [applyServiceProfiles, settingsOpen])
+    return () => { active = false }
+  }, [refreshServiceConnections, settingsOpen, project?.id, project?.rootPath])
 
   useEffect(() => {
     const connected = (Object.keys(serviceConnections) as ServiceProvider[])
-      .filter((provider) => provider !== 'omniroute' && serviceConnections[provider])
-    connected.forEach((provider) => {
-      void window.prism.services.models(provider).then((availability) => setServiceModels((current) => ({ ...current, [provider]: availability }))).catch(() => undefined)
+      .filter((provider) => serviceConnections[provider])
+    const stop = startServiceAvailabilityRefresh({
+      connected,
+      publicCatalogs: ['fish', 'higgsfield'],
+      models: (provider) => window.prism.services.models(provider),
+      account: (provider) => window.prism.services.account(provider),
+      requestGuard: (provider, channel) => serviceResponseScope.current!.begin(provider, channel),
+      onModelsError: (provider, error) => {
+        if (error instanceof Error && error.name === 'AbortError') return
+        if (provider === 'higgsfield') setServiceModels((current) => ({ ...current, [provider]: { ...current[provider], provider, verified: current[provider]?.verified || false, models: current[provider]?.models || [], catalogStale: true, catalogComplete: false, catalogError: error instanceof Error ? error.message : 'Could not load the official Higgsfield model documents.' } }))
+        if (provider === 'fish') setServiceModels((current) => ({ ...current, [provider]: { ...current[provider], provider, verified: current[provider]?.verified || false, models: current[provider]?.models || [], catalogStale: true, catalogError: error instanceof Error ? error.message : 'Could not load the official Fish Audio contract.' } }))
+        if (provider === 'fal') setServiceModels((current) => ({ ...current, [provider]: { ...current[provider], provider, verified: current[provider]?.verified || false, models: current[provider]?.models || [], catalogStale: true, catalogError: error instanceof Error ? error.message : 'Could not load fal models.' } }))
+        if (provider === 'elevenlabs') setServiceModels((current) => ({ ...current, [provider]: { provider, verified: false, models: [], catalogError: error instanceof Error ? error.message : 'Could not load ElevenLabs models.' } }))
+      },
+      onModels: (provider, availability) => setServiceModels((current) => ({ ...current, [provider]: availability })),
+      onAccount: (provider, account) => setServiceAccounts((current) => ({ ...current, [provider]: account })),
     })
-  }, [serviceConnections])
-
-  useEffect(() => {
-    if (!serviceConnections.omniroute) return
-    void window.prism.services.models('omniroute').then((availability) => setServiceModels((current) => ({ ...current, omniroute: availability }))).catch(() => undefined)
-    void window.prism.services.account('omniroute').then((account) => setServiceAccounts((current) => ({ ...current, omniroute: account }))).catch(() => undefined)
-  }, [serviceConnections.omniroute])
+    serviceAvailabilityStop.current = stop
+    return stop
+  }, [serviceConnections, project?.id, project?.rootPath])
 
   useEffect(() => {
     if (!loaded.current || !project) return
@@ -1528,52 +1690,42 @@ export function App() {
     saveLifecycle.current?.markDirty()
   }, [persistedCanvasFingerprint])
 
-  const persistWorkflow = useCallback((): Promise<boolean> => {
-    if (!loaded.current || !project) return Promise.resolve(true)
-    if (savePromise.current) return savePromise.current
-    if (saveTimer.current) window.clearTimeout(saveTimer.current)
-    lastAutosaveAt.current = Date.now()
-    const savingVersion = mutationVersion.current
-    saveLifecycle.current?.beginSaving()
-    const savedAt = new Date().toISOString()
-    const viewport = getViewport()
-    lastObservedViewport.current = viewport
+  const renderedActivation = projectActivation.current
+  saveSnapshot.current = () => {
+    if (!loaded.current || projectActivation.current !== renderedActivation || !project || !project.documentPath) return null
+    const savedAt = new Date().toISOString(), viewport = getViewport()
     const materializedPages = pages.map((page) => page.id === activePageId
       ? { ...page, nodes, edges, viewport, updatedAt: savedAt }
       : page)
     const materializedCanvases = canvases.map((canvas) => canvas.id === activeCanvasId
       ? { ...canvas, pages: materializedPages, activePageId, updatedAt: savedAt }
       : canvas)
-    const updated: WorkflowDocument = {
-      ...workflow,
-      nodes,
-      edges,
-      viewport,
-      pages: materializedPages,
-      activePageId,
-      canvases: materializedCanvases,
-      activeCanvasId,
-      updatedAt: savedAt,
+    return {
+      owner: workflowSaveOwner(project), activation: renderedActivation, version: mutationVersion.current,
+      fingerprint: JSON.stringify([persistedCanvasFingerprint, viewport]),
+      document: { ...workflow, nodes, edges, viewport, pages: materializedPages, activePageId, canvases: materializedCanvases, activeCanvasId, updatedAt: savedAt },
     }
-    const operation = (async () => {
-      try {
-        await window.prism.workflows.save(updated)
-        setWorkflow(updated)
-        userMutationArmed.current = false
-        saveLifecycle.current?.resolve(mutationVersion.current !== savingVersion)
-        return true
-      } catch (error) {
-        saveLifecycle.current?.reject()
-        setProjectError(error instanceof Error ? error.message : String(error))
-        return false
-      }
-    })()
-    savePromise.current = operation
-    void operation.finally(() => {
-      if (savePromise.current === operation) savePromise.current = null
-    })
-    return operation
-  }, [activeCanvasId, activePageId, canvases, edges, getViewport, nodes, pages, project, workflow])
+  }
+  if (!saveCoordinator.current) saveCoordinator.current = createWorkflowSaveCoordinator({
+    snapshot: () => saveSnapshot.current?.() || null,
+    save: snapshot => window.prism.workflows.save(snapshot.document, snapshot.owner),
+    begin: snapshot => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current)
+      lastAutosaveAt.current = Date.now()
+      lastObservedViewport.current = snapshot.document.viewport
+      saveLifecycle.current?.beginSaving()
+    },
+    saved: (snapshot, upToDate) => {
+      if (upToDate) { setWorkflow(snapshot.document); userMutationArmed.current = false }
+      saveLifecycle.current?.resolve(!upToDate)
+    },
+    failed: (_snapshot, error) => {
+      saveLifecycle.current?.reject()
+      setProjectError(error instanceof Error ? error.message : String(error))
+    },
+  })
+  useEffect(() => () => { saveSnapshot.current = null }, [])
+  const persistWorkflow = useCallback((): Promise<boolean> => saveCoordinator.current!.flush(), [])
 
   useEffect(() => {
     if (!loaded.current || saveState !== 'unsaved') return
@@ -1850,11 +2002,166 @@ export function App() {
     })
   }, [edges, nodes, setEdges, setNodes, updateNodeInternals])
 
+  const loadFalContract = useCallback(async (endpointId: string) => {
+    const current = serviceResponseScope.current!.capture('fal')
+    const scope = serviceResponseScope.current!.identity('fal')
+    setFalContracts(previous => ({ ...previous, [endpointId]: { ...(previous[endpointId]?.current() ? previous[endpointId] : {}), loading: true, current } }))
+    try {
+      const contract = await falContractStore.current!.read(scope, endpointId, () => window.prism.services.falSchema(endpointId), current)
+      if (!current()) return
+      setFalContracts(previous => ({ ...previous, [endpointId]: { contract, current } }))
+      for (const node of nodeLayoutRef.current) if (node.data.falNative?.endpointId === endpointId) {
+        const before = node.data.falNative
+        if (falProductionFlow(contract.category) !== before.flow) { updateNode(node.id, { error: 'The selected model changed its production flow. Review the saved selection.' }); continue }
+        const next = reconcileFalNodeBinding(before, contract)
+        if (JSON.stringify(next) !== JSON.stringify(before)) updateNode(node.id, { falNative: next })
+        window.requestAnimationFrame(() => updateNodeInternals(node.id))
+      }
+    } catch (error) {
+      if (!current()) return
+      setFalContracts(previous => ({ ...previous, [endpointId]: { error: error instanceof Error ? error.message : String(error), current } }))
+    }
+  }, [updateNode, updateNodeInternals])
+
+  const loadHiggsfieldContract = useCallback(async (endpointId: string, refresh = false) => {
+    if (!mediaProviderAvailable('higgsfield')) return
+    try { if (higgsfieldModel(endpointId).kind !== 'seedance') return } catch { return }
+    const owned = serviceResponseScope.current!.capture('higgsfield'), scope = serviceResponseScope.current!.identity('higgsfield')
+    const key = endpointId, revision = (higgsfieldContractRevisions.current.get(key) || 0) + 1
+    higgsfieldContractRevisions.current.set(key, revision)
+    const current = () => owned() && higgsfieldContractRevisions.current.get(key) === revision
+    if (refresh) higgsfieldContractStore.current!.invalidate(scope, endpointId)
+    setHiggsfieldContracts(previous => ({ ...previous, [endpointId]: { ...(previous[endpointId]?.current() ? previous[endpointId] : {}), loading: true, error: undefined, current: owned } }))
+    try {
+      const contract = await higgsfieldContractStore.current!.read(scope, endpointId, () => window.prism.services.higgsfieldSchema(endpointId), owned)
+      if (!current()) return
+      setHiggsfieldContracts(previous => ({ ...previous, [endpointId]: { contract, current: owned } }))
+      for (const node of nodeLayoutRef.current) if (node.data.higgsfieldNative?.endpointId === endpointId) {
+        const before = node.data.higgsfieldNative
+        try {
+          const next = reconcileHiggsfieldNodeBinding(before, contract)
+          if (JSON.stringify(next) !== JSON.stringify(before)) updateNode(node.id, { higgsfieldNative: next })
+          window.requestAnimationFrame(() => updateNodeInternals(node.id))
+        } catch (error) { updateNode(node.id, { error: error instanceof Error ? error.message : String(error) }) }
+      }
+    } catch (error) {
+      if (current()) setHiggsfieldContracts(previous => ({ ...previous, [endpointId]: { error: error instanceof Error ? error.message : String(error), current: owned } }))
+    }
+  }, [mediaProviderAvailable, updateNode, updateNodeInternals])
+
+  const higgsfieldSchema = useCallback((endpointId: string): HiggsfieldContractView => {
+    if (!mediaProviderAvailable('higgsfield')) return { error: 'Enable and connect Higgsfield to load current model inputs.' }
+    const entry = higgsfieldContracts[endpointId]
+    return entry?.current() ? entry : { loading: true }
+  }, [higgsfieldContracts, mediaProviderAvailable])
+
+  const selectFalModel = useCallback((nodeId: string, endpointId: string) => {
+    const node = nodeLayoutRef.current.find(candidate => candidate.id === nodeId)
+    const model = serviceModels.fal?.models.find(candidate => candidate.id === endpointId)
+    const flow = node && falNativeFlowForKind(node.data.kind)
+    if (!node || !model || !flow || falProductionFlow(model.category) !== flow) return
+    const connectedHandles = new Set(edges.filter(edge => edge.target === nodeId).map(edge => edge.targetHandle))
+    const presets = { ...(node.data.falNativePresets || {}), ...(node.data.falNative ? { [node.data.falNative.endpointId]: node.data.falNative } : {}) }
+    const state: FalNativeNodeState = node.data.falNative?.endpointId === endpointId ? node.data.falNative : { ...(presets[endpointId] || { endpointId, label: model.label, flow, values: {}, media: [] }), retiredPorts: nodeInputPorts(node.data).filter(port => connectedHandles.has(port.id)).map(({ id, label, signal }) => ({ id, label, signal })) }
+    updateNode(nodeId, { ...preserveHiggsfieldSelection(node.data), falNative: state, falNativePresets: presets, error: undefined })
+    void loadFalContract(endpointId)
+  }, [edges, loadFalContract, serviceModels.fal, updateNode])
+
+  const refreshHiggsfieldPresets = useCallback(async (refresh = false) => {
+    if (!serviceConnections.higgsfield) return
+    const current = serviceResponseScope.current!.capture('higgsfield')
+    setHiggsfieldPresetState(previous => ({ ...(previous.current?.() ? previous : {}), loading: true, current }))
+    try {
+      const presets: HiggsfieldPreset[] = await window.prism.services.higgsfieldPresets(refresh)
+      if (current()) setHiggsfieldPresetState({ presets, current })
+    } catch (error) {
+      if (current()) setHiggsfieldPresetState(previous => ({ ...(previous.current?.() ? previous : {}), loading: false, error: error instanceof Error ? error.message : String(error), current }))
+    }
+  }, [serviceConnections.higgsfield])
+  const higgsfieldPresets = useCallback((): HiggsfieldPresetView => higgsfieldPresetState.current?.() ? higgsfieldPresetState : { loading: serviceConnections.higgsfield, error: serviceConnections.higgsfield ? undefined : 'Connect Higgsfield to load current presets.' }, [higgsfieldPresetState, serviceConnections.higgsfield])
+  higgsfieldJobOwner.current = JSON.stringify([project?.id, project?.rootPath, activeCanvasId, activePageId])
+  const refreshHiggsfieldJobs = useCallback(async () => {
+    if (!project) return
+    const owner = higgsfieldJobOwner.current, owned = serviceResponseScope.current!.capture('higgsfield'), revision = ++higgsfieldJobRevision.current
+    const current = () => owned() && higgsfieldJobOwner.current === owner
+    setHiggsfieldJobState(previous => ({ ...(previous.current?.() ? previous : {}), loading: true, error: undefined, current }))
+    try {
+      const jobs = await window.prism.generation.higgsfieldJobs()
+      if (current() && revision === higgsfieldJobRevision.current) setHiggsfieldJobState(previous => ({ jobs, loading: false, busy: previous.current?.() ? previous.busy : undefined, current }))
+    } catch (error) {
+      if (current() && revision === higgsfieldJobRevision.current) setHiggsfieldJobState(previous => ({ ...(previous.current?.() ? previous : {}), loading: false, error: error instanceof Error ? error.message : String(error), current }))
+    }
+  }, [project])
+  const higgsfieldJobs = useCallback((): HiggsfieldJobsView => higgsfieldJobState.current?.() ? higgsfieldJobState : { loading: Boolean(project) }, [higgsfieldJobState, project])
+  const applyHiggsfieldJobAction = useCallback(async (command: HiggsfieldJobCommand) => {
+    const owner = higgsfieldJobOwner.current, owned = serviceResponseScope.current!.capture('higgsfield')
+    const current = () => owned() && higgsfieldJobOwner.current === owner
+    setHiggsfieldJobState(previous => ({ ...(previous.current?.() ? previous : {}), busy: command.nodeId, error: undefined, current }))
+    try {
+      const { result } = await window.prism.generation.higgsfieldAction(command)
+      if (!current()) return
+      if (result && nodeLayoutRef.current.some(node => node.id === command.nodeId)) {
+        const generatedResults = mergeLiveGeneratedResults(nodeLayoutRef.current.find(node => node.id === command.nodeId)?.data.generatedResults || [], [{ path: result.outputPath, url: result.outputUrl, type: result.outputType, modelId: result.modelId, createdAt: new Date().toISOString() }])
+        updateNode(command.nodeId, { runState: 'complete', progress: 'Recovered original Higgsfield result', error: undefined, modelId: result.modelId, outputPath: result.outputPath, outputUrl: result.outputUrl, outputType: result.outputType, generatedResults, activeResultIndex: Math.max(0, generatedResults.findIndex(item => item.path === result.outputPath)), runStartedAt: undefined })
+        userMutationArmed.current = true; mutationVersion.current += 1; saveLifecycle.current?.markDirty()
+        const [history, assets] = await Promise.all([window.prism.history.list(), window.prism.assets.list()])
+        if (current()) { setHistory(history); setAssets(assets) }
+      }
+      if (current()) await refreshHiggsfieldJobs()
+    } catch (error) {
+      if (current()) setHiggsfieldJobState(previous => ({ ...(previous.current?.() ? previous : {}), error: error instanceof Error ? error.message : String(error), current }))
+    } finally {
+      if (current()) setHiggsfieldJobState(previous => ({ ...previous, busy: undefined }))
+    }
+  }, [refreshHiggsfieldJobs, updateNode])
+  useEffect(() => { if (project && projectReady) void refreshHiggsfieldJobs() }, [project?.id, project?.rootPath, projectReady, activeCanvasId, activePageId, serviceProfiles, refreshHiggsfieldJobs])
+
+  const selectHiggsfieldModel = useCallback((nodeId: string, endpointId: string) => {
+    const node = nodeLayoutRef.current.find(candidate => candidate.id === nodeId)
+    if (!node || node.data.kind !== 'video-generator') return
+    try {
+      const connected = new Set(edges.filter(edge => edge.target === nodeId).map(edge => edge.targetHandle))
+      const patch = selectHiggsfieldBinding(node.data, endpointId, nodeInputPorts(node.data).filter(port => connected.has(port.id)))
+      updateNode(nodeId, { ...preserveFalNativeSelection(node.data), ...patch, ...(higgsfieldModel(endpointId).kind === 'genjutsu' ? { promptMode: 'manual' as const } : {}), error: undefined })
+      void loadHiggsfieldContract(endpointId)
+      window.requestAnimationFrame(() => updateNodeInternals(nodeId))
+    } catch (error) { updateNode(nodeId, { error: error instanceof Error ? error.message : String(error) }) }
+  }, [edges, loadHiggsfieldContract, updateNode, updateNodeInternals])
+  const selectedHiggsfieldEndpoints = [...new Set(nodes.flatMap(node => node.data.higgsfieldNative && node.data.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/') ? [node.data.higgsfieldNative.endpointId] : []))].sort().join('\n')
+  useEffect(() => {
+    if (!mediaProviderAvailable('higgsfield') || !selectedHiggsfieldEndpoints) return
+    const refresh = () => { for (const endpointId of selectedHiggsfieldEndpoints.split('\n')) void loadHiggsfieldContract(endpointId) }
+    refresh()
+    const timer = window.setInterval(refresh, 10 * 60_000)
+    return () => window.clearInterval(timer)
+  }, [loadHiggsfieldContract, mediaProviderAvailable, selectedHiggsfieldEndpoints, serviceModels.higgsfield, serviceProfiles, project?.id, project?.rootPath])
+  const hasHiggsfieldRestyle = nodes.some(node => node.data.higgsfieldNative?.endpointId === 'higgsfield/genjutsu/restyle/v1.0')
+  useEffect(() => {
+    if (!hasHiggsfieldRestyle || !serviceConnections.higgsfield) return
+    void refreshHiggsfieldPresets()
+    const timer = window.setInterval(() => { void refreshHiggsfieldPresets() }, 10 * 60_000)
+    return () => window.clearInterval(timer)
+  }, [hasHiggsfieldRestyle, refreshHiggsfieldPresets, serviceConnections.higgsfield, serviceModels.higgsfield, serviceProfiles, project?.id, project?.rootPath])
+
+  const falSchema = useCallback((endpointId: string) => {
+    const entry = falContracts[endpointId]
+    return entry?.current() ? entry : { loading: true, contract: undefined, error: undefined }
+  }, [falContracts])
+
+  const selectedFalEndpoints = [...new Set(nodes.flatMap(node => node.data.falNative ? [node.data.falNative.endpointId] : []))].sort().join('\n')
+  useEffect(() => {
+    if (!serviceConnections.fal) return
+    for (const endpointId of selectedFalEndpoints.split('\n').filter(Boolean)) void loadFalContract(endpointId)
+  }, [loadFalContract, selectedFalEndpoints, serviceConnections.fal, serviceModels.fal, project?.id, project?.rootPath])
+
   const resetNodeSettings = useCallback((id: string) => {
-    setNodes((current) => current.map((node) => node.id === id
-      ? { ...node, data: { ...node.data, ...resetNodeSettingsPatch(node.data) } }
-      : node))
-  }, [setNodes])
+    setNodes((current) => current.map((node) => {
+      if (node.id !== id) return node
+      const state = node.data.higgsfieldNative, view = state ? higgsfieldSchema(state.endpointId) : undefined
+      if (state?.endpointId.startsWith('bytedance/seedance-2.5/') && (!view?.contract || view.loading || view.error)) return { ...node, data: { ...node.data, error: 'Load current Higgsfield model inputs before resetting; saved values are preserved.' } }
+      return { ...node, data: { ...node.data, ...resetNodeSettingsPatch(node.data), ...(state && view?.contract ? { higgsfieldNative: resetHiggsfieldBinding(state, view.contract) } : {}) } }
+    }))
+  }, [setNodes, higgsfieldSchema])
 
   useEffect(() => {
     setNodes((current) => current.map((node) => {
@@ -2129,6 +2436,15 @@ export function App() {
         async () => {
           setProjectError('')
           setLauncherSection('home')
+          serviceResponseScope.current!.invalidate()
+          serviceAvailabilityStop.current?.()
+          setServiceModels({})
+          setServiceAccounts({})
+          projectActivation.current += 1
+          serviceReadiness.current.invalidate()
+          serviceBusyOperations.current = { count: 0 }
+          setServiceBusy(false)
+          loaded.current = false
           await window.prism.projects.close()
           const availableProjects = await window.prism.projects.recent()
           loaded.current = false
@@ -3387,15 +3703,16 @@ export function App() {
     const selection = resolveAssistantSelection(source.data.assistantProvider, source.data.stylePromptModelId, assistantCatalogs)
     if (!selection) { setSettingsOpen(true); updateNode(nodeId, { error: 'Connect OmniRoute or a direct text provider before building a Style prompt.' }); return }
     const { provider, model } = selection
+    const ownsServiceOperation = serviceResponseScope.current!.capture(provider)
     updateNode(nodeId, { runState: 'running', progress: `Building private Style prompt with ${providerDisplayName(provider)}…`, error: undefined })
     try {
       const output = await window.prism.assistant.rewrite(provider, text, 'Convert the input into one reusable visual-style instruction for image and video generation. Describe only medium, rendering, palette, lighting, texture, lens or finish where relevant. Never add characters, subjects, locations, actions, story events, camera movement, or copyrighted artist and franchise names. Preserve the user intent. Return only the final style instruction.', model)
       updateNode(nodeId, { prompt: undefined, stylePrompt: output, assistantProvider: provider, stylePromptModelId: model, runState: 'complete', progress: 'Style prompt ready', styleSavedAt: undefined, error: undefined })
     } catch (error) {
       updateNode(nodeId, { runState: 'error', progress: undefined, error: error instanceof Error ? error.message : String(error) })
-      void window.prism.services.account(provider).then((account) => setServiceAccounts((current) => ({ ...current, [provider]: account })))
+      void refreshServiceAccount(provider, ownsServiceOperation)
     }
-  }, [nodes, serviceModels, updateNode])
+  }, [nodes, refreshServiceAccount, serviceModels, updateNode])
 
   const saveStylePreset = useCallback(async (nodeId: string, rawName: string) => {
     const source = nodes.find((node) => node.id === nodeId && node.data.kind === 'style-reference')
@@ -3454,7 +3771,7 @@ export function App() {
       return
     }
     const rawAssistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, serviceModels[provider]?.models || []])) as AssistantCatalogs
-    const assistantCatalogs = assistantCatalogsWithSavedSelection(rawAssistantCatalogs, source.data.assistantProvider, source.data.assistantModelId)
+    const assistantCatalogs = assistantCatalogsWithSavedSelection(rawAssistantCatalogs, source.data.assistantProvider, source.data.assistantModelId, Boolean(source.data.assistantProvider && serviceModels[source.data.assistantProvider]?.verified))
     const selection = resolveAssistantSelection(source.data.assistantProvider, source.data.assistantModelId, assistantCatalogs)
     if (!selection) { updateNode(nodeId, { runState: 'error', progress: undefined, error: 'Could not revamp, check connection.' }); return }
     const { provider, model } = selection
@@ -3882,9 +4199,18 @@ export function App() {
     if (quantity !== state.quantity) updateNode(state.sourceId, { quantity })
   }, [listBatchState, updateNode])
 
+  const closeConnections = useCallback(() => {
+    setSettingsOpen(false)
+    setActiveService(null)
+    setSignInProfileId(null)
+    setServiceDrafts((current) => Object.fromEntries(Object.keys(current).map((provider) => [provider, ''])) as typeof current)
+  }, [])
+
   const openProviderConnections = useCallback((provider: ServiceProvider, modelLabel = 'this model') => {
     const providerName = providerDisplayName(provider)
     setActiveService(provider)
+    setSignInProfileId(null)
+    setServiceDrafts((current) => ({ ...current, [provider]: '' }))
     setSettingsOpen(true)
     setConnectionWarning({ provider, providerName, modelLabel })
   }, [])
@@ -3892,12 +4218,15 @@ export function App() {
   const runNode = useCallback(async (id: string) => {
     const node = nodes.find((candidate) => candidate.id === id)
     if (!node) return
+    const jobFailures = higgsfieldJobReadinessFailures(id, higgsfieldJobs(), Boolean(node.data.higgsfieldNative || Object.keys(node.data.higgsfieldNativePresets || {}).length))
+    if (jobFailures.length) { updateNode(id, { error: jobFailures.join('; ') }); return }
     const semanticAssetKind = ['character', 'element', 'location', 'wardrobe'].includes(node.data.kind) ? node.data.kind as 'character' | 'element' | 'location' | 'wardrobe' : undefined
     const isElementAsset = semanticAssetKind === 'element'
     const generationProvider = generationServiceProvider(node.data)
-    if (!serviceConnections[generationProvider]) {
+    const ownsServiceOperation = serviceResponseScope.current!.capture(generationProvider)
+    if (!mediaProviderAvailable(generationProvider)) {
       const providerName = providerDisplayName(generationProvider)
-      openProviderConnections(generationProvider, node.data.kind === 'video-generator' ? resolveVideoModel(node.data.videoEngine).label : modelDisplayName(node.data.imageModelId || node.data.videoEngine || node.data.kind))
+      openProviderConnections(generationProvider, node.data.kind === 'video-generator' ? resolveVideoModel(node.data.videoEngine).label : audioGenerationLabel(node.data, serviceModels.elevenlabs) || modelDisplayName(node.data.imageModelId || node.data.videoEngine || node.data.kind))
       updateNode(id, { error: `Connect ${providerName} to run this node.` })
       return
     }
@@ -3906,10 +4235,13 @@ export function App() {
       let availability = serviceModels.byteplus
       if (!availability) {
         try {
+          const acceptsModels = serviceResponseScope.current!.begin('byteplus', 'models')
           const refreshed = await window.prism.services.models('byteplus')
+          if (!ownsServiceOperation()) return
           availability = refreshed
-          setServiceModels((current) => ({ ...current, byteplus: refreshed }))
+          if (acceptsModels()) setServiceModels((current) => ({ ...current, byteplus: refreshed }))
         } catch (error) {
+          if (!ownsServiceOperation()) return
           openProviderConnections('byteplus', videoModel.label)
           updateNode(id, { error: `${providerDisplayName('byteplus')}: ${error instanceof Error ? error.message : String(error)}` })
           return
@@ -3932,6 +4264,18 @@ export function App() {
     }
     const account = serviceAccounts[generationProvider]
     const requirementFailures = generationRequirementFailures(request)
+    if (node.data.higgsfieldNative) {
+      requirementFailures.push(...higgsfieldPresetReadinessFailures(node.data.higgsfieldNative, higgsfieldPresets()), ...higgsfieldInputReadinessFailures(node.data.higgsfieldNative, higgsfieldSchema(node.data.higgsfieldNative.endpointId)))
+    }
+    const fishError = fishAvailabilityError(request, serviceModels.fish)
+    if (fishError) requirementFailures.push(fishError)
+    if (node.data.falNative) {
+      const view = falSchema(node.data.falNative.endpointId)
+      if (view.error) requirementFailures.push(view.error)
+      else if (view.loading || !view.contract) requirementFailures.push('load the selected model contract')
+      else if (view.contract.runtime?.fingerprint !== node.data.falNative.fingerprint) requirementFailures.push('review the refreshed model inputs')
+      if (serviceModels.fal?.verified && !serviceModels.fal.catalogStale && !serviceModels.fal.models.some(model => model.id === node.data.falNative!.endpointId)) requirementFailures.push('choose an available model; the saved endpoint is no longer in this catalog')
+    }
     if (account && ['credit-required', 'temporarily-limited', 'unavailable'].includes(account.state)) requirementFailures.unshift(account.message)
     if (requirementFailures.length) {
       updateNode(id, { runState: 'error', progress: undefined, error: `Cannot run: ${formatRequirementList(requirementFailures)}.` })
@@ -3943,7 +4287,7 @@ export function App() {
     const runStartedAt = new Date().toISOString()
     updateNode(id, { runState: 'queued', progress: 'Preparing request…', error: undefined, runStartedAt, learnedGenerationSeconds: learnedSeconds, ...(semanticAssetKind ? semanticAssetGenerationStartedPatch(node.data) : {}) })
     try {
-      const batchSize = isElementAsset ? Math.min(Math.max(node.data.quantity || 2, 2), 4) : Math.min(Math.max(node.data.quantity || 1, 1), 4)
+      const batchSize = generationCallCount(Boolean(request.falNative || request.higgsfieldNative), node.data.quantity, isElementAsset ? 2 : 1)
       const keepsGenerationHistory = ['image-generator', 'image-editor', 'upscaler', 'video-generator', 'voiceover', 'sound-effects', 'music-generator', 'output'].includes(node.data.kind)
       const batchGeneratedResults: NonNullable<StudioNodeData['generatedResults']> = []
       const sourceLabels = [...new Set([
@@ -3969,7 +4313,7 @@ export function App() {
           prompt: isElementAsset ? `Create the same reusable element consistently from a ${elementAngles[index]}. ${request.prompt || ''} Isolated readable presentation, identical design, materials, proportions, markings, and color across every angle. No unrelated objects.`.trim() : request.prompt,
         })
         lastResult = result
-        batchGeneratedResults.push({ id: crypto.randomUUID(), path: result.outputPath, url: result.outputUrl, type: result.outputType, modelId: result.modelId, name: generatedResultName({ path: result.outputPath, url: result.outputUrl, type: result.outputType, modelId: result.modelId }, node.data.title), createdAt: new Date().toISOString(), sourceLabels })
+        for (const media of generationResultMedia(result)) batchGeneratedResults.push({ id: crypto.randomUUID(), ...media, modelId: result.modelId, name: generatedResultName({ ...media, modelId: result.modelId }, node.data.title), createdAt: new Date().toISOString(), sourceLabels })
       }
 
       if (!lastResult) throw new Error('The generation completed without returning media.')
@@ -3981,12 +4325,12 @@ export function App() {
       const generatedResults = semanticGenerationPatch?.generatedResults || mergeLiveGeneratedResults(liveGeneratedResults, batchGeneratedResults)
       updateNode(id, {
         runState: 'complete',
-        progress: `${batchSize > 1 ? `${batchSize} results complete` : 'Complete'} · ${providerModelDisplayName(lastResult.modelId)}`,
+        progress: `${batchGeneratedResults.length > 1 ? `${batchGeneratedResults.length} results complete` : 'Complete'} · ${providerModelDisplayName(lastResult.modelId)}`,
         outputPath: lastResult.outputPath,
         outputUrl: lastResult.outputUrl,
         outputType: lastResult.outputType,
         modelId: lastResult.modelId,
-        ...(semanticGenerationPatch || { generatedResults, activeResultIndex: generatedResults.length - 1 }),
+        ...(semanticGenerationPatch || { generatedResults, activeResultIndex: Math.max(0, generatedResults.findIndex(item => item.path === lastResult!.outputPath)) }),
         ...(semanticAssetKind ? { referenceTag: node.data.referenceTag || `@${(node.data.title || semanticAssetKind).replace(/^@+/, '').replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-').toLowerCase()}` } : {}),
         runStartedAt: undefined,
       })
@@ -3997,7 +4341,7 @@ export function App() {
       setAssets(await window.prism.assets.list())
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const stopped = error instanceof DOMException && error.name === 'AbortError' || /abort|cancel|stopped/i.test(message)
+      const stopped = !isHiggsfieldRemoteUncertainty(message) && (error instanceof DOMException && error.name === 'AbortError' || /abort|cancel|stopped/i.test(message))
       const liveData = nodeLayoutRef.current.find((candidate) => candidate.id === id)?.data || node.data
       const semanticStopped = semanticAssetKind ? semanticAssetGenerationStoppedPatch(liveData) : {}
       updateNode(id, stopped ? { runState: 'idle', progress: 'Stopped', error: undefined, runStartedAt: undefined, ...semanticStopped } : { runState: 'error', progress: undefined, error: message, runStartedAt: undefined, ...semanticStopped })
@@ -4005,14 +4349,22 @@ export function App() {
       mutationVersion.current += 1
       saveLifecycle.current?.markDirty()
       setHistory(await window.prism.history.list())
-      if (!stopped) void window.prism.services.account(generationProvider).then((account) => setServiceAccounts((current) => ({ ...current, [generationProvider]: account })))
+      if (!stopped) {
+        void refreshServiceAccount(generationProvider, ownsServiceOperation)
+        if (request.falNative && ownsServiceOperation()) {
+          falContractStore.current!.invalidate(serviceResponseScope.current!.identity('fal'), request.falNative.endpointId)
+          void loadFalContract(request.falNative.endpointId)
+        }
+      }
+    } finally {
+      if (request.higgsfieldNative && ownsServiceOperation()) void refreshHiggsfieldJobs()
     }
-  }, [history, incomingValue, nodes, openProviderConnections, semanticGraphNodes, serviceAccounts, serviceConnections, serviceModels, setEdges, setNodes, updateNode])
+  }, [higgsfieldJobs, refreshHiggsfieldJobs, falSchema, higgsfieldSchema, loadFalContract, history, incomingValue, nodes, openProviderConnections, refreshServiceAccount, semanticGraphNodes, serviceAccounts, serviceConnections, mediaProviderAvailable, serviceModels, setEdges, setNodes, updateNode, higgsfieldPresets])
 
   const runSequence = useCallback(async () => {
     const origin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
     const originGraph = graphAtOrigin(origin)
-    const sequence = orderedSequenceNodes(originGraph.nodes)
+    const sequence = orderedSequenceNodes(originGraph.nodes.filter(node => !node.data.higgsfieldNative))
     if (sequence.length < 2) {
       setConnectionErrorNotice('Opt in at least two Video Generators and assign their sequence order first.')
       return
@@ -4530,40 +4882,66 @@ export function App() {
     onNodesChange(expandGroupedPositionChanges(nodes, adjustedChanges))
   }, [getViewport, magneticGuidesEnabled, nodes, onNodesChange])
 
-  const saveService = async (provider: ServiceProvider) => {
+  const saveService = async (provider: ServiceProvider, footer?: HTMLElement | null) => {
+    if (signInProfileId && signInProfileId !== 'new' && !serviceProfiles.profiles.some((profile) => profile.id === signInProfileId && profile.provider === provider)) {
+      setServiceError('Select an account belonging to this provider before saving.')
+      return
+    }
+    const card = footer?.closest?.('.service-card')
+    let saved = false
     setServiceError('')
-    setServiceBusy(true)
+    const finishBusy = beginServiceBusyOperation()
+    const ownsOperation = beginServiceProfileOperation(provider)
     try {
       const registry = await window.prism.services.addProfile(provider, serviceDrafts[provider], signInProfileId && signInProfileId !== 'new' ? signInProfileId : undefined)
-      applyServiceProfiles(registry, provider)
+      if (!ownsOperation()) return
+      await applyServiceProfiles(registry, provider, ownsOperation)
+      if (!ownsOperation()) return
       setServiceDrafts((current) => ({ ...current, [provider]: '' }))
       setSignInProfileId(null)
+      saved = true
     } catch (error) {
+      if (!ownsOperation()) return
       setServiceError(error instanceof Error ? error.message : String(error))
+      await restoreServiceConnectionsAfterFailure(ownsOperation)
     } finally {
-      setServiceBusy(false)
+      finishBusy()
+      if (footer && ownsOperation()) requestAnimationFrame(() => {
+        if (!ownsOperation() || (card && !card.isConnected)) return
+        const currentFooter = card ? card.querySelector<HTMLElement>(':scope > footer') : footer
+        if (!currentFooter?.isConnected) return
+        const focused = document.activeElement
+        if (focused !== document.body && focused && !currentFooter.contains(focused)) return
+        currentFooter.querySelector<HTMLElement>(saved ? '.fal-add-account' : '.service-key-input')?.focus()
+      })
     }
   }
 
   const refreshOmniRoute = async () => {
+    const ownsRefresh = serviceResponseScope.current!.begin('omniroute', 'manual')
+    const acceptsModels = serviceResponseScope.current!.begin('omniroute', 'models')
+    const acceptsAccount = serviceResponseScope.current!.begin('omniroute', 'account')
     setServiceError('')
-    setServiceBusy(true)
+    const finishBusy = beginServiceBusyOperation()
     try {
-      const availability = await window.prism.services.models('omniroute')
-      const account = await window.prism.services.account('omniroute')
+      const [availability, account] = await Promise.all([window.prism.services.models('omniroute'), window.prism.services.account('omniroute')])
+      if (!ownsRefresh() || !acceptsModels() || !acceptsAccount()) return
       setServiceModels((current) => ({ ...current, omniroute: availability }))
       setServiceAccounts((current) => ({ ...current, omniroute: account }))
       setServiceConnections((current) => ({ ...current, omniroute: true }))
     } catch (error) {
+      if (!ownsRefresh()) return
       setServiceConnections((current) => ({ ...current, omniroute: false }))
       setServiceError(error instanceof Error ? error.message : String(error))
     } finally {
-      setServiceBusy(false)
+      finishBusy()
     }
   }
 
   const removeService = async (provider: ServiceProvider) => {
+    const ownsOperation = beginServiceProfileOperation(provider)
     await window.prism.services.remove(provider)
+    if (!ownsOperation()) return
     setServiceConnections((current) => ({ ...current, [provider]: false }))
     setServiceModels((current) => ({ ...current, [provider]: undefined }))
     setServiceAccounts((current) => ({ ...current, [provider]: undefined }))
@@ -4573,49 +4951,65 @@ export function App() {
 
   const transitionServiceProfileState = async (profileId: string, transition: 'disconnect' | 'reconnect' | 'sign-out' | 'delete') => {
     setServiceError('')
-    setServiceBusy(true)
+    const finishBusy = beginServiceBusyOperation()
+    let ownsOperation = () => true
     try {
       const provider = serviceProfiles.profiles.find((profile) => profile.id === profileId)?.provider
       if (!provider) throw new Error('That account profile no longer exists.')
+      ownsOperation = beginServiceProfileOperation(provider)
       const registry = await window.prism.services.transitionProfile(profileId, transition)
-      applyServiceProfiles(registry, provider)
+      if (!ownsOperation()) return
+      await applyServiceProfiles(registry, provider, ownsOperation)
+      if (!ownsOperation()) return
       setProfileConfirmation(null)
       if (signInProfileId === profileId) setSignInProfileId(null)
     } catch (error) {
+      if (!ownsOperation()) return
       setServiceActionError((error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']+': Error:\s*/i, ''))
+      await restoreServiceConnectionsAfterFailure(ownsOperation)
     } finally {
-      setServiceBusy(false)
+      finishBusy()
     }
   }
 
   const setDefaultServiceProfileState = async (provider: ServiceProvider, profileId?: string) => {
     setServiceError('')
-    try { applyServiceProfiles(await window.prism.services.setDefaultProfile(provider, profileId), provider) }
-    catch (error) { setServiceActionError((error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']+': Error:\s*/i, '')) }
+    const ownsOperation = beginServiceProfileOperation(provider)
+    try { await applyServiceProfiles(await window.prism.services.setDefaultProfile(provider, profileId), provider, ownsOperation) }
+    catch (error) { if (!ownsOperation()) return; setServiceActionError((error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']+': Error:\s*/i, '')); await restoreServiceConnectionsAfterFailure(ownsOperation) }
   }
 
   const commitServiceProfileRename = async (profileId: string) => {
     const name = profileNameDraft.trim()
     if (!name) return
+    let ownsOperation = () => true
     try {
       const provider = serviceProfiles.profiles.find((profile) => profile.id === profileId)?.provider
       if (!provider) throw new Error('That account profile no longer exists.')
-      applyServiceProfiles(await window.prism.services.renameProfile(profileId, name), provider)
+      ownsOperation = beginServiceProfileOperation(provider)
+      await applyServiceProfiles(await window.prism.services.renameProfile(profileId, name), provider, ownsOperation)
+      if (!ownsOperation()) return
       setRenamingProfileId(null)
       setProfileNameDraft('')
     } catch (error) {
+      if (!ownsOperation()) return
       setServiceActionError((error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']+': Error:\s*/i, ''))
+      await restoreServiceConnectionsAfterFailure(ownsOperation)
     }
   }
 
   const selectProjectServiceProfile = async (provider: ServiceProvider, profileId?: string) => {
     setServiceError('')
+    const ownsOperation = beginServiceProfileOperation(provider)
     try {
       const selectedProject = await window.prism.services.selectProjectProfile(provider, profileId)
+      if (!ownsOperation()) return
       setProject(selectedProject)
-      applyServiceProfiles(serviceProfiles, provider, selectedProject)
+      await applyServiceProfiles(serviceProfiles, provider, ownsOperation)
     } catch (error) {
+      if (!ownsOperation()) return
       setServiceActionError((error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']+': Error:\s*/i, ''))
+      await restoreServiceConnectionsAfterFailure(ownsOperation)
     }
   }
 
@@ -4696,7 +5090,7 @@ export function App() {
       nextVideoEngine = plan.recommendedEngine || nextVideoEngine
     }
     if (workingEdges !== edges) setEdges(workingEdges)
-    if (nextVideoEngine && target.data.videoEngine !== nextVideoEngine) {
+    if (!target.data.higgsfieldNative && nextVideoEngine && target.data.videoEngine !== nextVideoEngine) {
       updateNode(target.id, { videoEngine: nextVideoEngine, progress: 'Compatible reference model selected.' })
     }
   }, [edges, nodes, promptTagConnectionPlan, setEdges, updateNode])
@@ -5379,7 +5773,8 @@ export function App() {
     })
   }, [edges, nodes, runNode])
 
-  const availableModels = useCallback((provider: ServiceProvider) => serviceModels[provider]?.models || [], [serviceModels])
+  const availableModels = useCallback((provider: ServiceProvider) => mediaProviderAvailable(provider) ? serviceModels[provider]?.models || [] : [], [serviceModels, mediaProviderAvailable])
+  const serviceAvailability = useCallback((provider: ServiceProvider) => serviceModels[provider], [serviceModels])
   const modelAvailabilityVerified = useCallback((provider: ServiceProvider) => Boolean(serviceModels[provider]?.verified), [serviceModels])
   const providerAccount = useCallback((provider: ServiceProvider) => serviceAccounts[provider], [serviceAccounts])
   const connectedStoryboardVideoFamily = useCallback((storyboardId: string) => {
@@ -5387,15 +5782,19 @@ export function App() {
       .filter((edge) => edge.source === storyboardId && edge.targetHandle === 'storyboard-in')
       .map((edge) => nodes.find((node) => node.id === edge.target))
       .filter((node): node is StudioNode => node?.data.kind === 'video-generator')
-      .map((node) => resolveVideoModel(node.data.videoEngine).family))
+      .map((node) => node.data.higgsfieldNative?.endpointId.startsWith('bytedance/seedance-2.5/') ? 'seedance' as const : resolveVideoModel(node.data.videoEngine).family))
     return families.size === 1 ? [...families][0] : undefined
   }, [edges, nodes])
-  const connectedStoryboardVideo = useCallback((storyboardId: string) => resolveConnectedStoryboardVideo(nodes, edges, storyboardId), [edges, nodes])
+  const connectedStoryboardVideo = useCallback((storyboardId: string) => resolveConnectedStoryboardVideo(nodes, edges, storyboardId, endpointId => falSchema(endpointId).contract, endpointId => higgsfieldSchema(endpointId).contract), [edges, nodes, falSchema, higgsfieldSchema])
 
   const videoPromptState = useCallback((nodeId: string) => {
     const node = nodes.find((candidate) => candidate.id === nodeId)
     const connected = Boolean(node && edges.some((edge) => edge.target === nodeId && edge.targetHandle === 'storyboard-in'))
     if (!node || node.data.kind !== 'video-generator') return null
+    if (node.data.higgsfieldNative && !node.data.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) {
+      const prompt = node.data.manualPromptDraft ?? node.data.prompt ?? ''
+      return { connected: false, mode: 'manual' as const, autoPrompt: '', manualPrompt: prompt, activePrompt: prompt, fingerprint: '', resetDisabled: true }
+    }
     const mode = activeVideoPromptMode(node.data, connected)
     let autoPrompt = ''
     let autoError: string | undefined
@@ -5436,11 +5835,22 @@ export function App() {
     if (!node) return { disabled: true, tooltip: 'Cannot run: this node is no longer available.' }
     if (node.data.runState === 'queued' || node.data.runState === 'running') return { disabled: false, tooltip: 'Stop — this node is currently running.' }
     const generationProvider = generationServiceProvider(node.data)
-    const providerName = generationProvider === 'openai' ? 'OpenAI' : generationProvider === 'google' ? 'Google Gemini' : generationProvider === 'fish' ? 'Fish Audio' : 'fal.ai'
+    const providerName = providerDisplayName(generationProvider)
     const failures: string[] = []
+    failures.push(...higgsfieldJobReadinessFailures(nodeId, higgsfieldJobs(), Boolean(node.data.higgsfieldNative || Object.keys(node.data.higgsfieldNativePresets || {}).length)))
     failures.push(...upstreamIncompleteSemanticReasons(nodeId, semanticGraphNodes, edges))
     const warnings = upstreamSemanticWarnings(nodeId, semanticGraphNodes, edges)
     if (!serviceConnections[generationProvider]) failures.push(`connect ${providerName} in Connections`)
+    if (node.data.higgsfieldNative) {
+      failures.push(...higgsfieldPresetReadinessFailures(node.data.higgsfieldNative, higgsfieldPresets()), ...higgsfieldInputReadinessFailures(node.data.higgsfieldNative, higgsfieldSchema(node.data.higgsfieldNative.endpointId)))
+    }
+    if (node.data.falNative) {
+      const view = falSchema(node.data.falNative.endpointId)
+      if (view.error) failures.push(view.error)
+      else if (view.loading || !view.contract) failures.push('load the selected model contract')
+      else if (view.contract.runtime?.fingerprint !== node.data.falNative.fingerprint) failures.push('review the refreshed model inputs')
+      if (serviceModels.fal?.verified && !serviceModels.fal.catalogStale && !serviceModels.fal.models.some(model => model.id === node.data.falNative!.endpointId)) failures.push('choose an available model; the saved endpoint is no longer in this catalog')
+    }
     const account = serviceAccounts[generationProvider]
     if (account && ['credit-required', 'temporarily-limited', 'unavailable'].includes(account.state)) failures.push(account.message)
     const hasSemanticAnchor = node.data.kind === 'character'
@@ -5451,18 +5861,24 @@ export function App() {
     if (!hasSemanticAnchor) {
       const inspection = inspectGenerationRequest(node, semanticGraphNodes, edges)
       if (inspection.error) failures.push(inspection.error)
-      else if (inspection.request) failures.push(...generationRequirementFailures(inspection.request))
+      else if (inspection.request) {
+        failures.push(...generationRequirementFailures(inspection.request))
+        const elevenError = directElevenAvailabilityError(inspection.request, serviceModels.elevenlabs)
+        if (elevenError) failures.push(elevenError)
+        const fishError = fishAvailabilityError(inspection.request, serviceModels.fish)
+        if (fishError) failures.push(fishError)
+      }
     }
     if (failures.length) return { disabled: true, tooltip: `Cannot run: ${formatRequirementList(failures)}.` }
     const warningSuffix = warnings.length ? ` Warning: ${formatRequirementList(warnings)}.` : ''
     return generationActionState(node.data) === 'rerun'
       ? { disabled: false, tooltip: `Rerun — generate again with the same inputs and settings.${warningSuffix}` }
       : { disabled: false, tooltip: `Run — all required inputs, settings, and provider access are ready.${warningSuffix}` }
-  }, [edges, nodes, semanticGraphNodes, serviceAccounts, serviceConnections])
+  }, [higgsfieldJobs, falSchema, higgsfieldSchema, edges, nodes, semanticGraphNodes, serviceAccounts, serviceConnections, serviceModels, higgsfieldPresets])
 
   const estimateNode = useCallback(async (nodeId: string): Promise<GenerationCostEstimate | null> => {
     const node = nodes.find((candidate) => candidate.id === nodeId)
-    if (!node || (node.data.kind === 'voiceover' && node.data.voiceEngine === 'fish-audio')) return null
+    if (!node || (node.data.kind === 'voiceover' && node.data.voiceEngine === 'fish-audio') || isDirectElevenAudio(node.data)) return null
     const imageProvider = ['image-generator', 'image-editor', 'character', 'element', 'location', 'wardrobe'].includes(node.data.kind) ? node.data.imageProvider || 'fal' : 'fal'
     if (!serviceConnections[imageProvider]) return null
     const upstream = incomingValue(nodeId)
@@ -5491,7 +5907,7 @@ export function App() {
     const incoming = edges.find((edge) => edge.target === nodeId && (edge.targetHandle === 'prompt' || edge.targetHandle === 'text-in'))
     const source = nodes.find((candidate) => candidate.id === incoming?.source)
     const text = node.data.prompt || source?.data.assistantOutput || source?.data.prompt || ''
-    const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, curatedAssistantModels(provider, availableModels(provider))])) as AssistantCatalogs
+    const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availableModels(provider)])) as AssistantCatalogs
     const selection = resolveAssistantSelection(node.data.assistantProvider, node.data.assistantModelId, assistantCatalogs)
     if (!selection) { updateNode(nodeId, { error: 'Connect OmniRoute or a direct text provider and refresh its available models first.' }); return }
     const { provider, model } = selection
@@ -5525,6 +5941,13 @@ export function App() {
   }, [assetRelinkStates, assetVisualState, assets, findingDots, missingAssetIds, nodes])
 
   const runtime = useMemo(() => ({
+    falSchema,
+    selectFalModel,
+    selectHiggsfieldModel,
+    higgsfieldSchema,
+    refreshHiggsfieldInputs: (endpointId: string) => { void loadHiggsfieldContract(endpointId, true) },
+    higgsfieldPresets,
+    refreshHiggsfieldPresets: () => { void refreshHiggsfieldPresets(true) },
     updateNode,
     updatePrompt,
     videoPromptState,
@@ -5578,11 +6001,12 @@ export function App() {
     openStyleChooser: setStyleChooserNodeId,
     rewriteStoryboardPanel,
     availableModels,
+    serviceAvailability,
     modelAvailabilityVerified,
     runAssistantNode,
     estimateNode,
     providerAccount,
-    providerConnected: (provider: ServiceProvider) => Boolean(serviceConnections[provider]),
+    providerConnected: (provider: ServiceProvider) => mediaProviderAvailable(provider),
     runReadiness,
     openConnections: openProviderConnections,
     characterLibrary,
@@ -5596,11 +6020,11 @@ export function App() {
     saveStoryboard,
     listBatchState,
     adjustListBatchQuantity,
-  }), [adjustListBatchQuantity, adjustVoiceoverQuantity, availableModels, availablePromptTags, buildStylePrompt, characterLibrary, chooseAssetBatch, commitSemanticAssetResult, completeCharacterSet, completeElementSet, connectPromptTags, connectedInputMedia, connectedInputRules, connectedReferenceTags, connectedStoryboardVideo, connectedStoryboardVideoFamily, copyGeneratedMedia, copyNodeLink, deleteNode, deleteReusableAsset, duplicateNode, estimateNode, exportReusableAsset, focusNode, generatedMediaFavorite, importAsset, importCanvasAssetIntoView, importDroppedAssets, importStoryboardPanel, inspectAssetBatch, inspectPort, listBatchState, modelAvailabilityVerified, nodeMediaLinkState, openGeneratedMedia, openInputQuickConnect, openProviderConnections, openQuickConnect, providerAccount, relinkAsset, renameNodeAsset, resetManualPrompt, revealGeneratedMedia, rewriteStoryboardPanel, runAssistantNode, runFromNode, runNode, runReadiness, saveAssetBatchRow, saveCharacterAsset, saveSemanticAsset, saveStoryboard, saveStylePreset, selectCharacter, selectSemanticAsset, semanticAvailabilityForData, semanticLibraries, serviceConnections, setGeneratedMediaFavorite, setInputFidelity, setReusableFavorite, setVideoPromptMode, stopNode, trashGeneratedMedia, updateNode, updatePrompt, videoPromptState])
+  }), [falSchema, higgsfieldSchema, loadHiggsfieldContract, selectFalModel, selectHiggsfieldModel, higgsfieldPresets, refreshHiggsfieldPresets, adjustListBatchQuantity, adjustVoiceoverQuantity, availableModels, availablePromptTags, buildStylePrompt, characterLibrary, chooseAssetBatch, commitSemanticAssetResult, completeCharacterSet, completeElementSet, connectPromptTags, connectedInputMedia, connectedInputRules, connectedReferenceTags, connectedStoryboardVideo, connectedStoryboardVideoFamily, copyGeneratedMedia, copyNodeLink, deleteNode, deleteReusableAsset, duplicateNode, estimateNode, exportReusableAsset, focusNode, generatedMediaFavorite, importAsset, importCanvasAssetIntoView, importDroppedAssets, importStoryboardPanel, inspectAssetBatch, inspectPort, listBatchState, modelAvailabilityVerified, nodeMediaLinkState, openGeneratedMedia, openInputQuickConnect, openProviderConnections, openQuickConnect, providerAccount, relinkAsset, renameNodeAsset, resetManualPrompt, revealGeneratedMedia, rewriteStoryboardPanel, runAssistantNode, runFromNode, runNode, runReadiness, serviceAvailability, mediaProviderAvailable, saveAssetBatchRow, saveCharacterAsset, saveSemanticAsset, saveStoryboard, saveStylePreset, selectCharacter, selectSemanticAsset, semanticAvailabilityForData, semanticLibraries, serviceConnections, setGeneratedMediaFavorite, setInputFidelity, setReusableFavorite, setVideoPromptMode, stopNode, trashGeneratedMedia, updateNode, updatePrompt, videoPromptState])
   const inspectorNode = inspectorNodeId ? nodes.find((node) => node.id === inspectorNodeId) : undefined
   const inspectorPromptTags = inspectorNode ? [...new Set(connectedInputRules(inspectorNode.id).flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))] : []
   const inspectorAvailablePromptTags = inspectorNode ? availablePromptTags(inspectorNode.id) : inspectorPromptTags
-  const inspectorVideoModel = inspectorNode?.data.kind === 'video-generator' ? resolveVideoModel(inspectorNode.data.videoEngine) : undefined
+  const inspectorVideoModel = inspectorNode?.data.kind === 'video-generator' && !inspectorNode.data.higgsfieldNative ? resolveVideoModel(inspectorNode.data.videoEngine) : undefined
   const inspectorRunnable = inspectorNode && isRunnableNodeKind(inspectorNode.data.kind)
   const inspectorInspection = inspectorNode && inspectorRunnable
     ? inspectGenerationRequest(inspectorNode, semanticGraphNodes, edges)
@@ -5612,8 +6036,10 @@ export function App() {
       ? inspectorRequest.imageModelId || ''
       : effectiveFalImageModel(inspectorRequest) || ''
     : ''
-  const inspectorImageModelLabel = /nano-banana/i.test(inspectorImageModelId) ? 'Nano Banana Pro' : /kontext/i.test(inspectorImageModelId) ? 'FLUX Kontext Pro' : /gpt-image-2/i.test(inspectorImageModelId) ? 'GPT Image 2' : /gemini/i.test(inspectorImageModelId) ? 'Gemini Image' : 'FLUX Schnell'
+  const inspectorImageModelLabel = inspectorNode?.data.falNative?.label || (/nano-banana/i.test(inspectorImageModelId) ? 'Nano Banana Pro' : /kontext/i.test(inspectorImageModelId) ? 'FLUX Kontext Pro' : /gpt-image-2/i.test(inspectorImageModelId) ? 'GPT Image 2' : /gemini/i.test(inspectorImageModelId) ? 'Gemini Image' : 'FLUX Schnell')
   const inspectorUsesNanoImage = inspectorImageModelId.includes('nano-banana')
+  const inspectorElevenDirect = inspectorNode?.data.voiceEngine === 'elevenlabs-direct'
+  const inspectorElevenModel = serviceModels.elevenlabs?.models.find((model) => model.id === inspectorNode?.data.voiceModelId)
   const inspectorRunReadiness = inspectorNode && inspectorRunnable ? runReadiness(inspectorNode.id) : undefined
   const inspectorRunning = inspectorNode?.data.runState === 'queued' || inspectorNode?.data.runState === 'running'
   const inspectorGenerationAction = inspectorNode ? generationActionState(inspectorNode.data) : 'run'
@@ -5633,15 +6059,12 @@ export function App() {
       : inspectorCostEstimate
         ? `Estimated cost: ${inspectorCostEstimate.totalCost.toLocaleString(undefined, { style: 'currency', currency: inspectorCostEstimate.currency })}`
         : 'Estimated cost unavailable'
-  const sequenceNodes = orderedSequenceNodes(nodes)
+  const sequenceNodes = orderedSequenceNodes(nodes.filter(node => !node.data.higgsfieldNative))
   const sequenceRunning = sequenceNodes.some((node) => node.data.sequenceStatus === 'running')
   const inspectedConnections = portInspector
     ? edges.filter((edge) => edge.source === portInspector.nodeId && edge.sourceHandle === portInspector.handleId)
     : []
-  const connectedServiceCount = Object.entries(serviceConnections).filter(([provider, connected]) => {
-    const providerProfiles = serviceProfiles.profiles.filter((profile) => profile.provider === provider)
-    return providerProfiles.length ? providerProfiles.some((profile) => profile.status === 'connected') : connected
-  }).length
+  const connectedServiceCount = Object.values(serviceConnections).filter(Boolean).length
   const contextNode = contextMenu?.kind === 'node' ? nodes.find((node) => node.id === contextMenu.nodeId) : undefined
   const contextAsset = contextMenu?.kind === 'asset' ? assets.find((asset) => asset.id === contextMenu.assetId) : contextNode ? assets.find((asset) => {
     const paths = [contextNode.data.assetPath, contextNode.data.outputPath, ...(contextNode.data.referenceAssets || []).map((item) => item.path), ...(contextNode.data.listItems || []).map((item) => item.asset?.path)]
@@ -5716,11 +6139,11 @@ export function App() {
         <small>Projects remain in folders you control.</small>
       </aside>
       <main className="launcher-main">
-        {launcherSection === 'home' ? <><header><div><p>HOME</p><h1>Project Library</h1><span>Continue recent work or choose any project in your library.</span></div><button className="primary" onClick={() => void chooseProject('create')}><Plus size={16} />New Project</button></header>
+        {launcherSection === 'home' ? <><header><div><p>HOME</p><h1>Project Library</h1><span>Continue recent work or choose any project in your library.</span></div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={16} />New Project</button></header>
         {recentProjects.length > 0 && <section className="launcher-project-section"><div className="launcher-section-title"><div><p>RECENT PROJECTS</p><h2>Continue Working</h2></div><button onClick={() => setLauncherSection('recent')}>View All</button></div><div className="project-library-grid home-recent-grid">{[...recentProjects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4).map((item) => <ProjectLibraryCard key={`recent-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div></section>}
-        <section className="launcher-project-section"><div className="launcher-section-title"><div><p>PROJECTS</p><h2>All Projects</h2></div><button onClick={() => setLauncherSection('projects')}>View All</button></div>{recentProjects.length ? <div className="project-library-grid">{recentProjects.map((item) => <ProjectLibraryCard key={`all-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty"><ProjectsIcon size={28} /><h2>No Projects Yet</h2><p>Create a new project or import an existing project folder.</p><div><button className="primary" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</section></> : <>
-        <header><div><p>PROJECT MANAGER</p><h1>{launcherSection === 'recent' ? 'Recent Projects' : 'Projects'}</h1><span>{launcherSection === 'recent' ? 'Continue your latest local productions.' : 'Create, import, arrange, and reopen local productions.'}</span></div><button className="primary" onClick={() => void chooseProject('create')}><Plus size={16} />New Project</button></header>
-        {launcherProjects.length ? <div className="project-library-grid">{launcherProjects.map((item) => <ProjectLibraryCard key={item.id} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty">{launcherSection === 'recent' ? <RecentProjectsIcon size={28} /> : <ProjectsIcon size={28} />}<h2>{launcherSection === 'recent' ? 'No Recent Projects' : 'No Projects Yet'}</h2><p>{launcherSection === 'recent' ? 'Projects you open will appear here.' : 'Create a working folder or import an existing Prism Foundry project.'}</p><div><button className="primary" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</>}
+        <section className="launcher-project-section"><div className="launcher-section-title"><div><p>PROJECTS</p><h2>All Projects</h2></div><button onClick={() => setLauncherSection('projects')}>View All</button></div>{recentProjects.length ? <div className="project-library-grid">{recentProjects.map((item) => <ProjectLibraryCard key={`all-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty"><ProjectsIcon size={28} /><h2>No Projects Yet</h2><p>Create a new project or import an existing project folder.</p><div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button className="creation-action" onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</section></> : <>
+        <header><div><p>PROJECT MANAGER</p><h1>{launcherSection === 'recent' ? 'Recent Projects' : 'Projects'}</h1><span>{launcherSection === 'recent' ? 'Continue your latest local productions.' : 'Create, import, arrange, and reopen local productions.'}</span></div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={16} />New Project</button></header>
+        {launcherProjects.length ? <div className="project-library-grid">{launcherProjects.map((item) => <ProjectLibraryCard key={item.id} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty">{launcherSection === 'recent' ? <RecentProjectsIcon size={28} /> : <ProjectsIcon size={28} />}<h2>{launcherSection === 'recent' ? 'No Recent Projects' : 'No Projects Yet'}</h2><p>{launcherSection === 'recent' ? 'Projects you open will appear here.' : 'Create a working folder or import an existing Prism Foundry project.'}</p><div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button className="creation-action" onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</>}
         {projectError && <div className="project-gate-error">{projectError}</div>}
       </main>
       {deleteRequest && <div className="modal-backdrop delete-confirm-backdrop" onMouseDown={() => setDeleteRequest(null)}><section className="delete-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="launcher-delete-confirm-title" onMouseDown={(event) => event.stopPropagation()}><header><span><Trash2 size={18} /></span><div><strong id="launcher-delete-confirm-title">{deleteRequest.title}</strong><small>Project Library Entry</small></div><button title="Cancel" aria-label="Cancel Delete" onClick={() => setDeleteRequest(null)}><X size={16} /></button></header><p>{deleteRequest.message}</p><label><input type="checkbox" checked={skipDeleteReminder} onChange={(event) => setSkipDeleteReminder(event.target.checked)} /><span>Don’t ask again for project removal this session</span></label><footer><button onClick={() => setDeleteRequest(null)}>Cancel</button><button className="is-danger" onClick={confirmDelete}>{deleteRequest.confirmLabel}</button></footer></section></div>}
@@ -5728,6 +6151,7 @@ export function App() {
   )
 
   return (
+    <ProviderAvailabilityContext.Provider value={{ mediaConnected: serviceConnections, promptConnected: serviceConnections }}>
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
@@ -5735,7 +6159,7 @@ export function App() {
           <div><strong>Prism Foundry</strong><small>Visual AI studio</small></div>
         </div>
         <div className="workflow-title">
-          <button className="space-breadcrumb" onClick={() => { setHomeSection('spaces'); setAppView('space') }} data-tooltip={`Project: ${project.name}`} aria-label={`Open project ${project.name}`}><ProjectFolderIcon size={13} /><span>{project.name}</span></button>
+          <button className="space-breadcrumb" onClick={() => { setHomeSection('spaces'); setAppView('space') }} data-tooltip={`Project: ${project.name}`} aria-label={`Open project ${project.name}`}><ProjectFolderIcon size={16} /><span>{project.name}</span></button>
         </div>
         <div className="top-actions">
           {appView === 'canvas' && <>
@@ -5784,13 +6208,9 @@ export function App() {
           <button className={activeTool === 'select' ? 'is-active' : ''} onClick={() => setActiveTool('select')} data-tooltip="Select [V]" aria-label="Select" aria-keyshortcuts="V"><MousePointer2 size={18} /></button>
           <button className={activeTool === 'hand' || spacePanning ? 'is-active' : ''} onClick={() => setActiveTool('hand')} data-tooltip="Hand" aria-label="Hand"><Hand size={18} /></button>
           <span className="tool-rail-spacer" />
-          <div className="tool-cluster">
-            <button className={activeTool === 'cut' ? 'is-active' : ''} onClick={() => setActiveTool('cut')} data-tooltip="Cut Connection [X]" aria-label="Cut Connection" aria-keyshortcuts="X"><Scissors size={17} /></button>
-            <button className={activeTool === 'connection' ? 'is-active' : ''} onClick={() => setActiveTool('connection')} data-tooltip="Connect [L]" aria-label="Connect" aria-keyshortcuts="L"><Link2 size={17} /></button>
-          </div>
-          <div className="tool-cluster creative-cluster">
-            <button className={activeTool === 'frame' ? 'is-active' : ''} onClick={() => setActiveTool('frame')} data-tooltip="Frame [F]" aria-label="Frame" aria-keyshortcuts="F"><Frame size={17} /></button>
-          </div>
+          <button className={activeTool === 'cut' ? 'is-active' : ''} onClick={() => setActiveTool('cut')} data-tooltip="Cut Connection [X]" aria-label="Cut Connection" aria-keyshortcuts="X"><Scissors size={17} /></button>
+          <button className={activeTool === 'connection' ? 'is-active' : ''} onClick={() => setActiveTool('connection')} data-tooltip="Connect [L]" aria-label="Connect" aria-keyshortcuts="L"><Link2 size={17} /></button>
+          <button className={activeTool === 'frame' ? 'is-active' : ''} onClick={() => setActiveTool('frame')} data-tooltip="Frame [F]" aria-label="Frame" aria-keyshortcuts="F"><Frame size={17} /></button>
           <span className="tool-rail-spacer" />
           <button onClick={undoCanvas} disabled={!canUndo} data-tooltip="Undo [⌘Z]" aria-label="Undo" aria-keyshortcuts="Meta+Z"><Undo2 size={18} /></button>
           <button onClick={redoCanvas} disabled={!canRedo} data-tooltip="Redo [⇧⌘Z]" aria-label="Redo" aria-keyshortcuts="Meta+Shift+Z"><Redo2 size={18} /></button>
@@ -6184,8 +6604,8 @@ export function App() {
             </aside>
             <div className="space-home-content">
               <header>
-                <div><p>{homeSection === 'spaces' ? 'CANVAS' : homeSection.toUpperCase()}</p><h1>{homeSection === 'spaces' ? 'Canvas' : homeSection === 'assets' ? assetTypeLabel : homeSection[0].toUpperCase() + homeSection.slice(1)}</h1><span>{project.name} · {canvases.length} canvas{canvases.length === 1 ? '' : 'es'} · {visibleAssetCount} asset{visibleAssetCount === 1 ? '' : 's'}</span></div>
-                <div className="space-header-actions">{legacyImport.detected && <button className="legacy-cleanup" onClick={() => void cleanInheritedTestData()}><Trash2 size={16} /> Remove Inherited Test Data</button>}{homeSection === 'spaces' ? <button onClick={addCanvas}><Plus size={16} /> New Canvas</button> : homeSection !== 'trash' && <>{homeSection === 'assets' && <button onClick={() => void importAssetPackage()}><Upload size={16} /> Import Asset</button>}<button onClick={createFromAssetSection}><Plus size={16} /> Create</button></>}</div>
+                <div><p>{homeSection === 'spaces' ? 'CANVAS' : homeSection.toUpperCase()}</p><h1>{homeSection === 'spaces' ? 'Canvas' : homeSection === 'assets' ? assetTypeLabel : homeSection[0].toUpperCase() + homeSection.slice(1)}</h1><span><strong className="space-project-name">{project.name}</strong> · {canvases.length} canvas{canvases.length === 1 ? '' : 'es'} · {visibleAssetCount} asset{visibleAssetCount === 1 ? '' : 's'}</span></div>
+                <div className="space-header-actions">{legacyImport.detected && <button className="legacy-cleanup" onClick={() => void cleanInheritedTestData()}><Trash2 size={16} /> Remove Inherited Test Data</button>}{homeSection === 'spaces' ? <button className="creation-action" onClick={addCanvas}><Plus size={16} /> New Canvas</button> : homeSection !== 'trash' && <>{homeSection === 'assets' && <button className="creation-action" onClick={() => void importAssetPackage()}><Upload size={16} /> Import Asset</button>}<button className="creation-action" onClick={createFromAssetSection}><Plus size={16} /> Create</button></>}</div>
               </header>
               {homeSection === 'spaces' && <div className="page-card-grid home-page-grid">
                 {canvases.map((canvas, index) => { const canvasPages = canvas.id === activeCanvasId ? pages.map((page) => page.id === activePageId ? { ...page, nodes, edges } : page) : canvas.pages; const previewPage = canvasPages.find((page) => page.id === canvas.activePageId) || canvasPages[0]; const totalNodes = canvasPages.reduce((total, page) => total + page.nodes.length, 0); return (
@@ -6261,7 +6681,7 @@ export function App() {
                   <div className="asset-facts">{ratio && <span>{ratio}</span>}{duration && <span>{Math.round(duration * 10) / 10}s</span>}{asset.metadata?.resolution && <span>{asset.metadata.resolution}</span>}{asset.metadata?.frameRate && <span>{asset.metadata.frameRate} fps</span>}<time>{new Date(asset.createdAt).toLocaleDateString()}</time></div>
                 </div>
               </article>})}
-              </div> : !(semanticAssetCollections.length || ungroupedHomeAssets.length || (homeSection === 'assets' && ((assetTypeFilter === 'style' && (visibleBuiltInStyles.length || visibleSavedStyleLibraryItems.length)) || (assetTypeFilter === 'storyboard' && storyboardLibraryItems.length)))) && <div className={`asset-empty ${homeSection === 'assets' && ['character', 'element', 'location', 'wardrobe', 'style', 'storyboard'].includes(assetTypeFilter) ? 'is-workflow-empty' : ''}`}><AssetTypeGlyph type={assetTypeFilter} size={22} /><strong>{homeSection === 'assets' && assetTypeFilter === 'character' ? 'No Character Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'element' ? 'No Element Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'location' ? 'No Location Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'wardrobe' ? 'No Wardrobe Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'style' ? 'No Matching Styles' : homeSection === 'assets' && assetTypeFilter === 'storyboard' ? 'No Storyboards Yet' : ''}</strong><span>{homeSection === 'favorites' ? 'Favorite assets will appear here.' : homeSection === 'trash' ? 'Trash is empty.' : homeSection === 'assets' && assetTypeFilter === 'character' ? 'Create starts a Prompt or Reference workflow. Completed identity views will appear here as one transferable asset set.' : homeSection === 'assets' && assetTypeFilter === 'element' ? 'Create starts a Prompt or Reference workflow with 2–4 consistent output angles.' : homeSection === 'assets' && assetTypeFilter === 'location' ? 'Create starts a Prompt or Reference workflow for a reusable environment.' : homeSection === 'assets' && assetTypeFilter === 'wardrobe' ? 'Create starts a Prompt or Reference workflow for reusable wardrobe.' : homeSection === 'assets' && assetTypeFilter === 'style' ? 'Clear the search or switch the source filter to All.' : homeSection === 'assets' && assetTypeFilter === 'storyboard' ? 'Create and compile a Storyboard to reuse it from the same node.' : 'Assets added to nodes and generated outputs will appear here.'}</span></div>}</>}
+              </div> : !(semanticAssetCollections.length || ungroupedHomeAssets.length || (homeSection === 'assets' && ((assetTypeFilter === 'style' && (visibleBuiltInStyles.length || visibleSavedStyleLibraryItems.length)) || (assetTypeFilter === 'storyboard' && storyboardLibraryItems.length)))) && <div className="asset-empty is-workflow-empty"><AssetTypeGlyph type={assetTypeFilter} size={22} /><strong>{homeSection === 'assets' && assetTypeFilter === 'character' ? 'No Character Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'element' ? 'No Element Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'location' ? 'No Location Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'wardrobe' ? 'No Wardrobe Assets Yet' : homeSection === 'assets' && assetTypeFilter === 'style' ? 'No Matching Styles' : homeSection === 'assets' && assetTypeFilter === 'storyboard' ? 'No Storyboards Yet' : homeSection === 'favorites' ? 'No Favorite Assets Yet' : homeSection === 'trash' ? 'Trash Is Empty' : assetTypeFilter === 'video' ? 'No Video Assets Yet' : assetTypeFilter === 'image' ? 'No Image Assets Yet' : assetTypeFilter === 'audio' ? 'No Audio Assets Yet' : 'No Assets Yet'}</strong><span>{homeSection === 'favorites' ? 'Favorite assets will appear here.' : homeSection === 'trash' ? 'Trash is empty.' : homeSection === 'assets' && assetTypeFilter === 'character' ? 'Create starts a Prompt or Reference workflow. Completed identity views will appear here as one transferable asset set.' : homeSection === 'assets' && assetTypeFilter === 'element' ? 'Create starts a Prompt or Reference workflow with 2–4 consistent output angles.' : homeSection === 'assets' && assetTypeFilter === 'location' ? 'Create starts a Prompt or Reference workflow for a reusable environment.' : homeSection === 'assets' && assetTypeFilter === 'wardrobe' ? 'Create starts a Prompt or Reference workflow for reusable wardrobe.' : homeSection === 'assets' && assetTypeFilter === 'style' ? 'Clear the search or switch the source filter to All.' : homeSection === 'assets' && assetTypeFilter === 'storyboard' ? 'Create and compile a Storyboard to reuse it from the same node.' : 'Assets added to nodes and generated outputs will appear here.'}</span></div>}</>}
               {projectError && <div className="project-inline-error"><span>{projectError}</span><button aria-label="Dismiss Project Error" onClick={() => setProjectError('')}><X size={13} /></button></div>}
               {projectNotice && <div className="project-inline-notice"><span>{projectNotice}</span><button aria-label="Dismiss Project Notice" onClick={() => setProjectNotice('')}><X size={13} /></button></div>}
             </div>
@@ -6279,15 +6699,18 @@ export function App() {
               {['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind)
                 ? <div className="inspector-model">{modelCompanyFor(inspectorImageModelId, inspectorImageModelLabel) && <CompanyIcon provider={modelCompanyFor(inspectorImageModelId, inspectorImageModelLabel)!} />}<span>{inspectorImageModelLabel}{inspectorReferenceCount ? ' · references' : ' · text to image'}</span></div>
                 : inspectorNode.data.kind === 'video-generator'
-                  ? <><GroupedMenuSelect className="inspector-model-select" menuClassName="video-model-menu" ariaLabel="Video model" value={resolveVideoModel(inspectorNode.data.videoEngine).id} groups={VIDEO_MODEL_MENU_GROUPS} onChange={(engine) => {
+                  ? <><GroupedMenuSelect catalog className="inspector-model-select" menuClassName="video-model-menu" ariaLabel="Video model" displayLabel={inspectorNode.data.higgsfieldNative?.label || inspectorNode.data.falNative?.label} value={inspectorNode.data.higgsfieldNative ? `higgsfield-native::${inspectorNode.data.higgsfieldNative.endpointId}` : inspectorNode.data.falNative ? `fal-native::${inspectorNode.data.falNative.endpointId}` : resolveVideoModel(inspectorNode.data.videoEngine).id} groups={videoModelGroups(serviceModels.fal, serviceModels.higgsfield, inspectorNode.data)} onChange={(engine) => {
+                    if (engine.startsWith('higgsfield-native::')) { selectHiggsfieldModel(inspectorNode.id, engine.slice('higgsfield-native::'.length)); return }
+                    if (engine.startsWith('fal-native::')) { selectFalModel(inspectorNode.id, engine.slice(12)); return }
                     const model = resolveVideoModel(engine)
                     const frameRate = model.frameRates.length ? (model.frameRates.includes(inspectorNode.data.frameRate || 24) ? inspectorNode.data.frameRate || 24 : model.frameRates[0]) : undefined
                     const duration = videoDurationOptions(engine, frameRate).filter((value): value is number => typeof value === 'number')[0]
-                    updateNode(inspectorNode.id, { videoEngine: engine, aspectRatio: defaultVideoRatio(model) || inspectorNode.data.aspectRatio, duration, autoDuration: false, generateAudio: model.nativeAudio ? inspectorNode.data.generateAudio : false, resolution: model.resolutions.length ? (model.resolutions.includes(inspectorNode.data.resolution || '') ? inspectorNode.data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined, frameRate, motionCadence: normalizedMotionCadence(model, frameRate, inspectorNode.data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : inspectorNode.data.inferenceSteps, guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : inspectorNode.data.guidanceScale, acceleration: model.family === 'wan' ? 'regular' : inspectorNode.data.acceleration })
-                  }} /><p className="inspector-model-capability"><strong>INPUTS</strong>{videoInputSummary(resolveVideoModel(inspectorNode.data.videoEngine))}</p></>
+                    updateNode(inspectorNode.id, { ...preserveFalNativeSelection(inspectorNode.data), videoEngine: engine, aspectRatio: defaultVideoRatio(model) || inspectorNode.data.aspectRatio, duration, autoDuration: false, generateAudio: model.nativeAudio ? inspectorNode.data.generateAudio : false, resolution: model.resolutions.length ? (model.resolutions.includes(inspectorNode.data.resolution || '') ? inspectorNode.data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined, frameRate, motionCadence: normalizedMotionCadence(model, frameRate, inspectorNode.data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : inspectorNode.data.inferenceSteps, guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : inspectorNode.data.guidanceScale, acceleration: model.family === 'wan' ? 'regular' : inspectorNode.data.acceleration })
+                  }} /><p className="inspector-model-capability"><strong>INPUTS</strong>{inspectorNode.data.higgsfieldNative ? 'One source video · image references across all image sockets · source supplies cuts and audio' : inspectorNode.data.falNative ? inspectorNode.data.falNative.media.filter(field => !field.retired).map(field => `${field.label}${field.maximum === undefined ? '' : ` (up to ${field.maximum})`}`).join(' · ') || 'No media inputs declared' : videoInputSummary(resolveVideoModel(inspectorNode.data.videoEngine))}</p></>
                   : inspectorNode.data.kind === 'voiceover'
-                    ? <GroupedMenuSelect className="inspector-model-select" ariaLabel="Voice model" value={inspectorNode.data.voiceEngine || 'elevenlabs'} groups={[{ label: 'fal.ai', options: [{ value: 'elevenlabs', label: 'ElevenLabs Eleven v3', provider: 'elevenlabs' }] }, { label: 'Fish Audio', options: [{ value: 'fish-audio', label: 'Fish Audio S1 / S2 Pro', provider: 'fish' }] }]} onChange={(engine) => updateNode(inspectorNode.id, { voiceEngine: engine as StudioNodeData['voiceEngine'] })} />
-                    : <div className="inspector-model">{inspectorNode.data.kind === 'image-editor' ? <CompanyIcon provider={modelCompanyFor(inspectorImageModelId, inspectorImageModelLabel)!} /> : inspectorNode.data.kind === 'sound-effects' || inspectorNode.data.kind === 'music-generator' ? <CompanyIcon provider="elevenlabs" /> : <span className="model-company-wordmark" aria-hidden="true">{inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'RE' : 'CL'}</span>}<span>{inspectorNode.data.kind === 'image-editor' ? `${inspectorImageModelLabel} · image editing` : inspectorNode.data.kind === 'upscaler' ? inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'RealESRGAN Video Upscaler' : 'Clarity Image Upscaler' : inspectorNode.data.kind === 'sound-effects' ? 'ElevenLabs Sound Effects v2' : 'ElevenLabs Music'}</span></div>}
+                    ? <VoiceModelSelect className="inspector-model-select" data={inspectorNode.data} falAvailability={serviceModels.fal} fishAvailability={serviceModels.fish} onFalSelect={(endpointId) => selectFalModel(inspectorNode.id, endpointId)} models={serviceModels.elevenlabs?.models || []} onChange={(patch) => updateNode(inspectorNode.id, patch)} />
+                    : inspectorNode.data.kind === 'sound-effects' ? <SoundModelSelect className="inspector-model-select" data={inspectorNode.data} falAvailability={serviceModels.fal} onFalSelect={(endpointId) => selectFalModel(inspectorNode.id, endpointId)} onChange={(patch) => updateNode(inspectorNode.id, patch)} />
+                    : <div className="inspector-model">{inspectorNode.data.kind === 'image-editor' ? <CompanyIcon provider={modelCompanyFor(inspectorImageModelId, inspectorImageModelLabel)!} /> : inspectorNode.data.kind === 'music-generator' ? <CompanyIcon provider="elevenlabs" /> : <span className="model-company-wordmark" aria-hidden="true">{inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'RE' : 'CL'}</span>}<span>{inspectorNode.data.kind === 'image-editor' ? `${inspectorImageModelLabel} · image editing` : inspectorNode.data.kind === 'upscaler' ? inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'RealESRGAN Video Upscaler' : 'Clarity Image Upscaler' : 'ElevenLabs Music'}</span></div>}
             </section>
 
             {['image-generator', 'upscaler', 'video-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) && <section className="inspector-section inspector-routine-references">
@@ -6296,27 +6719,28 @@ export function App() {
                 <button onClick={() => addInspectorReference(inspectorNode.id, 'style-reference')}><Palette size={17} /><span>Style</span><small>Connect node</small></button>
                 <button onClick={() => addInspectorReference(inspectorNode.id, 'character')}><UserRound size={17} /><span>Character</span><small>Connect node</small></button>
                 <button onClick={() => addInspectorReference(inspectorNode.id, 'upload')}><Plus size={17} /><span>Add</span><small>Local media</small></button>
-              </div> : ['element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload', 'image-in')}><ImageIcon size={17} /><span>{inspectorNode.data.kind === 'element' ? 'Object guide' : inspectorNode.data.kind === 'wardrobe' ? 'Wardrobe guide' : 'Location guide'}</span><small>Optional image</small></button></div> : inspectorNode.data.kind === 'video-generator' && inspectorVideoModel ? <><div className="inspector-reference-grid video-reference-grid">
+              </div> : ['element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload', 'image-in')}><ImageIcon size={17} /><span>{inspectorNode.data.kind === 'element' ? 'Object guide' : inspectorNode.data.kind === 'wardrobe' ? 'Wardrobe guide' : 'Location guide'}</span><small>Optional image</small></button></div> : inspectorNode.data.kind === 'video-generator' && (inspectorVideoModel || inspectorNode.data.higgsfieldNative) ? <><div className="inspector-reference-grid video-reference-grid">
                 {nodeInputPorts(inspectorNode.data).map((port) => {
                   const sourceKind = port.id === 'text-in' ? 'prompt' : port.id === 'storyboard-in' ? 'storyboard' : port.id === 'character-in' ? 'character' : port.id === 'wardrobe-in' ? 'wardrobe' : port.id === 'element-in' ? 'element' : port.id === 'location-in' ? 'location' : port.id === 'style-in' ? 'style-reference' : 'upload'
-                  return <button key={port.id} onClick={() => addInspectorReference(inspectorNode.id, sourceKind, port.id)}><GeneratorInputIcon id={port.id} signal={port.signal} kind="video-generator" /><span>{generatorInputLabel(port.id, port.label).replace(/^Add /, '')}</span><small>{port.maxConnections === 1 ? 'Single input' : port.maxConnections ? `Up to ${port.maxConnections}` : 'Connect node'}</small></button>
+                  return <button key={port.id} disabled={port.maxConnections === 0} onClick={() => addInspectorReference(inspectorNode.id, sourceKind, port.id)}><GeneratorInputIcon id={port.id} signal={port.signal} kind="video-generator" /><span>{generatorInputLabel(port.id, port.label).replace(/^Add /, '')}</span><small>{port.maxConnections === 1 ? 'Single input' : port.maxConnections ? `Up to ${port.maxConnections}` : 'Connect node'}</small></button>
                 })}
-              </div><p className="reference-budget">{inspectorVideoModel.label} · semantic inputs automatically select a legal reference-capable route.</p></> : <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload')}>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? <Video size={17} /> : <ImageIcon size={17} />}<span>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'Input video' : 'Input image'}</span><small>One {inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'video' : inspectorNode.data.kind === 'upscaler' ? 'image' : 'or more images'}</small></button></div>}
+              </div><p className="reference-budget">{inspectorNode.data.higgsfieldNative?.label || inspectorVideoModel?.label} · {inspectorNode.data.higgsfieldNative ? 'image capacity applies across every connected reference socket.' : inspectorNode.data.falNative ? 'connected media use this exact model’s declared inputs.' : 'semantic inputs automatically select a legal reference-capable route.'}</p></> : <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload')}>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? <Video size={17} /> : <ImageIcon size={17} />}<span>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'Input video' : 'Input image'}</span><small>One {inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'video' : inspectorNode.data.kind === 'upscaler' ? 'image' : 'or more images'}</small></button></div>}
             </section>}
 
-            {inspectorNode.data.kind !== 'upscaler' && <section className="inspector-section inspector-routine-prompt">
+            {inspectorNode.data.kind !== 'upscaler' && !(isElevenDialogue(inspectorNode.data) && !inspectorNode.data.falNative) && <section className="inspector-section inspector-routine-prompt">
               <label>PROMPT</label>
-              <TaggedPromptTextarea value={inspectorNode.data.prompt || ''} connectedTags={inspectorPromptTags} availableTags={inspectorAvailablePromptTags} placeholder={['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? inspectorNode.data.kind === 'element' ? 'Describe the reusable object to create…' : inspectorNode.data.kind === 'location' ? 'Describe the reusable environment to create…' : inspectorNode.data.kind === 'wardrobe' ? 'Describe the reusable wardrobe to create…' : 'Describe the image you want to generate…' : inspectorNode.data.kind === 'voiceover' ? 'Enter the words to speak…' : inspectorNode.data.kind === 'sound-effects' ? 'Describe the sound effect…' : inspectorNode.data.kind === 'music-generator' ? 'Describe the music…' : 'Reference connected media using its @ tag…'} onValueChange={(prompt) => updatePrompt(inspectorNode.id, prompt)} />
+              <TaggedPromptTextarea value={inspectorNode.data.higgsfieldNative ? inspectorNode.data.manualPromptDraft ?? inspectorNode.data.prompt ?? '' : inspectorNode.data.prompt || ''} connectedTags={inspectorPromptTags} availableTags={inspectorAvailablePromptTags} placeholder={['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? inspectorNode.data.kind === 'element' ? 'Describe the reusable object to create…' : inspectorNode.data.kind === 'location' ? 'Describe the reusable environment to create…' : inspectorNode.data.kind === 'wardrobe' ? 'Describe the reusable wardrobe to create…' : 'Describe the image you want to generate…' : inspectorNode.data.kind === 'voiceover' ? 'Enter the words to speak…' : inspectorNode.data.kind === 'sound-effects' ? 'Describe the sound effect…' : inspectorNode.data.kind === 'music-generator' ? 'Describe the music…' : 'Reference connected media using its @ tag…'} onValueChange={(prompt) => updatePrompt(inspectorNode.id, prompt)} />
             </section>}
 
-            {['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? <section className="inspector-grid">
+            {(inspectorNode.data.higgsfieldNative || higgsfieldJobs().jobs?.some(job => job.nodeId === inspectorNode.id)) && <HiggsfieldRecoveryControls nodeId={inspectorNode.id} view={higgsfieldJobs()} onRefresh={() => { void refreshHiggsfieldJobs() }} onAction={command => { void applyHiggsfieldJobAction(command) }} />}
+            {inspectorNode.data.higgsfieldNative ? <HiggsfieldFields state={inspectorNode.data.higgsfieldNative} view={higgsfieldPresets()} inputView={higgsfieldSchema(inspectorNode.data.higgsfieldNative.endpointId)} placement="advanced" onRefreshInputs={() => { void loadHiggsfieldContract(inspectorNode.data.higgsfieldNative!.endpointId, true) }} onRefresh={() => { void refreshHiggsfieldPresets(true) }} onChange={higgsfieldNative => updateNode(inspectorNode.id, { higgsfieldNative })} /> : inspectorNode.data.falNative ? <FalNativeFields state={inspectorNode.data.falNative} contract={falSchema(inspectorNode.data.falNative.endpointId).contract} placement="advanced" onChange={(falNative) => updateNode(inspectorNode.id, { falNative })} /> : ['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? <section className="inspector-grid">
               <label><span>Aspect ratio</span><SimpleMenuSelect ariaLabel="Aspect ratio" value={normalizedImageRatio(inspectorNode.data.aspectRatio)} options={(inspectorUsesNanoImage ? NANO_IMAGE_RATIOS : IMAGE_RATIOS).map((ratio) => ({ value: ratio, label: ratio === 'auto' ? 'Auto' : ratio }))} onChange={(value) => updateNode(inspectorNode.id, { aspectRatio: value })} /></label>
               <label><span>Format</span><SimpleMenuSelect ariaLabel="Image format" value={inspectorNode.data.outputFormat || 'png'} options={[{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG' }, ...(inspectorUsesNanoImage ? [{ value: 'webp', label: 'WebP' }] : [])]} onChange={(value) => updateNode(inspectorNode.id, { outputFormat: value as 'jpeg' | 'png' | 'webp' })} /></label>
               {inspectorUsesNanoImage ? <><label><span>Resolution</span><SimpleMenuSelect ariaLabel="Image resolution" value={inspectorNode.data.imageResolution || '1K'} options={['1K', '2K', '4K'].map((value) => ({ value, label: value }))} onChange={(value) => updateNode(inspectorNode.id, { imageResolution: value as StudioNodeData['imageResolution'] })} /></label><label><span>Safety tolerance</span><SimpleMenuSelect ariaLabel="Safety tolerance" value={String(inspectorNode.data.safetyTolerance || 4)} options={[1,2,3,4,5,6].map((value) => ({ value: String(value), label: String(value) }))} onChange={(value) => updateNode(inspectorNode.id, { safetyTolerance: Number(value) as StudioNodeData['safetyTolerance'] })} /></label><label className="inspector-wide inspector-switch"><input type="checkbox" checked={Boolean(inspectorNode.data.enableWebSearch)} onChange={(event) => updateNode(inspectorNode.id, { enableWebSearch: event.target.checked })} /><span>Enable web search</span></label></> : <><label><span>Steps</span><SimpleMenuSelect ariaLabel="Inference steps" value={String(inspectorNode.data.inferenceSteps || 4)} options={[1,2,4,6,8,12].map((value) => ({ value: String(value), label: String(value) }))} onChange={(value) => updateNode(inspectorNode.id, { inferenceSteps: Number(value) })} /></label><label><span>Acceleration</span><SimpleMenuSelect ariaLabel="Acceleration" value={inspectorNode.data.acceleration || 'none'} options={[{ value: 'none', label: 'None' }, { value: 'regular', label: 'Regular' }, { value: 'high', label: 'High' }]} onChange={(value) => updateNode(inspectorNode.id, { acceleration: value as StudioNodeData['acceleration'] })} /></label><label className="inspector-wide"><span>Guidance · {(inspectorNode.data.guidanceScale || 3.5).toFixed(1)}</span><input type="range" min="1" max="10" step="0.5" value={inspectorNode.data.guidanceScale || 3.5} onChange={(event) => updateNode(inspectorNode.id, { guidanceScale: Number(event.target.value) })} /></label></>}
               <label className="inspector-wide"><span>Seed</span><input type="number" placeholder="Random" value={inspectorNode.data.seed ?? ''} onChange={(event) => updateNode(inspectorNode.id, { seed: event.target.value ? Number(event.target.value) : undefined })} /></label>
             </section> : inspectorNode.data.kind === 'video-generator' ? <section className="inspector-grid">
               <label><span>Aspect ratio</span><SimpleMenuSelect ariaLabel="Video aspect ratio" disabled={!inspectorVideoModel?.ratios.length} value={inspectorVideoModel?.ratios.length ? resolvedVideoRatio(inspectorVideoModel, inspectorNode.data.aspectRatio) : 'fixed'} options={inspectorVideoModel?.ratios.length ? inspectorVideoModel.ratios.filter((ratio) => ratio !== 'auto').map((ratio) => ({ value: ratio, label: ratio })) : [{ value: 'fixed', label: inspectorVideoModel?.fixedAspectRatioLabel || 'Native' }]} onChange={(value) => updateNode(inspectorNode.id, { aspectRatio: value })} /></label>
-              <label><span>Duration</span><SimpleMenuSelect ariaLabel="Video duration" value={String(normalizedVideoDuration(inspectorNode.data))} options={videoDurationOptions(inspectorNode.data.videoEngine, inspectorNode.data.frameRate).map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value), autoDuration: false })} /></label>
+              <label><span>Duration</span><SimpleMenuSelect ariaLabel="Video duration" value={String(normalizedVideoDuration(inspectorNode.data))} options={videoDurationMenuOptions(inspectorNode.data)} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value), autoDuration: false })} /></label>
               <label><span>Motion FPS</span><GroupedMenuSelect ariaLabel="Motion FPS" title="Motion FPS controls visible movement cadence without changing encoded provider Native FPS or playback speed." displayLabel={`${normalizedMotionCadence(inspectorVideoModel || resolveVideoModel(inspectorNode.data.videoEngine), inspectorNode.data.frameRate, inspectorNode.data.motionCadence)} fps`} value={String(normalizedMotionCadence(inspectorVideoModel || resolveVideoModel(inspectorNode.data.videoEngine), inspectorNode.data.frameRate, inspectorNode.data.motionCadence))} groups={[
                 { label: 'Motion FPS', options: motionCadenceOptions(inspectorVideoModel || resolveVideoModel(inspectorNode.data.videoEngine), inspectorNode.data.frameRate).map((fps) => ({ value: String(fps), label: `${fps} fps` })) },
               ]} onChange={(value) => updateNode(inspectorNode.id, { motionCadence: Number(value) })} /></label>
@@ -6344,61 +6768,66 @@ export function App() {
               <label className="inspector-wide"><span>Seed</span><input type="number" placeholder="Random" value={inspectorNode.data.seed ?? ''} onChange={(event) => updateNode(inspectorNode.id, { seed: event.target.value ? Number(event.target.value) : undefined })} /></label>
               <p className="reference-budget inspector-wide">The source image remains primary. Independent references use Nano Banana Pro editing.</p>
             </section> : inspectorNode.data.kind === 'upscaler' ? <section className="inspector-grid">
-              <label className="inspector-wide"><span>Model</span><SimpleMenuSelect ariaLabel="Inspector upscaler model" value={inspectorNode.data.upscalerModel || 'clarity-image'} options={[{ value: 'clarity-image', label: 'Clarity Image Upscaler' }, { value: 'realesrgan-video', label: 'RealESRGAN Video Upscaler' }]} onChange={(value) => updateNode(inspectorNode.id, { upscalerModel: value as StudioNodeData['upscalerModel'], outputPath: undefined, outputUrl: undefined, outputType: undefined, generatedResults: undefined, error: undefined })} /></label>
+              <label className="inspector-wide"><span>Model</span><SimpleMenuSelect service="fal" ariaLabel="Inspector upscaler model" value={inspectorNode.data.upscalerModel || 'clarity-image'} options={[{ value: 'clarity-image', label: 'Clarity Image Upscaler' }, { value: 'realesrgan-video', label: 'RealESRGAN Video Upscaler' }]} onChange={(value) => updateNode(inspectorNode.id, { upscalerModel: value as StudioNodeData['upscalerModel'], outputPath: undefined, outputUrl: undefined, outputType: undefined, generatedResults: undefined, error: undefined })} /></label>
               <label><span>Scale</span><SimpleMenuSelect ariaLabel="Upscale amount" value={String(inspectorNode.data.scale || 2)} options={[2, 3, 4].map((value) => ({ value: String(value), label: `${value}×` }))} onChange={(value) => updateNode(inspectorNode.id, { scale: Number(value) })} /></label>
               {inspectorNode.data.upscalerModel !== 'realesrgan-video' && <><label className="inspector-wide"><span>Creativity · {(inspectorNode.data.creativity ?? 0.35).toFixed(2)}</span><input aria-label="Primary upscaler creativity" type="range" min="0" max="1" step="0.05" value={inspectorNode.data.creativity ?? 0.35} onChange={(event) => updateNode(inspectorNode.id, { creativity: Number(event.target.value) })} /></label><label className="inspector-wide"><span>Resemblance · {(inspectorNode.data.resemblance ?? 0.6).toFixed(2)}</span><input aria-label="Primary upscaler resemblance" type="range" min="0" max="1" step="0.05" value={inspectorNode.data.resemblance ?? 0.6} onChange={(event) => updateNode(inspectorNode.id, { resemblance: Number(event.target.value) })} /></label><label><span>Sampling steps</span><input type="number" min="1" max="100" value={inspectorNode.data.inferenceSteps ?? 18} onChange={(event) => updateNode(inspectorNode.id, { inferenceSteps: Number(event.target.value) })} /></label><label><span>Seed</span><input type="number" placeholder="Random" value={inspectorNode.data.seed ?? ''} onChange={(event) => updateNode(inspectorNode.id, { seed: event.target.value ? Number(event.target.value) : undefined })} /></label></>}
               <p className="reference-budget inspector-wide">Input budget · 1 {inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'video' : 'image'} · output preserves source aspect ratio</p>
             </section> : inspectorNode.data.kind === 'voiceover' && inspectorNode.data.voiceEngine === 'fish-audio' ? <section className="inspector-grid">
-              <label><span>Model</span><GroupedMenuSelect className="inspector-field-model-select" ariaLabel="Fish Audio model" value={inspectorNode.data.fishModel || 's2-pro'} groups={[{ label: 'Fish Audio', options: FISH_TTS_MODELS.map((model) => ({ ...model, provider: 'fish' as const })) }]} onChange={(model) => updateNode(inspectorNode.id, { fishModel: model as StudioNodeData['fishModel'] })} /></label>
+              <label><span>Model</span><GroupedMenuSelect catalog className="inspector-field-model-select" ariaLabel="Fish Audio model" value={inspectorNode.data.fishModel || 's2-pro'} groups={[{ label: 'Fish Audio', service: 'fish', options: [...(serviceModels.fish?.models || []).map(model => ({ value: model.id, label: model.label, provider: 'fish' as const, disabled: Boolean(serviceModels.fish?.catalogStale) })), ...(!serviceModels.fish?.models.some(model => model.id === (inspectorNode.data.fishModel || 's2-pro')) ? [{ value: inspectorNode.data.fishModel || 's2-pro', label: `Unavailable (${inspectorNode.data.fishModel || 's2-pro'})`, provider: 'fish' as const, disabled: true }] : [])] }]} onChange={(model) => { if (!serviceModels.fish?.catalogStale && serviceModels.fish?.models.some(item => item.id === model)) updateNode(inspectorNode.id, { fishModel: model }) }} /></label>
               <label><span>Voice reference ID</span><input aria-label="Fish primary voice ID" value={inspectorNode.data.fishReferenceId || ''} onChange={(event) => updateNode(inspectorNode.id, { fishReferenceId: event.target.value })} placeholder="Fish voice model ID" /></label>
               <label className="inspector-wide"><span>Expressiveness · {(inspectorNode.data.fishTemperature ?? 0.7).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.fishTemperature ?? 0.7} onChange={(event) => updateNode(inspectorNode.id, { fishTemperature: Number(event.target.value) })} /></label>
               <label className="inspector-wide"><span>Diversity · {(inspectorNode.data.fishTopP ?? 0.7).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.fishTopP ?? 0.7} onChange={(event) => updateNode(inspectorNode.id, { fishTopP: Number(event.target.value) })} /></label>
               <label className="inspector-wide"><span>Speed · {(inspectorNode.data.speed ?? 1).toFixed(2)}×</span><input aria-label="Fish primary speed" type="range" min="0.5" max="2" step="0.05" value={inspectorNode.data.speed ?? 1} onChange={(event) => updateNode(inspectorNode.id, { speed: Number(event.target.value) })} /></label>
               <label><span>Volume · {inspectorNode.data.fishVolume ?? 0} dB</span><input aria-label="Fish primary volume" type="range" min="-20" max="20" step="1" value={inspectorNode.data.fishVolume ?? 0} onChange={(event) => updateNode(inspectorNode.id, { fishVolume: Number(event.target.value) })} /></label>
               <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish audio format" value={inspectorNode.data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => updateNode(inspectorNode.id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label>
-              <label><span>Sample rate</span><SimpleMenuSelect ariaLabel="Fish sample rate" value={String(inspectorNode.data.fishSampleRate || 44100)} options={FISH_SAMPLE_RATES.map((value) => ({ value: String(value), label: `${value} Hz` }))} onChange={(value) => updateNode(inspectorNode.id, { fishSampleRate: Number(value) })} /></label>
-              {(inspectorNode.data.fishFormat || 'mp3') === 'mp3' && <label><span>MP3 bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 bitrate" value={String(inspectorNode.data.fishMp3Bitrate || 128)} options={FISH_MP3_BITRATES.map((value) => ({ value: String(value), label: `${value} kbps` }))} onChange={(value) => updateNode(inspectorNode.id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label>}
-              {inspectorNode.data.fishFormat === 'opus' && <label><span>Opus bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus bitrate" value={String(inspectorNode.data.fishOpusBitrate ?? 48)} options={FISH_OPUS_BITRATES.map((value) => ({ value: String(value), label: value === -1000 ? 'Auto' : `${value} kbps` }))} onChange={(value) => updateNode(inspectorNode.id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label>}
+              <label><span>Sample rate</span><SimpleMenuSelect ariaLabel="Fish sample rate" value={inspectorNode.data.fishSampleRate === undefined ? '@default' : String(inspectorNode.data.fishSampleRate)} options={fishSampleRateOptions(inspectorNode.data.fishFormat, inspectorNode.data.fishSampleRate)} onChange={(value) => updateNode(inspectorNode.id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label>
+              {(inspectorNode.data.fishFormat || 'mp3') === 'mp3' && <label><span>MP3 bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 bitrate" value={String(inspectorNode.data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', inspectorNode.data.fishMp3Bitrate ?? 128)} onChange={(value) => updateNode(inspectorNode.id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label>}
+              {inspectorNode.data.fishFormat === 'opus' && <label><span>Opus bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus bitrate" value={String(inspectorNode.data.fishOpusBitrate ?? 48)} options={fishBitrateOptions('opus', inspectorNode.data.fishOpusBitrate ?? 48)} onChange={(value) => updateNode(inspectorNode.id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label>}
               <label><span>Chunk length</span><input type="number" min="100" max="300" value={inspectorNode.data.fishChunkLength ?? 200} onChange={(event) => updateNode(inspectorNode.id, { fishChunkLength: Number(event.target.value) })} /></label>
               <label><span>Latency</span><SimpleMenuSelect ariaLabel="Latency" value={inspectorNode.data.fishLatency || 'normal'} options={[...FISH_LATENCY_OPTIONS]} onChange={(value) => updateNode(inspectorNode.id, { fishLatency: value as StudioNodeData['fishLatency'] })} /></label>
               <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalize !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalize: event.target.checked })} /><span>Normalize text</span></label>
-              <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalizeLoudness !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalizeLoudness: event.target.checked })} /><span>Normalize loudness</span></label>
+              {inspectorNode.data.fishModel !== 's1' && <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalizeLoudness !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalizeLoudness: event.target.checked })} /><span>Normalize loudness</span></label>}
               <p className="reference-budget inspector-wide">Fish Audio uses its own API key and dynamic voice Reference ID. Only controls supported by Fish are shown.</p>
-            </section> : inspectorNode.data.kind === 'voiceover' ? <section className="inspector-grid">
+            </section> : inspectorNode.data.kind === 'voiceover' ? <section className={`inspector-grid ${inspectorElevenDirect ? 'direct-eleven-settings' : ''}`}>
+              {inspectorElevenDirect ? <>
+                <label><span>Language</span><DirectElevenLanguageSelect data={inspectorNode.data} availability={serviceModels.elevenlabs} onChange={(patch) => updateNode(inspectorNode.id, patch)} /></label>
+              </> : <>
               <label><span>Voice</span><SimpleMenuSelect ariaLabel="ElevenLabs voice" value={(ELEVEN_V3_BUILT_IN_VOICES as readonly string[]).includes(inspectorNode.data.voice === undefined ? 'Rachel' : inspectorNode.data.voice) ? inspectorNode.data.voice === undefined ? 'Rachel' : inspectorNode.data.voice : '__custom'} options={[...ELEVEN_V3_BUILT_IN_VOICES.map((voice) => ({ value: voice, label: voice })), { value: '__custom', label: 'Custom voice name / ID' }]} onChange={(voice) => updateNode(inspectorNode.id, { voice: voice === '__custom' ? '' : voice })} /></label>
               {!(ELEVEN_V3_BUILT_IN_VOICES as readonly string[]).includes(inspectorNode.data.voice === undefined ? 'Rachel' : inspectorNode.data.voice) && <label><span>Custom voice</span><input aria-label="Custom ElevenLabs voice" value={inspectorNode.data.voice || ''} onChange={(event) => updateNode(inspectorNode.id, { voice: event.target.value })} placeholder="ElevenLabs voice name or ID" /></label>}
               <label><span>Language</span><SimpleMenuSelect className="inspector-field-model-select inspector-language-select" menuClassName="voice-language-menu" ariaLabel="Voice language" value={normalizedElevenV3LanguageCode(inspectorNode.data.languageCode) || 'eng'} options={[...ELEVEN_V3_LANGUAGES]} onChange={(languageCode) => updateNode(inspectorNode.id, { languageCode })} /></label>
-              <label className="inspector-wide"><span>Stability · {(inspectorNode.data.stability ?? 0.5).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.stability ?? 0.5} onChange={(event) => updateNode(inspectorNode.id, { stability: Number(event.target.value) })} /></label>
-              <label className="inspector-wide"><span>Similarity · {(inspectorNode.data.similarityBoost ?? 0.75).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.similarityBoost ?? 0.75} onChange={(event) => updateNode(inspectorNode.id, { similarityBoost: Number(event.target.value) })} /></label>
-              <label className="inspector-wide"><span>Speed · {(inspectorNode.data.speed ?? 1).toFixed(2)}×</span><input aria-label="Eleven primary speed" type="range" min="0.7" max="1.2" step="0.05" value={inspectorNode.data.speed ?? 1} onChange={(event) => updateNode(inspectorNode.id, { speed: Number(event.target.value) })} /></label>
+              </>}
+              {!inspectorElevenDirect && <label className="inspector-wide"><span>Stability · {(inspectorNode.data.stability ?? 0.5).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.stability ?? 0.5} onChange={(event) => updateNode(inspectorNode.id, { stability: Number(event.target.value) })} /></label>}
+              {!inspectorElevenDirect && <label className="inspector-wide"><span>Similarity · {(inspectorNode.data.similarityBoost ?? 0.75).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.similarityBoost ?? 0.75} onChange={(event) => updateNode(inspectorNode.id, { similarityBoost: Number(event.target.value) })} /></label>}
+              {(!inspectorElevenDirect || !isElevenDialogue(inspectorNode.data) && elevenSupportsSpeed(inspectorNode.data.voiceModelId)) && <label className="inspector-wide"><span>Speed · {(inspectorNode.data.speed ?? 1).toFixed(2)}×</span><input aria-label="Eleven primary speed" type="range" min={inspectorElevenDirect ? '0.25' : '0.7'} max={inspectorElevenDirect ? '4' : '1.2'} step="0.05" value={inspectorNode.data.speed ?? 1} onChange={(event) => updateNode(inspectorNode.id, { speed: Number(event.target.value) })} /></label>}
+              {inspectorElevenDirect && elevenSupportsSpeed(inspectorNode.data.voiceModelId) && !isElevenDialogue(inspectorNode.data) && inspectorElevenModel?.supportsStyle && <label className="inspector-wide"><span>Voice style · {(inspectorNode.data.voiceStyle ?? 0).toFixed(2)}</span><input aria-label="ElevenLabs voice style" type="range" min="0" max="1" step="0.05" value={inspectorNode.data.voiceStyle ?? 0} onChange={(event) => updateNode(inspectorNode.id, { voiceStyle: Number(event.target.value) })} /></label>}
               <label><span>Text normalization</span><SimpleMenuSelect ariaLabel="Text normalization" value={inspectorNode.data.textNormalization || 'auto'} options={[...ELEVEN_TEXT_NORMALIZATION_OPTIONS]} onChange={(value) => updateNode(inspectorNode.id, { textNormalization: value as StudioNodeData['textNormalization'] })} /></label>
-              <label><span>Output</span><SimpleMenuSelect ariaLabel="Output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={AUDIO_OUTPUT_FORMATS.map((format) => ({ value: format, label: format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
+              <label><span>Output</span><SimpleMenuSelect ariaLabel="Output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={(inspectorElevenDirect ? ELEVEN_DIRECT_OUTPUT_FORMATS : AUDIO_OUTPUT_FORMATS).map((format) => ({ value: format, label: inspectorElevenDirect ? directAudioFormatLabel(format) : format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
               <label><span>Seed</span><input type="number" placeholder="Random" value={inspectorNode.data.voiceSeed ?? ''} onChange={(event) => updateNode(inspectorNode.id, { voiceSeed: event.target.value ? Number(event.target.value) : undefined })} /></label>
               <label className="inspector-switch"><input type="checkbox" checked={inspectorNode.data.voiceTimestamps !== false} onChange={(event) => updateNode(inspectorNode.id, { voiceTimestamps: event.target.checked })} /><span>Return timestamps</span></label>
               <label className="inspector-wide"><span>Previous text · continuity context</span><textarea value={inspectorNode.data.previousText || ''} onChange={(event) => updateNode(inspectorNode.id, { previousText: event.target.value })} /></label>
               <label className="inspector-wide"><span>Next text · continuity context</span><textarea value={inspectorNode.data.nextText || ''} onChange={(event) => updateNode(inspectorNode.id, { nextText: event.target.value })} /></label>
             </section> : inspectorNode.data.kind === 'sound-effects' ? <section className="inspector-grid">
-              <label><span>Duration</span><SimpleMenuSelect ariaLabel="Sound effect duration" value={String(inspectorNode.data.duration || 5)} options={[0.5,1,2,3,5,8,10,15,22].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value) })} /></label>
+              <label><span>Duration</span><SimpleMenuSelect ariaLabel="Sound effect duration" value={String(inspectorNode.data.duration || 5)} options={(inspectorNode.data.audioProvider === 'elevenlabs' ? [0.5,1,2,3,5,8,10,15,22,30] : [0.5,1,2,3,5,8,10,15,22]).map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value) })} /></label>
               <label className="inspector-switch"><input aria-label="Sound primary loop" type="checkbox" checked={Boolean(inspectorNode.data.loop)} onChange={(event) => updateNode(inspectorNode.id, { loop: event.target.checked })} /><span>Seamless loop</span></label>
               <label className="inspector-wide"><span>Prompt influence · {(inspectorNode.data.promptInfluence ?? 0.3).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.promptInfluence ?? 0.3} onChange={(event) => updateNode(inspectorNode.id, { promptInfluence: Number(event.target.value) })} /></label>
-              <label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Sound effect output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={AUDIO_OUTPUT_FORMATS.map((format) => ({ value: format, label: format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
+              <label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Sound effect output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={(inspectorNode.data.audioProvider === 'elevenlabs' ? ELEVEN_DIRECT_OUTPUT_FORMATS : AUDIO_OUTPUT_FORMATS).map((format) => ({ value: format, label: inspectorNode.data.audioProvider === 'elevenlabs' ? directAudioFormatLabel(format) : format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
             </section> : <section className="inspector-grid">
               <label><span>Duration</span><SimpleMenuSelect ariaLabel="Music duration" value={String(inspectorNode.data.duration || 30)} options={[10,15,30,45,60,90,120,180,300,600].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value) })} /></label>
               <label className="inspector-switch"><input type="checkbox" checked={Boolean(inspectorNode.data.forceInstrumental)} onChange={(event) => updateNode(inspectorNode.id, { forceInstrumental: event.target.checked })} /><span>Instrumental only</span></label>
               <label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Music output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={AUDIO_OUTPUT_FORMATS.map((format) => ({ value: format, label: format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
             </section>}
-            {inspectorRequest && ['image-generator', 'video-generator'].includes(inspectorRequest.kind) && <section className="inspector-section inspector-direction-layer">
+            {inspectorRequest && !inspectorRequest.higgsfieldNative && ['image-generator', 'video-generator'].includes(inspectorRequest.kind) && <section className="inspector-section inspector-direction-layer">
               <label className="inspector-direction-layer-toggle">
                 <span><strong>Direction Layer</strong><small>Adds cinematography and story-beat guidance where your prompt and connected assets are silent.</small></span>
                 <input type="checkbox" checked={inspectorNode.data.directionLayer !== false} onChange={(event) => updateNode(inspectorNode.id, { directionLayer: event.target.checked })} />
               </label>
             </section>}
-            {inspectorNode.data.kind === 'video-generator' && <section className="inspector-section inspector-shot-locks">
+            {inspectorNode.data.kind === 'video-generator' && !inspectorNode.data.higgsfieldNative && <section className="inspector-section inspector-shot-locks">
               <label>SHOT LOCKS</label>
               <textarea value={inspectorNode.data.shotLocks || ''} placeholder="hero stays frame-left; only the helmsman touches the wheel; door closed until cut 4" onChange={(event) => updateNode(inspectorNode.id, { shotLocks: event.target.value })} />
               <small>Appended verbatim to POSITIVE LOCKS and never removed by prompt budgeting.</small>
             </section>}
-            {inspectorNode.data.kind === 'video-generator' && <section className="inspector-section inspector-sequence-runner">
+            {inspectorNode.data.kind === 'video-generator' && !inspectorNode.data.higgsfieldNative && <section className="inspector-section inspector-sequence-runner">
               <label className="inspector-direction-layer-toggle">
                 <span><strong>Shot Sequence</strong><small>Render opted-in Video Generators in order and lock each final frame into the next shot.</small></span>
                 <input type="checkbox" checked={Boolean(inspectorNode.data.sequenceEnabled)} onChange={(event) => updateNode(inspectorNode.id, { sequenceEnabled: event.target.checked, sequenceOrder: inspectorNode.data.sequenceOrder || sequenceNodes.length + 1, sequenceStatus: 'idle' })} />
@@ -6452,7 +6881,7 @@ export function App() {
             <label><Search size={13} /><input value={assetSearch} placeholder="Search Assets" onChange={(event) => setAssetSearch(event.target.value)} />{assetSearch && <button title="Clear Search" onClick={() => setAssetSearch('')}><X size={11} /></button>}</label>
             <div><button className={assetOriginFilter === 'all' ? 'is-active' : ''} onClick={() => setAssetOriginFilter('all')}>All</button><button className={assetOriginFilter === 'imported' ? 'is-active' : ''} onClick={() => setAssetOriginFilter('imported')}>Imported</button><button className={assetOriginFilter === 'generated' ? 'is-active' : ''} onClick={() => setAssetOriginFilter('generated')}>Generated</button></div>
           </div>
-          <div className={`canvas-asset-sticky-actions ${selectedManagedAssetDeletion.selectionCount > 0 ? 'has-delete' : ''}`}><button onClick={() => void importAssetPackage()}><Upload size={13} />Import Asset</button><button className="is-primary" onClick={createFromAssetSection}><Plus size={13} />{canvasAssetCreateLabel}</button>{selectedManagedAssetDeletion.selectionCount > 0 && <button className="canvas-asset-delete-selected" onClick={requestSelectedManagedAssetDelete}><Trash2 size={13} />Delete {selectedManagedAssetDeletion.selectionCount}</button>}</div>
+          <div className={`canvas-asset-sticky-actions ${selectedManagedAssetDeletion.selectionCount > 0 ? 'has-delete' : ''}`}><button className="creation-action" onClick={() => void importAssetPackage()}><Upload size={13} />Import Asset</button><button className="is-primary creation-action" onClick={createFromAssetSection}><Plus size={13} />{canvasAssetCreateLabel}</button>{selectedManagedAssetDeletion.selectionCount > 0 && <button className="canvas-asset-delete-selected" onClick={requestSelectedManagedAssetDelete}><Trash2 size={13} />Delete {selectedManagedAssetDeletion.selectionCount}</button>}</div>
           <div className="canvas-asset-list">
             {assetTypeFilter === 'style' && visibleBuiltInStyles.map((preset) => <article key={preset.id} className={`canvas-style-preset ${selectedAssetKeys.includes(`built-in-style:${preset.id}`) ? 'is-selected' : ''}`} onDragStart={(event) => beginCanvasAssetDrag(event, { kind: 'built-in-style', presetId: preset.id }, preset.title, 'Built-in Style')}>
               <button className="canvas-asset-thumb" draggable aria-pressed={selectedAssetKeys.includes(`built-in-style:${preset.id}`)} data-tooltip={`Select ${preset.title} · drag to Canvas to deploy`} data-tooltip-delay="1500" onClick={(event) => selectVisibleAsset(event, `built-in-style:${preset.id}`)}><img src={preset.thumbnail} alt={preset.title} loading="lazy" decoding="async" style={{ objectPosition: preset.focalPosition }} /></button>
@@ -6547,7 +6976,7 @@ export function App() {
       {assetErrorNotice && <div className="connection-error-toast media-offline-error-toast" role="alert"><Unlink size={16} /><span><strong>Media Not Found</strong><small>{assetErrorNotice}</small></span><button aria-label="Dismiss media not found error" onClick={() => setAssetErrorNotice('')}><X size={14} /></button></div>}
 
       {settingsOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setSettingsOpen(false)}>
+        <div className="modal-backdrop" onMouseDown={() => closeConnections()}>
           <section className="settings-modal connections-hub" onMouseDown={(event) => event.stopPropagation()} onMouseDownCapture={(event) => {
             if (!activeService) return
             const card = (event.target as HTMLElement).closest<HTMLElement>('.service-card')
@@ -6555,21 +6984,24 @@ export function App() {
             setActiveService(null)
             setSignInProfileId(null)
           }}>
-            <header><span><Settings size={18} /></span><div><strong>Connections</strong><small>Add AI services to Prism Foundry · {connectedServiceCount} connected</small></div><button title="Close Connections" aria-label="Close Connections" onClick={() => setSettingsOpen(false)}><X size={17} /></button></header>
+            <header><span><Settings size={18} /></span><div><strong>Connections</strong><small>Add AI services to Prism Foundry · {connectedServiceCount} connected</small></div><button title="Close Connections" aria-label="Close Connections" onClick={() => closeConnections()}><X size={17} /></button></header>
             <div className="connections-intro"><div><p>AI SERVICE DIRECTORY</p><h2>Choose the tools your studio can use.</h2><span>Generators route directly through the provider selected on each node.</span></div><div className="connection-security"><KeyRound size={14} /> macOS encrypted</div></div>
             <div className="service-grid">
               {SERVICE_CATALOG.map((service) => {
                 const providerProfiles = serviceProfiles.profiles.filter((profile) => profile.provider === service.id)
                 const providerSelection = projectServiceProfileSelection(serviceProfiles, project || undefined, service.id)
-                const connected = providerProfiles.length ? providerProfiles.some((profile) => profile.status === 'connected') : serviceConnections[service.id]
+                const connected = serviceConnections[service.id]
+                const hasAccounts = providerProfiles.length > 0 || connected
                 const expanded = activeService === service.id
+                const editingKey = expanded && (signInProfileId === 'new' || providerProfiles.some((profile) => profile.id === signInProfileId))
 
                 return <article data-service={service.id} className={`service-card ${connected ? 'is-connected' : ''} ${expanded ? 'is-expanded' : ''}`} key={service.id}>
                   <div className="service-card-head"><span className={`service-icon brand-${service.id}`}><ServiceBrandLogo provider={service.id} /></span><div><strong>{service.name}</strong><small>{service.company}</small></div>{connected && <span className="connection-badge"><i /> Connected</span>}</div>
                   <p>{service.description}</p>
+                  {serviceModels[service.id]?.catalogError && <p role="status" title={serviceModels[service.id]?.catalogError}>{serviceModels[service.id]?.catalogStale ? 'Model catalog unavailable' : 'Model catalog incomplete'} · saved choices preserved</p>}
                   <div className="service-capabilities">{service.capabilities.map((capability) => <span key={capability}>{capability}</span>)}</div>
-                  {service.id === 'omniroute' ? <footer><button className="connect-service" disabled={serviceBusy} onClick={() => void refreshOmniRoute()}><Route size={13} />{connected ? 'Refresh Models' : 'Check Local Gateway'}</button></footer> : expanded ? <div className="fal-account-manager">
-                    <div className="fal-account-manager-head"><div><strong>{service.name} Accounts</strong><small>Selecting an account saves it for {project?.name || 'this project'}.</small></div><button aria-label={`Collapse ${service.name} Accounts`} onClick={() => { setActiveService(null); setSignInProfileId(null) }}><X size={14} /></button></div>
+                  {service.id === 'omniroute' ? <footer><span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span><button className="connect-service" disabled={serviceBusy} onClick={() => void refreshOmniRoute()}><Route size={13} />{connected ? 'Refresh Models' : 'Check Local Gateway'}</button></footer> : expanded ? <div className="fal-account-manager">
+                    <div className="fal-account-manager-head"><button aria-label={`Collapse ${service.name} Accounts`} onClick={() => { setActiveService(null); setSignInProfileId(null) }}><X size={14} /></button></div>
                     <div className="fal-account-list">
                       {providerProfiles.map((profile) => {
                         const isDefault = serviceProfiles.defaults[service.id] === profile.id
@@ -6578,7 +7010,6 @@ export function App() {
                         const profileDisplayName = profile.displayName || profile.accountIdentifier
                         const signedOut = profile.status === 'signed-out'
                         const disconnected = profile.status === 'disconnected'
-                        const signInOpen = signInProfileId === profile.id
                         return <article className={`fal-account-row ${isProject ? 'is-project-account' : ''} state-${profile.status}`} key={profile.id}>
                           <div className="fal-account-select"><button className="fal-account-radio" disabled={profile.status !== 'connected'} onClick={() => setProfileConfirmation({ profileId: profile.id, action: isProjectOverride ? 'cancel-project' : 'select-project' })} aria-pressed={isProject} title={isProjectOverride ? 'This project uses this account. Click to return the project to its default account.' : 'Use this account for this project.'}><span className="fal-account-avatar">{profileDisplayName.slice(0, 1).toUpperCase()}</span></button><span className="fal-account-identity">{renamingProfileId === profile.id ? <input autoFocus value={profileNameDraft} onChange={(event) => setProfileNameDraft(event.target.value)} onBlur={() => void commitServiceProfileRename(profile.id)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); else if (event.key === 'Escape') { setRenamingProfileId(null); setProfileNameDraft('') } }} /> : <span className="fal-account-name"><strong onDoubleClick={() => { setRenamingProfileId(profile.id); setProfileNameDraft(profileDisplayName) }}>{profileDisplayName}</strong><button title="Rename Account Profile" aria-label={`Rename ${profileDisplayName}`} onClick={() => { setRenamingProfileId(profile.id); setProfileNameDraft(profileDisplayName) }}><PencilLine size={11} /></button></span>}<small>{profile.status === 'connected' ? 'Connected' : disconnected ? 'Disconnected · key retained' : 'Signed out · key removed'}</small></span></div>
                           <div className="fal-account-actions">
@@ -6589,13 +7020,17 @@ export function App() {
                             {signedOut ? <button onClick={() => { setSignInProfileId(profile.id); setServiceDrafts((current) => ({ ...current, [service.id]: '' })) }}><LogIn size={13} />Sign In</button> : <button onClick={() => setProfileConfirmation({ profileId: profile.id, action: 'sign-out' })}><LogOut size={13} />Sign Out</button>}
                             <button className="fal-account-delete" aria-label={`Delete ${profileDisplayName}`} title="Delete Account" onClick={() => setProfileConfirmation({ profileId: profile.id, action: 'delete' })}><Trash2 size={13} /></button>
                           </div>
-                          {signInOpen && <div className="fal-inline-key-form"><label>API key<input autoFocus type="password" value={serviceDrafts[service.id]} onChange={(event) => setServiceDrafts((current) => ({ ...current, [service.id]: event.target.value }))} placeholder={service.placeholder} autoComplete="off" /></label><div><button onClick={() => setSignInProfileId(null)}>Cancel</button><button className="connect-primary" disabled={serviceBusy || serviceDrafts[service.id].trim().length < 20} onClick={() => void saveService(service.id)}><LogIn size={13} />Sign In</button></div></div>}
                         </article>
                       })}
-                      {!providerProfiles.length && <div className="fal-account-empty"><KeyRound size={19} /><strong>No {service.name} accounts yet</strong><small>Connect an API key to add the first default account.</small></div>}
                     </div>
-                    {signInProfileId === 'new' ? <div className="fal-inline-key-form is-add-account"><label>API key<input autoFocus type="password" value={serviceDrafts[service.id]} onChange={(event) => setServiceDrafts((current) => ({ ...current, [service.id]: event.target.value }))} placeholder={service.placeholder} autoComplete="off" /></label><div><button onClick={() => setSignInProfileId(null)}>Cancel</button><button className="connect-primary" disabled={serviceBusy || serviceDrafts[service.id].trim().length < 20} onClick={() => void saveService(service.id)}><Plus size={13} />Connect Account</button></div></div> : <button className="fal-add-account" onClick={() => { setSignInProfileId('new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })) }}><Plus size={13} />Add Account</button>}
-                  </div> : <footer><button className="connect-service" onClick={() => { setActiveService(service.id); setServiceError('') }}>{connected ? <UserRound size={13} /> : <Plus size={13} />}{connected ? 'Manage Accounts' : 'Connect'}</button></footer>}
+                  </div> : null}
+                  {service.id !== 'omniroute' && <footer>
+                    <span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span>
+                    {editingKey ? <>
+                      <input className="service-key-input" autoFocus disabled={serviceBusy} type="password" aria-label={`${service.name} API key`} value={serviceDrafts[service.id]} onChange={(event) => setServiceDrafts((current) => ({ ...current, [service.id]: event.target.value }))} placeholder={service.placeholder} autoComplete="off" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); const footer = event.currentTarget.closest('footer'); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); requestAnimationFrame(() => footer?.querySelector<HTMLButtonElement>('button')?.focus()) } else if (event.key === 'Enter' && !serviceBusy && serviceDrafts[service.id].trim().length >= 20) { event.preventDefault(); void saveService(service.id, event.currentTarget.closest('footer')) } }} />
+                      <div className="service-key-actions"><button className="service-key-cancel" disabled={serviceBusy} onClick={(event) => { const footer = event.currentTarget.closest('footer'); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); requestAnimationFrame(() => footer?.querySelector<HTMLButtonElement>('button')?.focus()) }}>Cancel</button><button className="service-key-connect" disabled={serviceBusy || serviceDrafts[service.id].trim().length < 20} onClick={(event) => void saveService(service.id, event.currentTarget.closest('footer'))}>{signInProfileId === 'new' ? 'Connect' : 'Save'}</button></div>
+                    </> : expanded ? <button className="fal-add-account" onClick={() => { setSignInProfileId('new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })) }}><Plus size={13} />Add Account</button> : <button className="connect-service" onClick={() => { setActiveService(service.id); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); setServiceError('') }}>{hasAccounts ? <UserRound size={13} /> : <Plus size={13} />}{hasAccounts ? 'Manage Accounts' : 'Connect'}</button>}
+                  </footer>}
                 </article>
               })}
             </div>
@@ -6624,11 +7059,11 @@ export function App() {
           </section>
         </div>
       })()}
-      {connectionWarning && <div className="modal-backdrop connection-warning-backdrop" onMouseDown={() => { setConnectionWarning(null); setSettingsOpen(false) }}>
+      {connectionWarning && <div className="modal-backdrop connection-warning-backdrop" onMouseDown={() => { setConnectionWarning(null); closeConnections() }}>
         <section className="delete-confirm-modal connection-warning-modal" role="alertdialog" aria-modal="true" aria-labelledby="connection-warning-title" onMouseDown={(event) => event.stopPropagation()}>
-          <header><span><KeyRound size={18} /></span><div><strong id="connection-warning-title">{connectionWarning.providerName} connection required</strong><small>{connectionWarning.modelLabel}</small></div><button title="Cancel" aria-label="Cancel Connection Warning" onClick={() => { setConnectionWarning(null); setSettingsOpen(false) }}><X size={16} /></button></header>
+          <header><span><KeyRound size={18} /></span><div><strong id="connection-warning-title">{connectionWarning.providerName} connection required</strong><small>{connectionWarning.modelLabel}</small></div><button title="Cancel" aria-label="Cancel Connection Warning" onClick={() => { setConnectionWarning(null); closeConnections() }}><X size={16} /></button></header>
           <p>Select a signed-in {connectionWarning.providerName} account or connect an API key before running {connectionWarning.modelLabel}.</p>
-          <footer><button onClick={() => { setConnectionWarning(null); setSettingsOpen(false) }}>Cancel</button><button className="is-primary" onClick={() => { setConnectionWarning(null); setActiveService(connectionWarning.provider) }}>Manage Connection</button></footer>
+          <footer><button onClick={() => { setConnectionWarning(null); closeConnections() }}>Cancel</button><button className="is-primary" onClick={() => { setConnectionWarning(null); setActiveService(connectionWarning.provider) }}>Manage Connection</button></footer>
         </section>
       </div>}
       {serviceActionError && <div className="modal-backdrop connection-warning-backdrop" onMouseDown={() => setServiceActionError('')}>
@@ -6639,5 +7074,6 @@ export function App() {
         </section>
       </div>}
     </div>
+    </ProviderAvailabilityContext.Provider>
   )
 }

@@ -21,8 +21,8 @@ describe('safe product state without Director semantic workspace', () => {
     expect(app).toContain('currentProject: () => window.prism.projects.current()')
     expect(app).toContain('recentProjects: () => window.prism.projects.recent()')
     expect(app).toContain('onRecentProjects: (projects) => setRecentProjects([...projects])')
-    expect(app).toContain('if (storedProject) await activateProject(storedProject, false)')
-    expect(app.indexOf("if (storedProject) await activateProject(storedProject, false)")).toBeLessThan(app.indexOf('setProjectReady(true)'))
+    expect(app).toContain('const activation = activateProject(storedProject, false)')
+    expect(app.indexOf("const activation = activateProject(storedProject, false)")).toBeLessThan(app.indexOf('setProjectReady(true)'))
     expect(app).not.toMatch(/Promise\.all\(\[[^\]]*projects\.current\(\)[^\]]*projects\.recent\(\)/)
     const fixture = [{ name: '00. Prism' }, { name: 'Test Flow' }]
     expect(fixture.map((project) => project.name)).toEqual(['00. Prism', 'Test Flow'])

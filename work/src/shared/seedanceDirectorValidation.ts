@@ -1,3 +1,5 @@
+import { seedanceFinalSectionErrors } from './seedanceFinalSection'
+import { ownsExactSeedanceMaster } from './seedanceAuthoredMaster'
 import type { GenerationRequest } from './types'
 import { groupStoryboardSequence } from './storyboardSequence'
 import { directorProvenance, type SeedanceDirectorKnowledgeId } from './seedanceDirectorContract'
@@ -18,9 +20,24 @@ function count(value: string, pattern: RegExp): number {
   return [...value.matchAll(new RegExp(pattern.source, pattern.flags))].length
 }
 
-function typedShotBlocks(body: string): Map<number, string> {
-  const matches = [...body.matchAll(/^SHOT\s+(\d+)\b/gm)]
-  return new Map(matches.map((match, index) => [Number(match[1]), body.slice(match.index!, matches[index + 1]?.index ?? body.length)]))
+function typedBeatBlocks(body: string, sequence: ReturnType<typeof groupStoryboardSequence>): Map<number, { text: string; label: string }> {
+  // Camera summaries use `SHOT N:` too; only timeline headings delimit state.
+  const matches = [...body.matchAll(/^(?:SHOT\s+(\d+)(?:\s*\/\s*BEAT\s+(\d+))?|BEAT\s+(\d+))(?=\s*(?:[·—-]|$))/gm)]
+  const blocks = new Map(matches.map((match, index) => [
+    match[3] ? `beat-${match[3]}` : `shot-${match[1]}${match[2] ? `-beat-${match[2]}` : ''}`,
+    body.slice(match.index!, matches[index + 1]?.index ?? body.length),
+  ]))
+  const continuous = sequence.hardCutCount === 0 && (sequence.shots[0]?.beats.length || 0) > 1
+  const result = new Map<number, { text: string; label: string }>()
+  let panelIndex = 0
+  sequence.shots.forEach((group, shotIndex) => group.beats.forEach((_, beatIndex) => {
+    const key = continuous ? `beat-${beatIndex + 1}`
+      : `shot-${shotIndex + 1}${group.beats.length > 1 ? `-beat-${beatIndex + 1}` : ''}`
+    const label = continuous ? `Beat ${beatIndex + 1}`
+      : `Shot ${shotIndex + 1}${group.beats.length > 1 ? ` / beat ${beatIndex + 1}` : ''}`
+    result.set(++panelIndex, { text: blocks.get(key) || '', label })
+  }))
+  return result
 }
 
 function stateFields(block: string, tag: string): Set<string> | undefined {
@@ -43,7 +60,7 @@ function authoredStateFields(state: ReturnType<typeof buildContinuityLedger>['sh
 export function validateSeedanceDirectorPrompt(body: string, request: GenerationRequest): SeedanceDirectorValidationResult {
   directorProvenance('local-validation', VALIDATION_IDS)
   const errors: string[] = []
-  const shots = request.storyboardShots || []
+  const shots = ownsExactSeedanceMaster(request) ? [] : request.storyboardShots || []
   if (shots.length) {
     const sequence = groupStoryboardSequence(shots)
     const cuts = count(body, /\bHARD CUT\./g)
@@ -55,34 +72,33 @@ export function validateSeedanceDirectorPrompt(body: string, request: Generation
       if (/^SHOT\s+\d+/m.test(body)) errors.push('Continuous mode must not create SHOT boundaries.')
       if (cuts) errors.push('Continuous mode must not contain HARD CUT markers.')
     }
-    if (shots.some((shot) => shot.continuityGroupId || shot.activeCharacterTags?.length || shot.characterStates?.length || shot.characterStateDeltas?.length)) {
-      const ledger = buildContinuityLedger(request)
-      const blocks = typedShotBlocks(body)
+    if (shots.some((shot) => shot.continuityGroupId || shot.activeCharacterTags !== undefined || shot.characterStates?.length || shot.characterStateDeltas?.length)) {
+      let ledger: ReturnType<typeof buildContinuityLedger>
+      try { ledger = buildContinuityLedger(request) }
+      catch (error) { return { ok: false, knowledgeIds: VALIDATION_IDS, errors: [...errors, error instanceof Error ? error.message : 'Review physical cast ownership.'] } }
+      const blocks = typedBeatBlocks(body, sequence)
       for (const shot of ledger.shots) {
-        const block = blocks.get(shot.index) || ''
+        const entry = blocks.get(shot.index)
+        const block = entry?.text || ''
+        const label = entry?.label || `Shot ${shot.index}`
         const renderedGroup = block.match(/^CONTINUITY GROUP · (.+)$/m)?.[1]
-        if (renderedGroup && shot.groupId && renderedGroup !== shot.groupId) errors.push(`Shot ${shot.index} continuity group must remain ${shot.groupId}; found ${renderedGroup}.`)
+        if (renderedGroup && shot.groupId && renderedGroup !== shot.groupId) errors.push(`${label} continuity group must remain ${shot.groupId}; found ${renderedGroup}.`)
         for (const state of shot.characterStates) {
           const fields = stateFields(block, state.characterTag)
           if (!fields) {
-            errors.push(`Shot ${shot.index} is missing active Character state for ${state.characterTag}.`)
+            errors.push(`${label} is missing active Character state for ${state.characterTag}.`)
             continue
           }
           const dropped = authoredStateFields(state).filter((field) => !fields.has(field))
-          if (dropped.length) errors.push(`Shot ${shot.index} dropped inherited state for ${state.characterTag}: ${dropped.join(', ')}.`)
+          if (dropped.length) errors.push(`${label} dropped inherited state for ${state.characterTag}: ${dropped.join(', ')}.`)
         }
         for (const value of futureOnlyTypedContinuityValues(request, shot.index - 1)) {
-          if (block.includes(value) && !shots[shot.index - 1].prompt.includes(value)) errors.push(`Shot ${shot.index} contains future-only typed state before its owning shot: ${value}.`)
+          if (block.includes(value) && !shots[shot.index - 1].prompt.includes(value)) errors.push(`${label} contains future-only typed state before its owning shot: ${value}.`)
         }
       }
     }
   }
-  const negativeIndex = body.lastIndexOf('NEGATIVE PROMPT')
-  if (negativeIndex < 0) errors.push('NEGATIVE PROMPT is required.')
-  else {
-    const afterNegative = body.slice(negativeIndex + 'NEGATIVE PROMPT'.length)
-    if (/^\s*(?:ASSISTANT TASK|EDIT CONTROL|REFERENCE AUTHORITY|FORMAT MODE|TIMELINE AND CONTINUOUS ACTION|CAMERA|LENS AND OPTICS|LIGHTING|LOOK AND CAPTURE CHARACTER|IDENTITY AND ANATOMY CONTINUITY|FINAL-FRAME AND OUTPUT HARD GATE)\s*$/m.test(afterNegative)) errors.push('NEGATIVE PROMPT must be the final section.')
-  }
+  errors.push(...seedanceFinalSectionErrors(body))
   for (const dialogue of body.matchAll(/^DIALOGUE \/ AUDIO ·/gm)) {
     const remainder = body.slice(dialogue.index)
     const audioEndpoint = remainder.indexOf('\nAUDIO ENDPOINT ·')

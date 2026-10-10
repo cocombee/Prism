@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FILMIC_MOTION_NEGATIVE_TERMS, filmicMotionSemantics } from './filmicMotion'
+import { authoredPlaybackTiming, FILMIC_MOTION_NEGATIVE_TERMS, filmicMotionSemantics } from './filmicMotion'
 
 const APPROVED_TEMPORAL_CLAUSES = [
   'Render motion with an even 24fps cinematic cadence and natural directional exposure blur across each frame’s exposure interval.',
@@ -14,6 +14,33 @@ const UNRELATED_TERMS = [
 ] as const
 
 describe('filmic motion semantics', () => {
+  it('leaves capture rate, shutter exposure and speed factors unknown for authored playback intervals', () => {
+    const result = filmicMotionSemantics({ authoredText: 'Slow motion then return to real time.', captureFps: 24, selectedAngle: 180, playback: { mode: 'authored', deliveryFps: 24 } })
+    expect(result.deliveryFps).toBe(24)
+    expect(result.captureFps).toBeUndefined()
+    expect(result.playbackFps).toBeUndefined()
+    expect(result.exposureSeconds).toBeUndefined()
+    expect(result.positive).not.toContain('at normal speed')
+    expect(result.positive).not.toContain('1/48-second')
+    expect(result.positive).toContain('capture cadence, playback speed and ramp intervals in each shot or beat')
+  })
+  it('detects playback wording without interpreting slow camera travel as slow playback', () => {
+    for (const text of ['slow-motion', 'No slow motion', 'Speed ramping at impact', 'play back at 24fps', 'real-time', '120fps capture']) expect(authoredPlaybackTiming(text)).toBe(true)
+    for (const text of ['Slow dolly down', 'Extremely fast pan', '80cm travel in 4 seconds', 'Slow shutter']) expect(authoredPlaybackTiming(text)).toBe(false)
+  })
+  it('retains the literal no-motion-blur conflict when authored playback owns intervals', () => {
+    const result = filmicMotionSemantics({ authoredText: 'Slow motion, no motion blur.', captureFps: 24, selectedAngle: 180, playback: { mode: 'authored', deliveryFps: 24 } })
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'shutter-no-motion-blur', severity: 'conflict' }))
+  })
+  it('checks an explicit authored capture/shutter pair against capture rather than delivery cadence', () => {
+    const input = { captureFps: 24, selectedAngle: 180, playback: { mode: 'authored' as const, deliveryFps: 24 } }
+    const correct = filmicMotionSemantics({ ...input, authoredText: 'Slow motion. Capture at 120fps with 180-degree shutter angle and shutter speed 1/240 second.' })
+    expect(correct.captureFps).toBe(120)
+    expect(correct.exposureSeconds).toBeCloseTo(1 / 240)
+    expect(correct.diagnostics).toEqual([])
+    const conflict = filmicMotionSemantics({ ...input, authoredText: 'Slow motion. Capture at 120fps with 180-degree shutter angle and shutter speed 1/120 second.' })
+    expect(conflict.diagnostics).toContainEqual(expect.objectContaining({ code: 'shutter-pair-conflict' }))
+  })
   it('resolves ordinary capture/playback and 180-degree exposure from capture FPS', () => {
     for (const [captureFps, reciprocal] of [[24, 48], [25, 50], [30, 60], [60, 120], [100, 200]] as const) {
       const result = filmicMotionSemantics({ authoredText: '', captureFps, selectedAngle: 180, playback: { mode: 'normal' } })

@@ -4,7 +4,7 @@ import { NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import { ArrowDown, ArrowUp, AudioLines, Bot, ChevronDown, Clapperboard, Clock3, Copy, Frame, Image as ImageIcon, Link2, List, Lock, MessageCircle, Play, Plus, Route, StickyNote, Trash2, Unlock, Video, Volume2, WandSparkles } from 'lucide-react'
 import type { StudioNode } from '../../shared/types'
 import { fallbackAssetTag, FluidControlGroup, FooterSaveAction, GroupedMenuSelect, hasMaterializedAsset, NodeRuntimeContext, type FluidGroupControl } from './NodeCardNext'
-import { curatedAssistantModels, type AssistantProvider } from '../../shared/assistantModels'
+import type { AssistantProvider } from '../../shared/assistantModels'
 import { formatDurationSeconds } from '../../shared/videoModels'
 import { NodePort } from './NodePort'
 import { nodeInputPorts } from '../../shared/nodePorts'
@@ -161,11 +161,12 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
     mode: 'single',
     targetDuration: connectedVideo?.duration,
     modelDurationOptions,
+    modelMinimumSeconds: connectedVideo?.minimumSeconds,
   })
   const panels = storedPanels
   const totalDuration = durationBudget.totalDuration
   const overBudget = durationBudget.overBudget
-  const remainingDuration = connectedVideo ? connectedVideo.duration - totalDuration : undefined
+  const remainingDuration = connectedVideo?.duration !== undefined ? connectedVideo.duration - totalDuration : undefined
   const addPanelAvailable = canAppendStoryboardPanel(panels, remainingDuration)
   const storyboardInputRules = runtime?.connectedInputRules(id) || []
   const storyboardPromptTags = [...new Set(storyboardInputRules.flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))]
@@ -174,8 +175,8 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
   const storyboardNotificationCategory = nodeNotificationCategory(data)
   const storyboardStatus = storyboardNotificationCategory === 'error' ? data.error : storyboardNotificationCategory === 'running' || storyboardNotificationCategory === 'transient' ? data.progress : undefined
   const rawAssistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availableModels(provider) || []])) as AssistantCatalogs
-  const assistantCatalogs = assistantCatalogsWithSavedSelection(rawAssistantCatalogs, data.assistantProvider, data.assistantModelId)
-  const groupedAssistantModels = assistantModelGroups(assistantCatalogs)
+  const assistantCatalogs = assistantCatalogsWithSavedSelection(rawAssistantCatalogs, data.assistantProvider, data.assistantModelId, Boolean(data.assistantProvider && runtime?.modelAvailabilityVerified?.(data.assistantProvider)))
+  const groupedAssistantModels = assistantModelGroups(assistantCatalogs, data.assistantProvider, data.assistantModelId)
   const assistantSelection = resolveAssistantSelection(data.assistantProvider, data.assistantModelId, assistantCatalogs)
   const assistantModelValue = assistantSelection ? `${assistantSelection.provider}::${assistantSelection.model}` : ''
   const assistantDefaultLabel = groupedAssistantModels.flatMap((group) => group.options).find((option) => option.value === assistantModelValue)?.label || 'Model'
@@ -237,7 +238,7 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
           const activePrompt = selectedStoryboardPrompt(panel)
           const panelBudget = durationBudget.budgets[index]
           const positiveDurationOptions: StoryboardMenuOption[] = panelBudget.options.map((option) => ({ value: String(option.value), label: option.label, disabled: option.disabled, disabledReason: option.disabledReason }))
-          const panelDurationOptions: StoryboardMenuOption[] = positiveDurationOptions
+          const panelDurationOptions: StoryboardMenuOption[] = positiveDurationOptions.some(option => option.value === String(panelBudget.effectiveDuration)) ? positiveDurationOptions : [{ value: String(panelBudget.effectiveDuration), label: `${panelBudget.effectiveDuration}s · review`, disabled: true, disabledReason: 'Saved timing preserved. Choose a supported duration explicitly.' }, ...positiveDurationOptions]
           const durationDescription = panelBudget.description
           const durationAriaLabel = `Panel ${index + 1} duration, ${panelBudget.effectiveDuration.toFixed(1)} seconds.`
           return (
@@ -279,7 +280,8 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
         })}
         {panels.length < panelLimit && <button className="storyboard-add-panels" disabled={!addPanelAvailable} title={!addPanelAvailable ? 'No sequence time remains. Reduce an earlier panel or increase Video duration.' : undefined} onClick={addPanel}><Plus size={13} />Add Panel</button>}
       </div>
-      {connectedVideo && overBudget && durationBudget.helper && <div className="storyboard-feedback-row storyboard-duration-helper is-overflow" role="status" aria-live="polite">{durationBudget.helper.text}</div>}
+      {connectedVideo?.timingError && <div className="storyboard-feedback-row storyboard-duration-helper" role="status" aria-live="polite">{connectedVideo.timingError}</div>}
+      {connectedVideo && durationBudget.helper && <div className="storyboard-feedback-row storyboard-duration-helper is-overflow" role="status" aria-live="polite">{durationBudget.helper.text}</div>}
       <footer className="storyboard-footer nodrag">
         <FluidControlGroup
           className="storyboard-footer-group"
@@ -288,8 +290,8 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
           allocation={{ minRows: 1, maxRows: 1, firstId: 'assistant-model' }}
           recalculationKey={`${connectedVideo?.duration ?? 'disconnected'}:${panels.length}:${assistantDefaultLabel}`}
           controls={([
-            { id: 'assistant-model', kind: 'selector', defaultLabel: assistantDefaultLabel, fullLabel: assistantDefaultLabel, compactLabel: assistantDefaultLabel, intrinsicWidth: 80, minimumWidth: 70, shrinkPriority: 'model', node: <GroupedMenuSelect ariaLabel="Storyboard AI model" title="Revamp sends a paid AI text request to the selected provider." defaultLabel={assistantDefaultLabel} compactLabel={assistantDefaultLabel} fillTrack disabled={!assistantSelection} value={assistantModelValue} groups={groupedAssistantModels} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined }) }} /> },
-            connectedVideo ? { id: 'budget', kind: 'bounded-elastic', intrinsicWidth: 68, maximumExtraWidth: 12, shortCharacterWidth: 6, node: <div className={`storyboard-budget ${overBudget ? 'is-over' : ''}`} role="status" aria-label={overBudget ? `Storyboard timing overflow, ${totalDuration.toFixed(1)} seconds used of ${connectedVideo.duration.toFixed(1)} seconds available` : `Storyboard timing, ${totalDuration.toFixed(1)} seconds used of ${connectedVideo.duration.toFixed(1)} seconds available`}><span style={{ width: `${Math.min(100, (totalDuration / Math.max(0.5, connectedVideo.duration)) * 100)}%` }} /><strong>{totalDuration.toFixed(1)} / {formatDurationSeconds(connectedVideo.duration)}</strong></div> } : null,
+            { id: 'assistant-model', kind: 'selector', defaultLabel: assistantDefaultLabel, fullLabel: assistantDefaultLabel, compactLabel: assistantDefaultLabel, intrinsicWidth: 80, minimumWidth: 70, shrinkPriority: 'model', node: <GroupedMenuSelect catalog ariaLabel="Storyboard AI model" title="Revamp sends a paid AI text request to the selected provider." defaultLabel={assistantDefaultLabel} compactLabel={assistantDefaultLabel} fillTrack disabled={!groupedAssistantModels.some((group) => group.options.length)} value={assistantModelValue} groups={groupedAssistantModels} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined }) }} /> },
+            connectedVideo?.duration !== undefined ? { id: 'budget', kind: 'bounded-elastic', intrinsicWidth: 68, maximumExtraWidth: 12, shortCharacterWidth: 6, node: <div className={`storyboard-budget ${overBudget ? 'is-over' : ''}`} role="status" aria-label={overBudget ? `Storyboard timing overflow, ${totalDuration.toFixed(1)} seconds used of ${connectedVideo.duration.toFixed(1)} seconds available` : `Storyboard timing, ${totalDuration.toFixed(1)} seconds used of ${connectedVideo.duration.toFixed(1)} seconds available`}><span style={{ width: `${Math.min(100, (totalDuration / Math.max(0.5, connectedVideo.duration)) * 100)}%` }} /><strong>{totalDuration.toFixed(1)} / {formatDurationSeconds(connectedVideo.duration)}</strong></div> } : null,
             { id: 'save', kind: 'fixed-action', intrinsicWidth: 28, node: <FooterSaveAction className="storyboard-save" ariaLabel="Save Storyboard" tooltip="Save Storyboard" disabled={nodeBusy} onSave={() => runtime?.saveStoryboard(id)} /> },
             { id: 'revamp', kind: 'intrinsic', intrinsicWidth: 62, node: <button className="storyboard-revamp-all" data-tooltip="Revamp sends a paid AI text request to the selected provider." aria-label="Revamp All" disabled={nodeBusy} onClick={() => runtime?.rewriteStoryboardPanel(id)}><WandSparkles size={12} />All</button> },
           ].filter(Boolean)) as FluidGroupControl<'budget' | 'assistant-model' | 'save' | 'revamp'>[]}
@@ -322,10 +324,10 @@ StoryboardAssetNode.displayName = 'StoryboardAssetNode'
 
 export const AssistantNode = memo(({ id, data, selected }: NodeProps<StudioNode>) => {
   const runtime = useContext(NodeRuntimeContext)
-  const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, curatedAssistantModels(provider, runtime?.availableModels(provider) || [])])) as AssistantCatalogs
-  const modelGroups = assistantModelGroups(assistantCatalogs)
+  const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availableModels(provider) || []])) as AssistantCatalogs
+  const modelGroups = assistantModelGroups(assistantCatalogs, data.assistantProvider, data.assistantModelId)
   const selection = resolveAssistantSelection(data.assistantProvider, data.assistantModelId, assistantCatalogs)
-  const provider = selection?.provider || 'omniroute'
+  const provider = selection?.provider || ASSISTANT_PROVIDER_GROUPS.find(({ id: provider }) => provider === data.assistantProvider)?.id || 'omniroute'
   const selectedModel = selection?.model || ''
   const models = assistantCatalogs[provider] || []
   const account = runtime?.providerAccount(provider)
@@ -336,7 +338,7 @@ export const AssistantNode = memo(({ id, data, selected }: NodeProps<StudioNode>
   return <article className={`assistant-node ${selected ? 'is-selected' : ''} ${blocked ? 'is-access-blocked' : ''}`} title={blocked ? account?.message : undefined} aria-busy={assistantBusy || undefined}>
     <header><Bot size={15} /><div><strong>{data.title || 'Assistant'}</strong><small>Prompt revamp</small></div></header>
     <div className="assistant-model-row nodrag">
-      <GroupedMenuSelect ariaLabel="Assistant AI model" title={blocked ? account?.message : 'AI model used for prompt enhancement'} disabled={!modelGroups.some((group) => group.options.length) || blocked} value={`${provider}::${selectedModel}`} groups={modelGroups} onChange={(selection) => { const [nextProvider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: nextProvider as AssistantProvider, assistantModelId: modelParts.join('::') }) }} />
+      <GroupedMenuSelect catalog ariaLabel="Assistant AI model" title={blocked ? account?.message : 'AI model used for prompt enhancement'} disabled={!modelGroups.some((group) => group.options.length)} value={`${provider}::${selectedModel}`} groups={modelGroups} onChange={(selection) => { const [nextProvider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: nextProvider as AssistantProvider, assistantModelId: modelParts.join('::') }) }} />
     </div>
     <textarea className="assistant-input nodrag" value={data.prompt || ''} placeholder="Write or connect a prompt…" onChange={(event) => runtime?.updateNode(id, { prompt: event.target.value })} />
     <div className="assistant-output nodrag">{data.assistantOutput ? <textarea value={data.assistantOutput} onChange={(event) => runtime?.updateNode(id, { assistantOutput: event.target.value })} /> : <span>Revamped prompt appears here</span>}</div>

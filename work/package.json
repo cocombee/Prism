@@ -12,7 +12,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "dist:mac": "npm run build && electron-builder --mac dmg",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:native": "node scripts/run-native-tests.mjs"
   },
   "dependencies": {
     "@fal-ai/client": "^1.6.2",

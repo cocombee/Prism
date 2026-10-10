@@ -76,7 +76,7 @@ describe('migrateUnifiedStoryboards', () => {
     expect(migrated.nodes[0].data).not.toHaveProperty('imageResolution')
   })
 
-  it('migrates legacy Auto and numeric zero once to legal authored values without changing other panel bytes', () => {
+  it('migrates legacy Auto and preserves numeric zero for explicit review without changing other panel bytes', () => {
     const modelId = 'bytedance/seedance-2.0/reference-to-video'
     const numericDurations = resolveVideoModel(modelId).durations.filter((value): value is number => typeof value === 'number')
     const target = Math.max(...numericDurations)
@@ -92,13 +92,13 @@ describe('migrateUnifiedStoryboards', () => {
 
     const firstOpen = migrateUnifiedStoryboards([legacy], [])
     const firstPanels = firstOpen.nodes[0].data.storyboardPanels || []
-    expect(firstPanels.map((panel) => panel.duration)).toEqual([1, 0.5])
+    expect(firstPanels.map((panel) => panel.duration)).toEqual([1, 0])
     expect(firstPanels[1]).toMatchObject({ id: 'locked-zero', prompt: 'Locked exhausted prompt.', locked: true })
     expect(firstOpen.nodes[0].data).not.toHaveProperty('storyboardDesiredDurations')
 
     const reopened = migrateUnifiedStoryboards(firstOpen.nodes, firstOpen.edges)
     expect(reopened).toEqual(firstOpen)
-    expect(reopened.nodes[0].data.storyboardPanels?.map((panel) => panel.duration)).toEqual([1, 0.5])
+    expect(reopened.nodes[0].data.storyboardPanels?.map((panel) => panel.duration)).toEqual([1, 0])
   })
 
   it('migrates Video prompt modes without persisting compiled Auto text or transient errors', () => {

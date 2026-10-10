@@ -24,6 +24,7 @@ describe('rendered Generator and Storyboard selector menus', () => {
       import { createRoot } from 'react-dom/client'
       import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
       import { NodeCard, NodeRuntimeContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/NodeCardNext.tsx'))}
+      import { ProviderAvailabilityContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/ProviderAvailabilityContext.tsx'))}
       import { StoryboardNode } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/UtilityNodes.tsx'))}
 
       const noop=()=>undefined
@@ -46,7 +47,7 @@ describe('rendered Generator and Storyboard selector menus', () => {
         {id:'disconnected-board',type:'storyboard',position:{x:380,y:0},style:{width:315},data:board(false)},
         {id:'connected-board',type:'storyboard',position:{x:760,y:0},style:{width:315},data:board(true)},
       ]
-      function App(){return <><div className="prompt-enhance-model-menu" data-prompt-heading-probe><section><small>Prompt provider group</small></section></div><select data-native-optgroup-probe><optgroup label="Native provider"><option>Model</option></optgroup></select><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard,storyboard:StoryboardNode}} defaultViewport={{x:10,y:10,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></>}
+      function App(){return <><div className="prompt-enhance-model-menu" data-prompt-heading-probe><section><small>Prompt provider group</small></section></div><select data-native-optgroup-probe><optgroup label="Native provider"><option>Model</option></optgroup></select><ProviderAvailabilityContext.Provider value={{mediaConnected:{fal:true,byteplus:true},promptConnected:{anthropic:true}}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard,storyboard:StoryboardNode}} defaultViewport={{x:10,y:10,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></ProviderAvailabilityContext.Provider></>}
       const wait=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))
       const trigger=(nodeId,label,index=0)=>document.querySelectorAll('.react-flow__node[data-id="'+nodeId+'"] [aria-label="'+label+'"]')[index]
       const portal=()=>document.querySelector('.grouped-menu-select-menu,.storyboard-compact-menu')
@@ -63,7 +64,7 @@ describe('rendered Generator and Storyboard selector menus', () => {
         const prior=results.scrollTop
         for(const character of query){portal().dispatchEvent(new KeyboardEvent('keydown',{key:character,bubbles:true}));await wait()}
         const currentMenu=portal(),currentResults=currentMenu.querySelector('.selector-results')
-        window.__openSearchContext={menu:currentMenu,results:currentResults,prior}
+        window.__openSearchContext={menu:currentMenu,results:currentResults,prior,nodeId,label,query}
       }
       const finishSearch=async()=>{
         const {menu,results,prior}=window.__openSearchContext
@@ -71,8 +72,9 @@ describe('rendered Generator and Storyboard selector menus', () => {
         const input=menu.querySelector('.selector-search-row input')
         const visible=labels();const active=menu.querySelector('[role="option"].is-keyboard-active')
         const option=menu.querySelector('[role="option"]')
+        if(!input || !option)throw new Error('Empty selector search: '+JSON.stringify({context:window.__openSearchContext.query,label:window.__openSearchContext.label,visible,input:input?.value}));
         const inputStyle=getComputedStyle(input), optionStyle=getComputedStyle(option)
-        const headings=Array.from(menu.querySelectorAll('section > small,.selector-results > div > small')).map(heading=>({text:heading.textContent.trim(),weight:getComputedStyle(heading).fontWeight,color:getComputedStyle(heading).color}))
+        const headings=Array.from(menu.querySelectorAll('section > small,.selector-results > div > small,.model-catalog-company > small')).map(heading=>({text:heading.textContent.trim(),weight:getComputedStyle(heading).fontWeight,color:getComputedStyle(heading).color}))
         const filtered={visible,scrollTop:results.scrollTop,active:active?.textContent.trim(),aria:input.getAttribute('aria-activedescendant'),inputFont:[inputStyle.fontSize,inputStyle.fontWeight],optionFont:[optionStyle.fontSize,optionStyle.fontWeight],headings}
         menu.querySelector('[aria-label="Clear selector search"]').click()
         await new Promise(resolve=>requestAnimationFrame(resolve))
@@ -97,7 +99,7 @@ describe('rendered Generator and Storyboard selector menus', () => {
     const styles = resolve(process.cwd(), 'src/renderer/src/styles-next.css')
     const flowStyles = resolve(process.cwd(), 'node_modules/@xyflow/react/dist/style.css')
     writeFileSync(html, `<!doctype html><html><head><link rel="stylesheet" href="file://${flowStyles}"><link rel="stylesheet" href="file://${styles}"><style>*{box-sizing:border-box}html,body,#root{width:100%;height:100%;margin:0}body{background:#111;color:#ddd}</style></head><body><div id="root"></div><script src="./renderer.js"></script></body></html>`)
-    writeFileSync(main, `const {app,BrowserWindow}=require('electron');const path=require('node:path');const finish=(value,code=0)=>{process.stdout.write('SELECTOR_MENUS_RESULT:'+JSON.stringify(value)+'\\n');app.exit(code)};const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));app.setPath('userData',path.join(${JSON.stringify(directory)},'user-data'));app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:1300,height:2400,webPreferences:{contextIsolation:false,sandbox:false}});await win.loadFile(${JSON.stringify(html)});const evaluate=code=>win.webContents.executeJavaScript(code);await evaluate('document.fonts.ready');await wait(500);const result=await evaluate('window.__selectorMenus.inventoryData()');result.headingProbes=await evaluate("(()=>{const prompt=getComputedStyle(document.querySelector('[data-prompt-heading-probe] small'));const native=getComputedStyle(document.querySelector('[data-native-optgroup-probe] optgroup'));return {prompt:{weight:prompt.fontWeight,color:prompt.color},native:{weight:native.fontWeight,color:native.color}}})()");const search=async(node,label,query,index=0,bottom=false)=>{await evaluate('window.__selectorMenus.openSearch('+JSON.stringify(node)+','+JSON.stringify(label)+','+JSON.stringify(query)+','+index+','+bottom+')');await wait(120);return evaluate('window.__selectorMenus.finishSearch()')};result.cameraSearch=await search('disconnected-board','Camera Movement','track',0,true);result.stabilizedHeading=await search('disconnected-board','Camera Movement','handheld');result.simpleFont=await search('video','Video Duration','4');result.groupedFont=await search('video','Video Model','seedance');result.durationFont=await search('disconnected-board','Panel 1 duration, 2.0 seconds.','0.5');finish(result)}).catch(error=>finish({error:error.stack||String(error)},1));`)
+    writeFileSync(main, `const {app,BrowserWindow}=require('electron');const path=require('node:path');const finish=(value,code=0)=>{process.stdout.write('SELECTOR_MENUS_RESULT:'+JSON.stringify(value)+'\\n');app.exit(code)};const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));app.setPath('userData',path.join(${JSON.stringify(directory)},'user-data'));app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:1300,height:2400,webPreferences:{contextIsolation:false,sandbox:false}});await win.loadFile(${JSON.stringify(html)});const evaluate=code=>win.webContents.executeJavaScript(code);await evaluate('document.fonts.ready');await wait(500);const result=await evaluate('window.__selectorMenus.inventoryData()');result.headingProbes=await evaluate("(()=>{const prompt=getComputedStyle(document.querySelector('[data-prompt-heading-probe] small'));const native=getComputedStyle(document.querySelector('[data-native-optgroup-probe] optgroup'));return {prompt:{weight:prompt.fontWeight,color:prompt.color},native:{weight:native.fontWeight,color:native.color}}})()");const search=async(node,label,query,index=0,bottom=false)=>{await evaluate('window.__selectorMenus.openSearch('+JSON.stringify(node)+','+JSON.stringify(label)+','+JSON.stringify(query)+','+index+','+bottom+')');await wait(120);return evaluate('window.__selectorMenus.finishSearch()')};result.cameraSearch=await search('disconnected-board','Camera Movement','track',0,true);result.stabilizedHeading=await search('disconnected-board','Camera Movement','handheld');result.simpleFont=await search('video','Video Duration','4');result.groupedFont=await search('video','Video Model','seedance');result.durationFont=await search('disconnected-board','Panel 1 duration, 2.0 seconds.','1.5');finish(result)}).catch(error=>finish({error:error.stack||String(error)},1));`)
     const run = spawnSync(electronPath, [main], { cwd: directory, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined }, timeout: 60_000 })
     const marker = run.stdout.split('\n').find((line) => line.startsWith('SELECTOR_MENUS_RESULT:'))
     expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0)
@@ -106,10 +108,10 @@ describe('rendered Generator and Storyboard selector menus', () => {
 
     expect(result.generator.labels).toEqual(Array.from({ length: 27 }, (_, index) => `${(index + 4).toFixed(1)}s`))
     expect(result.generator.labels.some((label: string) => label === '4.5s')).toBe(false)
-    expect(result.disconnected.labels.slice(0, 4)).toEqual(['0.5s', '1.0s', '1.5s', '2.0s'])
+    expect(result.disconnected.labels.slice(0, 4)).toEqual(['1.0s', '1.5s', '2.0s', '2.5s'])
     expect(result.disconnected.labels.at(-1)).toBe('30.0s')
     expect(result.connectedFirst.labels.at(-1)).toBe('8.0s')
-    expect(result.connectedFirst.enabled.slice(0, 4)).toEqual(['0.5s', '1.0s', '1.5s', '2.0s'])
+    expect(result.connectedFirst.enabled.slice(0, 4)).toEqual(['1.0s', '1.5s', '2.0s', '2.5s'])
     expect(result.connectedFirst.enabled.at(-1)).toBe('6.0s')
     expect(result.connectedSecond.enabled.at(-1)).toBe('4.0s')
 

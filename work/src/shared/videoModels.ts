@@ -189,9 +189,18 @@ const LEGACY_VIDEO_MODELS: Record<string, string> = {
   'seedance-reference': 'bytedance/seedance-2.0/reference-to-video',
 }
 
-export function resolveVideoModel(id?: string): VideoModelDefinition {
+/** Exact request lookup; an ambiguous provider API ID does not identify a route. */
+export function findVideoModel(id?: string): VideoModelDefinition | undefined {
   const resolved = LEGACY_VIDEO_MODELS[id || ''] || id || 'wan-controlled'
-  return VIDEO_MODELS.find((model) => model.id === resolved) || VIDEO_MODELS[0]
+  const registered = VIDEO_MODELS.find((model) => model.id === resolved)
+  if (registered) return registered
+  const apiMatches = VIDEO_MODELS.filter((model) => model.apiModelId === resolved)
+  return apiMatches.length === 1 ? apiMatches[0] : undefined
+}
+
+/** Display-only fallback. Request paths must validate with findVideoModel first. */
+export function resolveVideoModel(id?: string): VideoModelDefinition {
+  return findVideoModel(id) || VIDEO_MODELS[0]
 }
 
 export function videoModelDurationInventory(id?: string, frameRate = 24): Array<number | 'auto'> {

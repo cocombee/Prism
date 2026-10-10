@@ -21,8 +21,8 @@ describe('production shot specification', () => {
       ],
     }).map((section) => section.heading)
     expect(headings).toEqual([
-      'SCENE CONTEXT', 'FORMAT MODE', 'CUT 1', 'CUT 2', 'OPTICS', 'CAMERA', 'ACTION',
-      'LIGHTING', 'STYLE', 'FILMIC MOTION RENDERING', 'NEGATIVE PROMPT', 'POSITIVE LOCKS',
+      'SCENE CONTEXT', 'FORMAT MODE', 'CUT 1', 'CUT 2', 'OPTICS', 'CAMERA',
+      'POSITIVE LOCKS', 'FILMIC MOTION RENDERING', 'NEGATIVE PROMPT',
     ])
     expect(headings).not.toContain('PERFORMANCE')
     expect(headings).not.toContain('PHYSICS')
@@ -37,7 +37,7 @@ describe('production shot specification', () => {
         { prompt: 'Second authored panel.', duration: 0, shotSize: 'medium', camera: 'static' },
       ],
     }
-    const expected = 'Storyboard panel 2 is below the minimum 0.5s duration.'
+    const expected = 'Storyboard panel 2 is below the minimum 1.0s duration.'
     expect(() => productionShotSpecSections(request)).toThrow(expected)
     expect(() => seedanceShotSpecSections(request)).toThrow(expected)
     expect(request.storyboardShots?.map((shot) => shot.prompt)).toEqual(['First authored panel.', 'Second authored panel.'])
@@ -51,7 +51,7 @@ describe('production shot specification', () => {
         { prompt: 'Second multi prompt.', duration: '0' },
       ],
     }
-    const expected = 'Storyboard panel 2 is below the minimum 0.5s duration.'
+    const expected = 'Storyboard panel 2 is below the minimum 1.0s duration.'
     expect(() => productionShotSpecSections(request)).toThrow(expected)
     expect(request.multiPrompt?.map((shot) => shot.prompt)).toEqual(['First multi prompt.', 'Second multi prompt.'])
   })
@@ -141,12 +141,10 @@ describe('production shot specification', () => {
     expect(still.map((section) => section.heading)).not.toContain('PHYSICS')
   })
 
-  it('keeps LIGHTING quantified without echoing STYLE verbatim', () => {
+  it('preserves authored Style without inventing lighting fixtures', () => {
     const sections = productionShotSpecSections({ ...base, stylePrompt: 'Copper halation with violet moon haze.' })
-    const lighting = sections.find((section) => section.heading === 'LIGHTING')!.text
     const style = sections.find((section) => section.heading === 'STYLE')!.text
-    expect(lighting).not.toContain('Copper halation with violet moon haze')
-    expect(lighting).toMatch(/5600K.*3200K.*2 stops.*3% haze/)
+    expect(sections.find((section) => section.heading === 'LIGHTING')).toBeUndefined()
     expect(style).toBe('Copper halation with violet moon haze.')
   })
 
@@ -167,7 +165,7 @@ describe('production shot specification', () => {
         references: [{ role: 'style', tag: '@look', description: stylePrompt, slot: 'reference' }],
       }, { family })
       expect(compiled.text.match(/Silver-blue halation, restrained contrast, and fine 35mm grain\./g), family).toHaveLength(1)
-      expect(compiled.text, family).toContain(family === 'seedance' ? '@look is the Style visual authority' : '@look — Style authority.')
+      expect(compiled.text, family).toContain(family === 'seedance' ? 'Use @look for the visual style.' : '@look — Style authority.')
       expect(compiled.text, family).toContain(family === 'seedance' ? 'LOOK AND CAPTURE CHARACTER' : 'STYLE')
     }
   })
@@ -189,12 +187,12 @@ describe('production shot specification', () => {
       storyboardShots: [{ prompt: 'Hero crosses the hangar.', duration: 4, shotSize: 'wide', camera: 'dolly-in' }],
     }, { legend: { heading: 'SEEDANCE REFERENCE MAP', body: '@Image1 = @hero identity' }, ceiling: 1 })
     expect(compiled.blocks.filter((block) => block.required).map((block) => block.label)).toEqual([
-      'ASSISTANT TASK', 'EDIT CONTROL', 'REFERENCE AUTHORITY', 'SUBJECT AND PERFORMANCE', 'CAMERA',
+      'REFERENCE AUTHORITY', 'SUBJECT AND PERFORMANCE', 'CAMERA',
       'TIMELINE AND CONTINUOUS ACTION', 'IDENTITY AND ANATOMY CONTINUITY',
       'CAMERA, FRAMING, AND OPTICAL HARD GATE', 'FINAL-FRAME AND OUTPUT HARD GATE', 'NEGATIVE PROMPT',
     ])
     expect(compiled.text.match(/Scar over left brow/g)).toHaveLength(1)
-    expect(compiled.text.match(/@hero is the Character visual authority/g)).toHaveLength(1)
+    expect(compiled.text.match(/Use @hero as the Character./g)).toHaveLength(1)
     expect(compiled.text).not.toMatch(/HARD RULE|AUTO RULE|GUIDE RULE|LOCK RULE/)
   })
 
@@ -330,7 +328,7 @@ describe('production shot specification', () => {
     expect(timeline).toContain('REFERENCES · @misi wearing @misi-red-jacket; @phone')
     expect(compiled.continuityLedger?.boundaries).toHaveLength(4)
     expect(timeline).not.toContain('CONTINUITY · Preserve authored incoming state')
-    expect(timeline.match(/ENDPOINT \/ REACTION · Complete the authored consequence, keep the reaction readable, decelerate when moving, and hold the selected final composition\./g)).toHaveLength(5)
+    expect(timeline.match(/ENDPOINT \/ REACTION · Keep the authored consequence and reaction readable within this interval; follow authored motion through its boundary, and settle or hold only where authored\./g)).toHaveLength(5)
     expect(timeline).not.toContain('BOUNDARY ')
     expect(compiled.text).not.toMatch(/@Image\d+|@Video\d+|@Audio\d+/)
     expect(compiled.text).toBe(compileProviderPrompt(request).text)
@@ -453,7 +451,7 @@ describe('production shot specification', () => {
       videoEngine: 'bytedance/seedance-2.0/text-to-video',
     })
     expect(compiled.blocks.map((block) => block.label)).toEqual([
-      'ASSISTANT TASK', 'EDIT CONTROL', 'REFERENCE AUTHORITY', 'EDITABLE VARIABLE REGISTRY',
+      'REFERENCE AUTHORITY',
       'SUBJECT AND PERFORMANCE', 'CAMERA', 'LENS AND OPTICS', 'LIGHTING',
       'LOOK AND CAPTURE CHARACTER', 'TIMELINE AND CONTINUOUS ACTION', 'OPENING-FRAME HARD LOCK',
       'CAMERA, FRAMING, AND OPTICAL HARD GATE',
@@ -523,7 +521,7 @@ describe('production shot specification', () => {
     expect(sections.find((section) => section.heading === 'FILMIC MOTION RENDERING')?.text).toContain('Capture at 24fps and play back at 24fps at normal speed.')
     expect(sections.find((section) => section.heading === 'FILMIC MOTION RENDERING')?.text).toContain('1/48-second exposure')
     expect(sections.find((section) => section.heading === 'NEGATIVE PROMPT')?.text.split(', ')).toEqual(['hard photographic cadence', 'disconnected still frames', 'slideshow motion', 'stop-motion cadence', 'cadence jitter', 'frame skipping', 'frame duplication', 'frame blending', 'optical-flow artifacts', 'temporal ghosting', 'repeated contours', 'detached motion trails', 'double images', 'excessive motion smear'])
-    expect(sections.find((section) => section.heading === 'LIGHTING')?.text).toBe('5600K daylight key from screen-left; 3200K practicals 2 stops under key; 3% haze. Adapt these quantified fixtures to the STYLE authority without repeating its wording.')
+    expect(sections.find((section) => section.heading === 'LIGHTING')).toBeUndefined()
     expect(sections.find((section) => section.heading === 'STYLE')?.text).toBe('Authored copper finish.')
     expect(sections.find((section) => section.heading === 'SCENE CONTEXT')?.text).toBe('Two pilots cross the hangar.')
   })
@@ -561,7 +559,7 @@ describe('production shot specification', () => {
 
   it('parses every canonical Seedance heading with or without a colon', () => {
     const headings = [
-      'ASSISTANT TASK', 'EDIT CONTROL', 'REFERENCE AUTHORITY', 'EDITABLE VARIABLE REGISTRY', 'SUBJECT AND PERFORMANCE', 'CAMERA', 'LENS AND OPTICS', 'LIGHTING',
+      'REFERENCE AUTHORITY', 'SUBJECT AND PERFORMANCE', 'CAMERA', 'LENS AND OPTICS', 'LIGHTING',
       'LOOK AND CAPTURE CHARACTER', 'TIMELINE AND CONTINUOUS ACTION', 'OPENING-FRAME HARD LOCK', 'IDENTITY AND ANATOMY CONTINUITY',
       'WARDROBE, ACCESSORY, AND PROP CONTINUITY', 'SCENE, VEHICLE, AND ENVIRONMENT CONTINUITY', 'CAMERA, FRAMING, AND OPTICAL HARD GATE',
       'FINAL-FRAME AND OUTPUT HARD GATE', 'NEGATIVE PROMPT',
@@ -716,7 +714,7 @@ describe('production shot specification', () => {
     const shotTwo = compiled.text.slice(compiled.text.indexOf('SHOT 2 ·'), compiled.text.indexOf('SHOT 3 ·'))
     const shotThree = compiled.text.slice(compiled.text.indexOf('SHOT 3 ·'))
 
-    expect(shotOne).toContain('REFERENCES · @chef; @kitchen; @chef is the sole authority for chef as one complete physical body and one cast member, wearing the appearance governed by @chef-apron on that same body.')
+    expect(shotOne).toContain('REFERENCES · @chef; @kitchen; Use @chef as chef.; Use @chef-apron for @chef\'s wardrobe.')
     expect(shotOne).toContain('active off-camera cooking continues now')
     expect(shotOne).not.toMatch(/later screen-right|reverse-view front relation|future action raises the plated dish/)
     expect(shotTwo).toMatch(/world=later screen-right.*orientation=reverse-view front relation/)

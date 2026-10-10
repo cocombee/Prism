@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { defaultVideoRatio, effectiveOutputFrameRate, formatDurationSeconds, motionCadenceOptions, MOTION_CADENCES, normalizedMotionCadence, referenceCapableVideoEngine, resolveVideoModel, videoModelDurationInventory, VIDEO_MODELS } from './videoModels'
+import { findVideoModel, defaultVideoRatio, effectiveOutputFrameRate, formatDurationSeconds, motionCadenceOptions, MOTION_CADENCES, normalizedMotionCadence, referenceCapableVideoEngine, resolveVideoModel, videoModelDurationInventory, VIDEO_MODELS } from './videoModels'
 
 describe('video model aspect-ratio capabilities', () => {
+  it('keeps registered selections and known legacy aliases exact while rejecting unknown IDs', () => {
+    for (const model of VIDEO_MODELS) expect(findVideoModel(model.id)?.id).toBe(model.id)
+    expect(findVideoModel('kling-v3')?.id).toBe('fal-ai/kling-video/v3/standard/text-to-video')
+    expect(findVideoModel('seedance-reference')?.id).toBe('bytedance/seedance-2.0/reference-to-video')
+    expect(findVideoModel()?.id).toBe('wan-controlled')
+    expect(findVideoModel('unsupported-saved-model')).toBeUndefined()
+  })
+
+  it('requires an unambiguous route when a provider API ID is supplied', () => {
+    const sharedApiId = VIDEO_MODELS.find((model) => VIDEO_MODELS.filter((other) => other.apiModelId === model.apiModelId).length > 1)!.apiModelId
+    expect(findVideoModel(sharedApiId)).toBeUndefined()
+    const uniqueApiModel = VIDEO_MODELS.find((model) => VIDEO_MODELS.filter((other) => other.apiModelId === model.apiModelId).length === 1)!
+    expect(findVideoModel(uniqueApiModel.apiModelId)?.id).toBe(uniqueApiModel.id)
+  })
+
   it('gives every route an explicit provider and provider-native API model id', () => {
     for (const model of VIDEO_MODELS) {
       expect(['fal', 'byteplus']).toContain(model.provider)

@@ -33,6 +33,9 @@ const api: PrismAPI = {
     save: (provider, key) => ipcRenderer.invoke('services:save', provider, key),
     remove: (provider) => ipcRenderer.invoke('services:remove', provider),
     models: (provider) => ipcRenderer.invoke('services:models', provider),
+    higgsfieldPresets: (refresh?: boolean) => ipcRenderer.invoke('services:higgsfield-presets', refresh),
+    higgsfieldSchema: (endpointId) => ipcRenderer.invoke('services:higgsfield-schema', endpointId),
+    falSchema: (endpointId) => ipcRenderer.invoke('services:fal-schema', endpointId),
     account: (provider) => ipcRenderer.invoke('services:account', provider),
     profiles: (provider, refresh) => ipcRenderer.invoke('services:profiles', provider, refresh),
     addProfile: (provider, key, expectedProfileId) => ipcRenderer.invoke('services:add-profile', provider, key, expectedProfileId),
@@ -42,8 +45,8 @@ const api: PrismAPI = {
     selectProjectProfile: (provider, profileId) => ipcRenderer.invoke('services:select-project-profile', provider, profileId),
   },
   workflows: {
-    load: () => ipcRenderer.invoke('workflows:load'),
-    save: (document: WorkflowDocument) => ipcRenderer.invoke('workflows:save', document),
+    load: (owner: import('../shared/workflowSaveOwnership').WorkflowSaveOwner) => ipcRenderer.invoke('workflows:load', owner),
+    save: (document: WorkflowDocument, owner: import('../shared/workflowSaveOwnership').WorkflowSaveOwner) => ipcRenderer.invoke('workflows:save', document, owner),
   },
 
   assets: {
@@ -86,6 +89,8 @@ const api: PrismAPI = {
     rewrite: (provider, text, instruction, model) => ipcRenderer.invoke('assistant:rewrite', provider, text, instruction, model),
   },
   generation: {
+    higgsfieldJobs: () => ipcRenderer.invoke('generation:higgsfield-jobs'),
+    higgsfieldAction: (command) => ipcRenderer.invoke('generation:higgsfield-action', command),
     run: (request: GenerationRequest) => ipcRenderer.invoke('generation:run', request),
     cancel: (nodeId) => ipcRenderer.invoke('generation:cancel', nodeId),
     estimate: (request: GenerationRequest) => ipcRenderer.invoke('generation:estimate', request),

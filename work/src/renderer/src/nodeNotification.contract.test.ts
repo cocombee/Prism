@@ -48,7 +48,7 @@ describe('active next-generation notification categories', () => {
   })
 
   it('owns one shared lifecycle geometry with semantic variants and no persistent green', () => {
-    expect(styles).toMatch(/\.node-lifecycle-row,\s*\.storyboard-feedback-row \{[^}]*min-height:\s*var\(--node-control-height\);[^}]*padding:\s*0 8px;[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*font-size:\s*var\(--font-node-control\);[^}]*font-weight:\s*400;[^}]*line-height:\s*1\.25;/)
+    expect(styles).toMatch(/\.node-lifecycle-row,\s*\.storyboard-feedback-row \{[^}]*min-height:\s*var\(--node-control-height\);[^}]*padding:\s*0 8px;[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*font-size: var\(--font-smaller-text\);[^}]*font-weight: var\(--font-weight-normal\);[^}]*line-height:\s*1\.25;/)
     expect(styles).toContain('.node-lifecycle-row.is-running')
     expect(styles).toContain('.node-lifecycle-row.is-transient')
     expect(styles).toContain('.node-lifecycle-row.is-error')

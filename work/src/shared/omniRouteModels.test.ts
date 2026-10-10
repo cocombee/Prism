@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { omniRouteChatRequest, omniRouteModelOptions, omniRouteRewriteOutput } from './omniRouteModels'
 
 describe('OmniRoute text model integration', () => {
-  it('keeps the newest three root text releases per upstream owner', () => {
+  it('keeps every eligible root text release per upstream owner', () => {
     const models = omniRouteModelOptions([
       { id: 'cc/claude-opus-5', name: 'cc/Claude Opus 5', owned_by: 'claude', parent: null, output_modalities: ['text'] },
       { id: 'cc/claude-sonnet-5', name: 'cc/Claude Sonnet 5', owned_by: 'claude', parent: null, output_modalities: ['text'] },
@@ -24,9 +24,9 @@ describe('OmniRoute text model integration', () => {
       { id: 'auto/best-chat', name: 'auto/best-chat', owned_by: 'combo', parent: null },
     ])
     expect(models.map((model) => model.id)).toEqual([
-      'cc/claude-opus-5', 'cc/claude-sonnet-5', 'cc/claude-fable-5',
-      'cx/gpt-5.6-sol', 'cx/gpt-5.6-terra', 'cx/gpt-5.6-luna',
-      'gemini/gemini-3.7-flash', 'gemini/gemini-3.6-pro', 'gemini/gemini-3.5-flash',
+      'cc/claude-opus-5', 'cc/claude-sonnet-5', 'cc/claude-fable-5', 'cc/claude-opus-4-8',
+      'cx/gpt-5.6-sol', 'cx/gpt-5.6-terra', 'cx/gpt-5.6-luna', 'cx/gpt-5.5',
+      'gemini/gemini-3.7-flash', 'gemini/gemini-3.6-pro', 'gemini/gemini-3.5-flash', 'gemini/gemini-2.5-flash',
     ])
   })
 

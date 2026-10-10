@@ -5,7 +5,15 @@ type Reference = NonNullable<GenerationRequest['references']>[number]
 export function characterBodyAuthorityLine(reference: Reference): string | undefined {
   if (reference.role !== 'character' || !reference.tag || reference.characterAuthorityMode !== 'complete-dressed-body') return undefined
   const label = reference.name?.trim() || reference.tag.replace(/^@/, '')
-  return `${reference.tag} is the sole complete authority for ${label} as one fully dressed physical body and one cast member.`
+  return `Use ${reference.tag} as ${label}.`
+}
+
+export function appearanceLayerRoleLine(reference: Reference): string | undefined {
+  if (!reference.tag || !reference.boundCharacterTag || !reference.appearanceScope) return undefined
+  const scope = reference.appearanceScope === 'helmet-headwear' ? 'helmet or headwear'
+    : reference.appearanceScope === 'glasses-accessory' ? 'glasses or accessory'
+      : reference.appearanceScope === 'connected-element' ? 'assigned item' : 'wardrobe'
+  return `Use ${reference.tag} for ${reference.boundCharacterTag}'s ${scope}.`
 }
 
 export function isTypedAppearanceLayer(reference: Reference): boolean {
@@ -34,6 +42,8 @@ export function providerVisibleReferences(request: GenerationRequest): Reference
     ? shots.flatMap((shot) => emittedAppearanceLayers(request, shot.panelId))
     : emittedAppearanceLayers(request))
   return (request.references || []).filter((reference) => {
+    if (request.kind === 'image-generator' && request.semanticAssetCreation?.kind === 'character'
+      && reference.boundCharacterTag === request.semanticAssetCreation.tag) return true
     if (hasExecutableCharacter && reference.role === 'wardrobe' && (reference.path || reference.url) && !isTypedAppearanceLayer(reference)) return false
     return !isTypedAppearanceLayer(reference) || emitted.has(reference)
   })
@@ -84,13 +94,11 @@ export function sameBodyAuthorityReadinessFailures(request: GenerationRequest): 
 export function sameBodyAuthorityLines(request: GenerationRequest): string[] {
   const references = request.references || []
   const layers = emittedAppearanceLayers(request)
-  return references.filter((reference) => reference.role === 'character' && reference.tag).flatMap((character) => {
+  return [...new Set(references.filter((reference) => reference.role === 'character' && reference.tag).flatMap((character) => {
     const complete = characterBodyAuthorityLine(character)
     if (complete) return [complete]
     if (character.characterAuthorityMode !== 'identity-body-with-layers') return []
     const label = character.name?.trim() || character.tag!.replace(/^@/, '')
-    return layers.filter((layer) => layer.boundCharacterTag === character.tag && layer.tag).map((layer) => (
-      `${character.tag} is the sole authority for ${label} as one complete physical body and one cast member, wearing the appearance governed by ${layer.tag} on that same body.`
-    ))
-  })
+    return [`Use ${character.tag} as ${label}.`, ...layers.filter((layer) => layer.boundCharacterTag === character.tag).map(appearanceLayerRoleLine).filter((line): line is string => Boolean(line))]
+  }))]
 }

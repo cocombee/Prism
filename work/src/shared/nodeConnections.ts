@@ -11,7 +11,7 @@ const QUICK_CONNECT_TARGET_KINDS: NodeKind[] = [
   'character', 'wardrobe', 'element', 'location', 'storyboard', 'router',
 ]
 
-type TargetConnectionData = Pick<StudioNodeData, 'kind' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId'>
+type TargetConnectionData = Pick<StudioNodeData, 'kind' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId' | 'falNative' | 'higgsfieldNative'>
 
 export function outputSignalFor(data: SourceConnectionData, sourceHandleId?: string | null): ConnectionSignal {
   if (sourceHandleId?.includes('storyboard')) return 'storyboard'
@@ -99,6 +99,12 @@ export function compatibleSourceHandle(kind: NodeKind, signal: ConnectionSignal)
 
 export function targetSignalFor(data: TargetConnectionData, targetHandle?: string | null): ConnectionSignal | null {
   if (!targetHandle) return null
+  const native = data.falNative?.media.find(binding => binding.portId === targetHandle)
+  if (native) return native.type
+  if (data.higgsfieldNative) {
+    const port = nodeInputPorts(data).find(port => port.id === targetHandle)
+    if (port) return port.signal
+  }
   if (targetHandle === 'text-in' || targetHandle === 'prompt') return 'text'
   if (targetHandle === 'image-in' || targetHandle === 'end-image' || targetHandle === 'reference-in' || targetHandle === 'reference' || ['character-in', 'wardrobe-in', 'element-in', 'location-in'].includes(targetHandle)) return 'image'
   if (targetHandle === 'video-in' || targetHandle === 'video-reference-in') return 'video'
@@ -143,14 +149,20 @@ export function connectionCompatibilityError(
   const sourceSignal = outputSignalFor(source, sourceHandle)
   const targetSignal = targetSignalFor(target, targetHandle)
   const handle = targetHandle || ''
+  const native = target.falNative?.media.find(binding => binding.portId === handle)
+  const higgsfieldMedia = target.higgsfieldNative?.media?.find(binding => binding.portId === handle)
+  if (target.falNative?.retiredPorts?.some(port => port.id === handle) && !native && nodeInputPorts(target).find(port => port.id === handle)?.maxConnections === 0) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'
+  if (target.higgsfieldNative?.retiredPorts?.some(port => port.id === handle) && nodeInputPorts(target).find(port => port.id === handle)?.maxConnections === 0) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'
+  if (native?.retired) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'
+  if (higgsfieldMedia?.retired) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'
   if (target.kind === 'output') return 'Generated Output is a legacy materialized result and does not accept upstream connections. Connect media to Gallery instead.'
   if (['storyboard', 'storyboard-asset'].includes(source.kind) && handle !== 'storyboard-in') return 'A Storyboard retains panel timing, camera guidance, and model targeting, so it can connect only to its dedicated Storyboard input.'
   if (source.kind === 'list' && sourceSignal === 'mixed' && target.kind === 'gallery') return 'A mixed List may include text or storyboard data. Connect a homogeneous Image, Video, or Audio List to Gallery instead.'
   if (target.kind === 'gallery' && handle === 'media-in' && !['image', 'video', 'audio'].includes(sourceSignal)) return 'Gallery is a media-only terminal. Connect a materialized Image, Video, or Audio output.'
-  if (['voiceover', 'sound-effects', 'music-generator'].includes(target.kind)) return `${target.kind === 'voiceover' ? 'Voiceover' : target.kind === 'sound-effects' ? 'Sound Effects' : 'Music Generator'} is self-contained and does not expose an upstream input. Enter its prompt inside the node.`
-  if (target.kind === 'character' && !['style-in', 'wardrobe-in'].includes(handle)) return 'Character accepts only optional Style and Wardrobe inputs. Create its prompt, Face, and remaining views inside the Character node.'
+  if (['voiceover', 'sound-effects', 'music-generator'].includes(target.kind) && !native) return `${target.kind === 'voiceover' ? 'Voiceover' : target.kind === 'sound-effects' ? 'Sound Effects' : 'Music Generator'} is self-contained and does not expose an upstream input. Enter its prompt inside the node.`
+  if (target.kind === 'character' && !['style-in', 'wardrobe-in', 'element-in'].includes(handle)) return 'Character accepts optional Style, Wardrobe, and Prop inputs. Create its prompt, Face, and remaining views inside the Character node.'
   if (target.kind === 'style-reference') return 'Style is an output-only visual-language asset. Build its prompt and add its optional reference inside the Style node.'
-  if (target.kind === 'location' && handle !== 'style-in') return 'Location accepts only an optional Style input. Create its prompt, references, and generation inside the Location node.'
+  if (target.kind === 'location' && !['style-in', 'character-in', 'element-in'].includes(handle)) return 'Location accepts optional Style, Character, and Prop inputs. Create its prompt, references, and generation inside the Location node.'
   if (target.kind === 'wardrobe' && handle !== 'style-in') return 'Wardrobe accepts only an optional Style input. Create its prompt, references, and generation inside the Wardrobe node.'
   if (target.kind === 'element' && handle !== 'style-in') return 'Element accepts only an optional Style input. Create its prompt, Front, and remaining views inside the Element node.'
   if (target.kind === 'storyboard' && !['style-in', 'character-in', 'element-in', 'location-in', 'reference-in'].includes(handle)) return 'Storyboard accepts Style, Character, Element, Location, and ordinary Image Reference inputs. Author panels, timing, and camera inside the Storyboard node.'
@@ -160,16 +172,16 @@ export function connectionCompatibilityError(
   const listItemInput = target.kind === 'list' && handle === 'input'
   if (listItemInput && !['image', 'video', 'audio'].includes(sourceSignal)) return 'List is a generated-media batch. Connect an Image, Video, or Audio output—not Prompt, Style, Storyboard, or semantic assets.'
   const semanticImageFallback = ['image-generator', 'image-editor', 'list'].includes(target.kind) && handle === 'image-in'
-  const locationFrameFallback = source.kind === 'location' && target.kind === 'video-generator' && ['image-in', 'end-image'].includes(handle)
+  const locationFrameFallback = source.kind === 'location' && target.kind === 'video-generator' && (['image-in', 'end-image'].includes(handle) || Boolean(higgsfieldMedia && ['start-frame','end-frame'].includes(higgsfieldMedia.role)))
   if (source.kind === 'wardrobe' && (target.kind !== 'character' || handle !== 'wardrobe-in')) return 'A Wardrobe asset can connect only to a Character Wardrobe input.'
   const semanticRoleHandle = ['character-in', 'wardrobe-in', 'element-in', 'location-in'].includes(handle)
   if (semanticRoleHandle && handle !== `${source.kind}-in`) return `The ${handle.replace('-in', '')} input accepts only a matching reusable ${handle.replace('-in', '')} asset.`
   const legacySemanticHandle = handle === `${source.kind}-in`
-  if (['character', 'location', 'element'].includes(source.kind) && !listItemInput && !['reference-in', 'media-in'].includes(handle) && !semanticImageFallback && !locationFrameFallback && !legacySemanticHandle) return `A ${source.kind === 'character' ? 'Character' : source.kind === 'location' ? 'Location' : 'Element'} asset can connect only as a semantic Reference, not as Prompt, Start Frame, End Frame, Video, or Audio.`
+  if (['character', 'location', 'element'].includes(source.kind) && !listItemInput && !['reference-in', 'media-in'].includes(handle) && !semanticImageFallback && !locationFrameFallback && !legacySemanticHandle && !(native?.type === 'image' && native.role === 'native-input') && higgsfieldMedia?.role !== 'reference-image') return `A ${source.kind === 'character' ? 'Character' : source.kind === 'location' ? 'Location' : 'Element'} asset can connect only as a semantic Reference, not as Prompt, Start Frame, End Frame, Video, or Audio.`
   if (source.kind === 'style-reference' && !listItemInput && !['style-in', 'reference-in'].includes(handle) && !(target.kind === 'router' && handle === 'input')) return 'A Style asset can connect only to a Style, compatible Reference, or typed Router input.'
   if (source.kind === 'list' && sourceSignal === 'mixed' && target.kind === 'gallery') return 'A mixed List may include text or storyboard data. Connect a homogeneous Image, Video, or Audio List to Gallery instead.'
-  if (sourceSignal === 'audio' && !listItemInput && !['audio-in', 'audio-reference-in', 'media-in'].includes(handle)) return 'Audio can connect only to an Audio or compatible media-collection input.'
-  if (sourceSignal === 'video' && !listItemInput && !['video-in', 'video-reference-in', 'media-in'].includes(handle) && !(target.kind === 'router' && handle === 'input')) return 'Video can connect only to a Video or compatible media-collection input.'
+  if (sourceSignal === 'audio' && !listItemInput && !['audio-in', 'audio-reference-in', 'media-in'].includes(handle) && !(target.kind === 'router' && handle === 'input') && native?.type !== 'audio' && higgsfieldMedia?.type !== 'audio') return 'Audio can connect only to an Audio or compatible media-collection input.'
+  if (sourceSignal === 'video' && !listItemInput && !['video-in', 'video-reference-in', 'media-in'].includes(handle) && !(target.kind === 'router' && handle === 'input') && native?.type !== 'video' && higgsfieldMedia?.type !== 'video') return 'Video can connect only to a Video or compatible media-collection input.'
   if (!nodeInputPorts(target).some((port) => port.id === handle)) return 'This node does not declare that input socket.'
   if (!targetSignal) return 'These node types cannot be connected.'
   const compatible = targetSignal === 'mixed'
@@ -251,6 +263,8 @@ export function pruneSurplusInputEdges<T extends { source: string; target: strin
       }
       storyboardSources.add(edge.source)
     }
+    // Native model changes retain every saved edge; readiness validates capacity and retired sockets.
+    if (target?.falNative || target?.higgsfieldNative) { kept.push(edge); continue }
     const port = target && nodeInputPorts(target).find((candidate) => candidate.id === edge.targetHandle)
     if (!target || !port?.maxConnections) {
       kept.push(edge)

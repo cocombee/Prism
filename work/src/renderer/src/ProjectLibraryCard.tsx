@@ -39,7 +39,6 @@ export function ProjectLibraryCard({ item, onOpen, onRenamed, onRequestForget, o
     <div className="project-library-title-row">
       {renaming ? <input autoFocus aria-label={`Rename ${item.name} project document`} value={draft} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.stopPropagation()} onBlur={() => { if (!cancelRename.current) void commitRename() }} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { event.stopPropagation(); if (event.key === 'Enter') void commitRename(); else if (event.key === 'Escape') { cancelRename.current = true; setDraft(projectDocumentStem(item)); setRenaming(false) } }} /> : <><strong>{item.name}</strong><button title="Rename Project Document" aria-label={`Rename ${item.name} project document`} onClick={(event) => { event.stopPropagation(); beginRename() }}><PencilLine size={13} /></button></>}
     </div>
-    <small>{item.rootPath}</small>
     <time>Updated {new Date(item.updatedAt).toLocaleDateString()}</time>
   </article>
 }

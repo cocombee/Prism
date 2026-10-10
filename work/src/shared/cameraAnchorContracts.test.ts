@@ -26,7 +26,7 @@ describe('camera path and support anchor contracts', () => {
     const compiled = camera(visibleProviderPromptBody(request(shots)))
     const positive = 'The camera makes a markedly slow, deliberate dolly straight downward, preserving the authored subject framing and viewing side throughout the descent.'
     expect(compiled.match(new RegExp(positive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1)
-    expect(compiled).toContain('Support rides only the explicit authored vertical path, then settles at its arrived endpoint.')
+    expect(compiled).toContain('Support rides only the explicit authored path while preserving authored pace and endpoint state; settle only where authored.')
     expect(compiled).not.toMatch(/return(?:s|ing)? to (?:the )?start|starting composition|speed ramp|push-in|pull-out|new camera side/i)
   })
 

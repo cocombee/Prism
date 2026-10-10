@@ -59,6 +59,28 @@ export function workflowTag(data: Pick<StudioNodeData, 'title'> & Partial<Pick<S
 export function connectedInputRule(source: StudioNodeData, target: StudioNodeData, targetHandle?: string | null, mode: InputFidelity = 'auto'): ConnectedInputRule {
   const handle = targetHandle || ''
   const tag = workflowTag(source, 'image-reference')
+  if (target.higgsfieldNative) {
+    const retired = target.higgsfieldNative.retiredPorts?.find(port => port.id === handle)
+    const binding = target.higgsfieldNative.media?.find(item => item.portId === handle)
+    if (binding && target.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) {
+      const rules = {
+        'start-frame': 'Use this image as the opening-frame authority, then follow the authored action.',
+        'end-frame': 'Use this image as the ending-frame authority, preserving the authored transition into that state.',
+        'source-video': target.higgsfieldNative.endpointId.endsWith('/video-extend') ? 'Use this source video as continuity context for the authored extension. Its duration is separate from the generated extension.' : 'Use this video as the existing shot to edit. Preserve source timing and untouched content while applying the authored changes.',
+        'reference-image': 'Use this physical image for its authored visual-reference role. Identity, object and location authority comes from the connected reusable asset and written instruction.',
+        'reference-video': 'Use this video for the authored motion, camera or performance guidance. Do not automatically copy its subjects, appearance or audio.',
+        'reference-audio': 'Use this audio for the authored audio-reference role. It does not supply visual identity or camera instructions.',
+      }
+      return { tag: workflowTag(source, binding.role), label: binding.retired || retired ? `Unavailable · ${binding.label}` : binding.label,
+        rule: binding.retired || retired ? 'This saved connection needs repair before generation.' : rules[binding.role] }
+    }
+    // Native Seedance retains the established Prompt, Storyboard, Style and semantic-asset rules below.
+    if (!target.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) {
+    const label = retired ? `Unavailable · ${retired.label}` : handle === 'video-in' ? 'Source Video' : handle === 'text-in' ? 'Prompt' : `${handle === 'character-in' ? 'Character' : handle === 'element-in' ? 'Element' : handle === 'location-in' ? 'Location' : 'Image'} Reference`
+    return { tag: workflowTag(source, handle === 'video-in' ? 'source-video' : 'image-reference'), label, rule: retired ? 'This saved connection needs repair before generation.' : 'Bound directly to the selected Higgsfield model input. The authored prompt and source video control the transformation.' }
+    }
+    if (retired) return { tag, label: `Unavailable · ${retired.label}`, rule: 'This saved connection needs repair before generation.' }
+  }
   const imageReferenceRule = (guide: string, auto: string, lock: string) => fidelityRule(mode, guide, auto, lock, target.prompt, tag)
   const fidelity = supportsInputFidelity(source, targetHandle) ? { mode, toggleable: true } : {}
   if (handle === 'storyboard-in' || source.kind === 'storyboard' || source.kind === 'storyboard-asset') return { tag: workflowTag(source, 'storyboard'), label: 'Storyboard', rule: fidelityRule(mode, 'Use this storyboard as loose structural guidance; preserve its story intent while allowing reframing, retiming, and stronger transitions.', 'Preserve the storyboard’s subjects, shot order, timing intent, and continuity, while automatically improving weak framing, detail, transitions, or image quality.', 'Follow this storyboard exactly once as the locked shot plan, timing, framing, movement, and continuity structure.'), ...fidelity }

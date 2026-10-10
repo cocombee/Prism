@@ -238,9 +238,9 @@ describe('typed node connections', () => {
     expect(compatibleNodeTargets({ kind: 'prompt' })).not.toContain('upscaler')
     expect(compatibleNodeTargets({ kind: 'prompt' })).not.toContain('character')
     expect(compatibleNodeTargets({ kind: 'upload', outputType: 'image' })).not.toContain('character')
-    expect(connectionCompatibilityError({ kind: 'upload', outputType: 'image' }, { kind: 'character' }, 'media-out', 'image-in')).toContain('accepts only optional Style and Wardrobe inputs')
+    expect(connectionCompatibilityError({ kind: 'upload', outputType: 'image' }, { kind: 'character' }, 'media-out', 'image-in')).toContain('accepts optional Style, Wardrobe, and Prop inputs')
     expect(connectionCompatibilityError({ kind: 'prompt' }, { kind: 'element' }, 'text-out', 'text-in')).toContain('accepts only an optional Style input')
-    expect(connectionCompatibilityError({ kind: 'upload', outputType: 'image' }, { kind: 'location' }, 'media-out', 'image-in')).toContain('accepts only an optional Style input')
+    expect(connectionCompatibilityError({ kind: 'upload', outputType: 'image' }, { kind: 'location' }, 'media-out', 'image-in')).toContain('accepts optional Style, Character, and Prop inputs')
   })
 
   it('keeps Style output-only because prompt building and optional reference intake happen inside the node', () => {
@@ -261,7 +261,7 @@ describe('typed node connections', () => {
 
   it('routes audio only to typed audio consumers and rejects generic visual sockets', () => {
     const audio = { kind: 'music-generator' as const, outputType: 'audio' as const }
-    expect(compatibleNodeTargets(audio)).toEqual(['video-generator', 'list', 'gallery'])
+    expect(compatibleNodeTargets(audio)).toEqual(['video-generator', 'list', 'gallery', 'router'])
     expect(compatibleTargetHandle(audio, 'video-generator')).toBe('audio-reference-in')
     expect(connectionCompatibilityError(audio, { kind: 'video-generator', videoEngine: 'bytedance/seedance-2.0/reference-to-video' }, 'media-out', 'audio-reference-in')).toBeNull()
     expect(connectionCompatibilityError(audio, { kind: 'video-generator', videoEngine: 'bytedance/seedance-2.0/reference-to-video' }, 'media-out', 'image-in')).toContain('Audio can connect only')

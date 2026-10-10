@@ -5,8 +5,11 @@ import type { ImportedAsset, SemanticAssetCommitRequest, SemanticAssetCommitResu
 import { commitSemanticAssetSave } from './semanticAssetSaveTransaction'
 
 interface IpcRegistrar { handle(channel: string, handler: (event: unknown, request: unknown) => unknown): void }
-interface SemanticAssetProjectContext { rootPath: string; workflowPath: string; assetsPath: string; projectDocumentPath?: string }
-interface SemanticAssetIpcDependencies { currentProject(): SemanticAssetProjectContext | null }
+interface SemanticAssetProjectContext { projectId?: string; rootPath: string; workflowPath: string; assetsPath: string; projectDocumentPath?: string }
+interface SemanticAssetIpcDependencies {
+  currentProject(): SemanticAssetProjectContext | null
+  runWithDocumentOwner?<T>(context: SemanticAssetProjectContext, action: () => Promise<T>): Promise<T>
+}
 
 function contained(path: string, root: string) {
   const rel = relative(resolve(root), resolve(path))
@@ -43,9 +46,7 @@ async function createCanonicalPath(rootPath: string, kind: string, logicalName: 
 }
 
 export function registerSemanticAssetSaveIpc(ipc: IpcRegistrar, dependencies: SemanticAssetIpcDependencies) {
-  ipc.handle('assets:commit-semantic-result', async (_event, rawRequest): Promise<SemanticAssetCommitResult> => {
-    const context = dependencies.currentProject()
-    if (!context) throw new Error('Choose or open a project folder first.')
+  async function commit(context: SemanticAssetProjectContext, rawRequest: unknown): Promise<SemanticAssetCommitResult> {
     const request = rawRequest as Partial<SemanticAssetCommitRequest> | null
     if (!request || typeof request.nodeId !== 'string' || typeof request.selectedResultId !== 'string' || (request.intent?.mode !== 'create-new' && request.intent?.mode !== 'replace-existing')) throw new Error('Invalid semantic asset save request.')
     const intent = request.intent as SemanticAssetCommitRequest['intent']
@@ -127,5 +128,11 @@ export function registerSemanticAssetSaveIpc(ipc: IpcRegistrar, dependencies: Se
       externalReferencePaths, referenceSourcePaths, canonicalPath, metadataWrites,
     })
     return { asset: canonicalAsset, deletedGeneratedResultIds: generated.filter((item) => item.id !== selected.id).map((item) => item.id) }
+  }
+  ipc.handle('assets:commit-semantic-result', async (_event, rawRequest): Promise<SemanticAssetCommitResult> => {
+    const context = dependencies.currentProject()
+    if (!context) throw new Error('Choose or open a project folder first.')
+    const action = () => commit(context, rawRequest)
+    return dependencies.runWithDocumentOwner ? dependencies.runWithDocumentOwner(context, action) : action()
   })
 }

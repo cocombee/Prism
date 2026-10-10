@@ -21,3 +21,48 @@ Executable owners: `src/shared/storyboardGeneration.ts`, `referenceInstructions.
 - A configured selected-model character ceiling is measured against the exact uncompressed semantic body. Under-limit text passes unchanged; only an over-limit body receives safe deterministic optional-line deduplication/compression. Diagnostics expose limit source, measured count, compressed count, and an exact blocking reason; irreducible mandatory state blocks submission without truncation.
 
 Director provenance is Seedance `1.1.11`, SHA-256 `3d269a485e793854cedcfa404d9b41526db02181b0281754c1132341006f6203`. Prompt Revision and Asset Binding `1.1.5` (`a46a3d48366625bd02359e597e25e37e105f85384aae52bc0acae710d75f939f`) and Deterministic Prompt Compilation `0.1.4` (`a2ece7f2ece633a948366ca844305ea9cfdcce3b6c07d90ff2ae10aa4487d961`) are implementation guidance/evidence only and are not Seedance Director provenance. Reference-exclusive behavior remains bound only to promoted IDs `SD-AB-001`, `SD-AB-002`, `SD-PS-007`, `SD-PS-008`, and `SD-PS-004`; the previous source hash remains only the immutable historical extraction fingerprint. Prism field names, enums, ledger, state inventory, manifest, budget diagnostic, and parity checks are local representations, not invented Director IDs. Bare Prompt and manual/OpenArt workflow behavior—including lowercase `@imageN` lexical validation—are intentionally excluded from Prism runtime behavior. Canonical Prism semantic tags and request-local adapter translation remain unchanged.
+
+
+## Current generated-prompt adaptation — 9 October 2026
+
+New general prompts use plain reference assignments, such as “Use @maya as Maya” and “Use @coat for @maya's wardrobe.” Body counting, explicit layer scopes, conflicts and suppression remain typed invariants. Generated ASSISTANT TASK, EDIT CONTROL and EDITABLE VARIABLE REGISTRY bookkeeping is omitted; explicit legacy authored fields remain supported without migrating an approved master.
+
+Qualified Natural Skin instructions are visible in the canonical body before budgeting, with negatives merged into its final NEGATIVE PROMPT section. Submission adds no hidden skin block. Manual/User overrides preserve exact bytes including CRLF and whitespace; only actual bound reference tokens are translated by Seedance's transport adapter. Unviewed exact-reference description metadata does not establish skin treatment.
+
+This is partial implementation of our Codex Seedance 1.1.22 behavior. Full-skill parity remains open; machine provenance is not bumped from 1.1.14 by these changes. Native provider efficacy and desktop acceptance are separate gates.
+
+
+## Current shot-local exclusion and budget ownership — 9 October 2026
+
+`shotSpec.ts` uses one sequence-wide exclusion intersection for the global ledger and Seedance authority. A single local exclusion cannot erase a later Character identity. Dialogue participation retains an off-camera identity; it does not make that Character visually active. Existing local state exclusion remains unchanged, and an unrelated Character excluded in every shot still has no global authority prose. Stable typed identities appear in REFERENCE AUTHORITY when their detailed same-body authority is correctly assigned per shot. Physical transport order and reference arrays remain owned by their existing adapters.
+
+Explicit performance, optics, variable registry and opening lock are required budget blocks, including with no external Character/start frame. Authored settings survive configured compression or submission fails without truncation. Manual authored bytes remain protected. Tested source behavior is a subset of CodexSeedance1.1.22; current machine provenance1.1.14 remains unchanged. The earlier provenance extraction above is historical baseline evidence. Desktop installation, generated adherence, duration/transition/audio-intent gaps and final whole-app stress are not proved by this repair.
+
+
+## Final Continue and unsupported saved boundaries — 9 October 2026
+
+Source implementation only. Internal Continue beats still group into the same unbroken shot; internal Cut boundaries still create exactly one hard cut. Final Continue now survives graph normalization, upstream/compiled Storyboard prose, Seedance timeline, generic required shot text, native Kling group output and both single/batch rewrite contexts as one outgoing continuation hook. It adds no next beat, cut, shot or duration. A locked last panel remains read-only context. Final Cut/missing final boundary emits no invented terminal hard cut.
+
+The final Seedance endpoint guidance retains authored state and does not invent a stop for this hook; authored stop/hold instructions remain untouched. Saved unsupported transition types remain intact and block graph/prompt/rewrite processing instead of becoming hard cuts. UI normalization is non-throwing; its existing controls and tokens are unchanged. Missing legacy internal boundaries retain their established hard-cut default. Typed flash/occlusion intervals are still unimplemented; fail-closed preservation is not full mixed-transition support.
+
+Seven actual graph/compiler/rewrite regressions cover grouped counts/totals, locked context, unknown saved transitions and approved Manual bytes. Manual compiler metadata no longer builds/validates an unused graph ledger. This is not installed, generated-output or complete current-skill parity evidence.
+
+
+## Authored camera timing and playback — 9 October 2026
+
+Generated Seedance timeline and bridge subwindows use the authored decimal precision, with at least one displayed decimal and no one-decimal rounding of finer cut times. Each interval retains its authored duration. Generic endpoint, support and camera recipe guidance preserves authored pace and state; deceleration, recovery and holds are added only where authored. Continue support follows the actual authored path and does not manufacture a vertical direction. Dialogue/audio may continue across a declared span; an endpoint does not create a new pause or require every line to finish at each beat.
+
+When overall or per-beat prose contains authored playback/capture timing, the shared filmic-motion owner preserves those intervals and states only the selected delivery cadence. It does not equate delivery FPS with capture FPS, calculate reciprocal exposure from delivery, select a playback factor or derive physical rig velocity from the full shot duration. An explicit unambiguous global capture/shutter pair is checked against that capture rate; per-shot authored rates remain in their owning prose. Ordinary requests without authored playback timing retain the existing normal-speed default. Manual and recognized complete masters retain their existing exact-body ownership.
+
+Executable owners: `work/src/shared/storyboardTimecodes.ts`, `shotSpec.ts`, `shotRecipes.ts`, `cameraSupportSemantics.ts`, `filmicMotion.ts`; behavioral coverage includes `cameraTimingCompilation.test.ts` and neighboring prompt/support tests. This repairs compiler contradictions, not a new calibrated camera-speed control or proof of generated video adherence. Full current-skill geometry, timed motion controls, interval validation and output verification remain separate open gates.
+
+
+## Current model duration and beat floor — 10 October 2026
+
+Generated typed Storyboard panels require at least1.0s. New menu selections advance in0.5s steps; saved valid finer decimal timing and decimal bridge/action/reaction subwindows stay exact. The floor belongs to the authored panel, not each subwindow or every provider-native shot group. Exact Manual/recognized-master ownership remains unchanged.
+
+`videoDurationLimits.ts` projects only current declared limits and values. Native endpoint/fingerprint ownership precedes observation; frame counts use the selected declared FPS, enum strings retain their units, and conditional constraints use actual/defaulted owned values. Defaults are values, not maximum evidence. Unsupported root alternatives, unknown timing units, missing contracts, automatic selections and invalid saved values do not become a Wan fallback or a silently fixed budget. Existing native schema validation and exact total-duration equality remain authoritative before submission. Legacy Wan requires17–161 exact frames at4–60fps and rejects unsupported automatic duration. Native Kling still requires integral1–15s groups and integral3–15s clip totals; Continue beat grouping does not round or pad authored timing.
+
+Video Generator shows the verified clip maximum on its compact surface. A source-timed Genjutsu route instead identifies its30s source-video ceiling; this is not an editable output-duration guarantee. Unverified limits are labelled unverified. A sparse native clip enum is not reused as the panel menu: the independent1.0s/0.5s authoring sequence is bounded by the actual maximum. A model4s clip minimum therefore does not force each beat to4s; the whole authored timeline must meet the selected route before generation.
+
+Canonical UI/persistence behavior is in `storyboard-node.md`. Source, actual compiled preflight and isolated rendered-node evidence cover the duration slice; authenticated output efficacy and the final whole-app stress remain separate gates. The unchanged parent and candidate both produce one transient ResizeObserver notification when overflow feedback changes node height; geometry then stabilizes. This existing layout issue is retained in the inspection record, not counted as resolved.

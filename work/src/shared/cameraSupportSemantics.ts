@@ -27,28 +27,28 @@ const SHARED_SUPPORT_NEGATIVES = [
 ] as const
 
 function revampInstruction(providerClause: string): string {
-  return `Preserve the already-authored camera path and action exactly. ${providerClause} During an explicit authored camera movement or spatial Continue bridge, support rides only that path, then anchors and settles at the arrived endpoint. A non-spatial Continue preserves the current anchor and does not imply travel. A Cut resets the anchor to the new shot authored viewpoint, framing, angle, and camera side; no prior momentum, path, or recovery carries across. If support and the authored path become ambiguous, preserve the authored path and omit support embellishment.`
+  return `Preserve the already-authored camera path and action exactly. ${providerClause} During an explicit authored camera movement or spatial Continue bridge, support rides only that path while preserving authored pace and endpoint state; settling is added only where authored. A non-spatial Continue preserves the current anchor and does not imply travel. A Cut resets the anchor to the new shot authored viewpoint, framing, angle, and camera side; no prior momentum, path, or recovery carries across. If support and the authored path become ambiguous, preserve the authored path and omit support embellishment.`
 }
 
 const CAMERA_SUPPORT_SEMANTICS: Record<CameraSupportValue, CameraSupportSemantic> = {
   handheld: {
-    providerClause: 'Restrained natural handheld micro-sway and micro-translation remain local to the current authored viewpoint and framing, then settle at that anchor.',
-    revampInstruction: revampInstruction('Restrained natural handheld micro-sway and micro-translation remain local to the current authored viewpoint and framing, then settle at that anchor.'),
+    providerClause: 'Restrained natural handheld micro-sway and micro-translation remain local to the current authored viewpoint and framing; settle at that anchor only where authored.',
+    revampInstruction: revampInstruction('Restrained natural handheld micro-sway and micro-translation remain local to the current authored viewpoint and framing; settle at that anchor only where authored.'),
     negatives: SHARED_SUPPORT_NEGATIVES,
   },
   'handheld-subtle': {
-    providerClause: 'Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing, then settles calmly at that anchor.',
-    revampInstruction: revampInstruction('Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing, then settles calmly at that anchor.'),
+    providerClause: 'Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing; settle calmly at that anchor only where authored.',
+    revampInstruction: revampInstruction('Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing; settle calmly at that anchor only where authored.'),
     negatives: SHARED_SUPPORT_NEGATIVES,
   },
   'handheld-intense': {
-    providerClause: 'Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition.',
-    revampInstruction: revampInstruction('Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition.'),
+    providerClause: 'Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition only where authored.',
+    revampInstruction: revampInstruction('Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition only where authored.'),
     negatives: SHARED_SUPPORT_NEGATIVES,
   },
   'shoulder-rig': {
-    providerClause: 'Weighted shoulder-mounted micro-movement and bodily operator transfer remain local to the current authored viewpoint and framing, then settle firmly at that anchor.',
-    revampInstruction: revampInstruction('Weighted shoulder-mounted micro-movement and bodily operator transfer remain local to the current authored viewpoint and framing, then settle firmly at that anchor.'),
+    providerClause: 'Weighted shoulder-mounted micro-movement and bodily operator transfer remain local to the current authored viewpoint and framing; settle firmly at that anchor only where authored.',
+    revampInstruction: revampInstruction('Weighted shoulder-mounted micro-movement and bodily operator transfer remain local to the current authored viewpoint and framing; settle firmly at that anchor only where authored.'),
     negatives: SHARED_SUPPORT_NEGATIVES,
   },
 }

@@ -13,6 +13,16 @@ Selector-row arithmetic uses one coordinate system. When the canvas is zoomed or
 
 For bounded discrete on-node values such as Voiceover Speed and Fish Audio Volume, use the shared application selector with one downward chevron instead of the browser's up/down number spinner. Show multipliers with the multiplication sign, such as `1.2×`. This supersedes the earlier Voiceover native-spinner presentation requirement while preserving the same legal provider values.
 
+## Selected identity alignment
+
+Closed selected-value triggers keep their content at the caller's established left inset: ordinarily `--selector-content-inset` (8px), with retained 7px Storyboard and 10px Inspector caller insets. The icon-to-name relationship uses Prism's predominant existing 7px spacing, owned by `--selector-icon-label-gap`; Audyt supplied the alignment method, not a replacement numeric scale.
+
+The selected leading identity mark is intrinsic and never receives the name field's flex growth or a sibling's surplus space. Crop only the SVG viewport or remove font side bearings to establish its actual painted width, preserving original company artwork and the accepted 12px icon envelope. A shared-row allocation may enlarge the field frame; surplus width stays after the left-aligned name before the fixed right chevron. Do not center the selected icon/name cluster or add symmetric extra left padding.
+
+This rule concerns the closed selected trigger. Popup list rows keep their existing layout. Preserve model-default track calculation, row membership, bounded Quantity symmetry, terminal actions, focus, selected values, menu anchors and four typography roles / two weights.
+
+Regression owner: `work/src/renderer/src/controlGroupMounted.electron.test.ts` covers actual selection changes for 15 company marks beside a sibling selector, including narrow and zoomed layouts. Native screenshots and installed acceptance are tracked separately from source tests.
+
 ## Fluid control-group composition
 
 A logical control group is composed before spacing is distributed. Determine the active capability-aware control set, preserve each approved component's anatomy, measure real painted content in the production component, then evaluate complete one-to-three-row assignments. Compatible controls may change rows. A third row is allowed only after rebalancing all rows and proving that no one- or two-control move can preserve readable defaults.
@@ -33,7 +43,7 @@ Acceptance is based on painted geometry: first/last visible borders, border-to-b
 
 ## Storyboard ordered-duration selectors
 
-Single Sequence duration options remain visible when the ordered budget makes them unavailable. Disabled rows use `aria-disabled="true"`, `tabIndex=-1`, full-opacity `#8e8999` text, no disabled hover/selected fill, and a central selection guard; Arrow keys, Home/End, typeahead, Enter, Space, and pointer selection must never enter or choose them. The listbox/trigger carries the remaining-budget description. Closed duration triggers remain 8px/400, duration menu rows 10px/400, and focus uses the existing 2px `#b89cff` treatment without changing the 315px node geometry or viewport-clamped portal behavior.
+Single Sequence duration options remain visible when the ordered budget makes them unavailable. Disabled rows use `aria-disabled="true"`, `tabIndex=-1`, full-opacity `#8e8999` text, no disabled hover/selected fill, and a central selection guard; Arrow keys, Home/End, typeahead, Enter, Space, and pointer selection must never enter or choose them. The listbox/trigger carries the remaining-budget description. Closed duration triggers and their menus use the shared Smaller text role (compact 8px/Normal 400), and focus uses the existing 2px `#b89cff` treatment without changing the 315px node geometry or viewport-clamped portal behavior.
 
 A system-generated `0s` row is visible, selected, neutral, `aria-disabled`, and never user-selectable or Auto. The trigger remains a focusable menu opener. One derived 8px/400 neutral helper sits between panel grid and footer; locked conflicts may use the existing error color, but budget guidance never overwrites unrelated persisted errors.
 

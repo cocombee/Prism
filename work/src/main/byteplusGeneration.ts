@@ -1,7 +1,12 @@
+import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
+import { videoDialogueAudioReadinessFailures } from '../shared/videoDialogueAudio'
+import { storyboardPhysicalCastReadinessFailures } from '../shared/storyboardPhysicalCast'
+import { legacyVideoDurationPlan, authoredTimelineSeconds } from '../shared/videoTiming'
 import { compileBytePlusSeedancePayload, type BytePlusCreatePayload, type BytePlusReference } from '../shared/byteplusSeedance'
 import { providerSeedancePayloadCompilation, selectSeedanceReferences } from '../shared/referenceInstructions'
 import type { GenerationRequest } from '../shared/types'
 import { resolveVideoModel } from '../shared/videoModels'
+import { seedanceReferenceCandidates, seedanceReferenceCapacityFailures } from '../shared/referenceCapacity'
 
 type GenerationReference = NonNullable<GenerationRequest['references']>[number]
 export type BytePlusMediaResolver = (source: { path?: string; url?: string; mediaType?: 'image' | 'video' | 'audio' }) => Promise<string>
@@ -14,8 +19,16 @@ export async function compileBytePlusGenerationRequest(request: GenerationReques
   const route = resolveVideoModel(request.videoEngine)
   if (route.provider !== 'byteplus') throw new Error('The selected video model is not a BytePlus route.')
 
-  const references: GenerationReference[] = [...(request.references || [])]
-  if ((request.inputPath || request.inputUrl) && !references.some((reference) => Boolean(request.inputPath && reference.path === request.inputPath) || Boolean(request.inputUrl && reference.url === request.inputUrl))) {
+  const castFailures = [...storyboardPhysicalCastReadinessFailures(request), ...videoDialogueAudioReadinessFailures(request)]
+  if (castFailures.length) throw new Error(castFailures.join('; '))
+  assertVideoProviderPromptPreflight(request)
+
+  const timing = legacyVideoDurationPlan(request, route), timeline = authoredTimelineSeconds(request)
+  if (timeline !== undefined && Math.abs(timeline - timing.seconds!) > 0.000001) throw new Error(`BytePlus duration must match the authored ${timeline}s timeline; timing was not substituted.`)
+  const capacityFailures = seedanceReferenceCapacityFailures(request)
+  if (capacityFailures.length) throw new Error(capacityFailures.join('; '))
+  const references: GenerationReference[] = route.mode === 'reference' ? seedanceReferenceCandidates(request).filter(reference => Boolean(reference.path || reference.url)) : [...(request.references || [])]
+  if (route.mode !== 'reference' && (request.inputPath || request.inputUrl) && !references.some((reference) => Boolean(request.inputPath && reference.path === request.inputPath) || Boolean(request.inputUrl && reference.url === request.inputUrl))) {
     references.unshift({ role: 'reference', slot: 'start', path: request.inputPath, url: request.inputUrl, mediaType: 'image' })
   }
 
@@ -41,7 +54,7 @@ export async function compileBytePlusGenerationRequest(request: GenerationReques
     promptRequest = { ...request, references: resolved.map(({ reference, url }) => ({ ...reference, url, path: undefined })) }
   }
 
-  const duration = route.durations.includes(request.duration || 0) ? request.duration! : route.durations.find((value): value is number => typeof value === 'number') || 4
+  const duration = timing.seconds!
   const ratio = request.aspectRatio && route.ratios.includes(request.aspectRatio) ? request.aspectRatio : route.ratios.includes('16:9') ? '16:9' : undefined
   const resolution = request.resolution && route.resolutions.includes(request.resolution) ? request.resolution : route.resolutions.includes('720p') ? '720p' : route.resolutions[0]
   const prompt = providerSeedancePayloadCompilation(promptRequest).text

@@ -23,7 +23,7 @@ describe('camera support provider compilation', () => {
     const authoredPath = 'Track left beside @hero on the authored rail; she opens the red door at 2.0s.'
     const body = visibleProviderPromptBody(request('handheld-intense', authoredPath, `CAMERA\n${authoredPath}`))
     const camera = section(body, 'CAMERA')
-    expect(camera).toContain('Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition.')
+    expect(camera).toContain('Strong reactive handheld shake may disturb the framing locally, but remains anchored to the current authored viewpoint and recovers into that composition only where authored.')
     expect(camera).toContain(authoredPath)
     expect(body.match(new RegExp(authoredPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(2)
     expect(camera).not.toMatch(/fight mode|choreography|impact response|reportage|\bENG\b/)
@@ -32,7 +32,7 @@ describe('camera support provider compilation', () => {
   it('emits support texture alone without inventing path, target, action, event, timing, lens, focus, zoom, light, composition, endpoint, or Style', () => {
     const body = visibleProviderPromptBody(request('handheld-subtle', 'A woman waits.'))
     const camera = section(body, 'CAMERA')
-    expect(camera).toBe('SHOT 1: Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing, then settles calmly at that anchor.')
+    expect(camera).toBe('SHOT 1: Near-locked gentle handheld micro-sway remains local to the current authored viewpoint and framing; settle calmly at that anchor only where authored.')
     for (const invented of ['track', 'pan', 'tilt', 'push', 'pull', 'orbit', 'arc', 'target', 'event', 'lens', 'focus', 'zoom', 'lighting', 'composition', 'endpoint', 'Style']) expect(camera).not.toContain(invented)
   })
 

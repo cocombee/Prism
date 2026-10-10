@@ -44,7 +44,7 @@ describe('composed provider prompt inspector', () => {
     const entries = composedProviderPromptEntries(request, null)
     expect(entries[0].label).not.toBe('Preview unavailable')
     expect(entries[0].body).toContain('REFERENCE AUTHORITY')
-    expect(entries[0].body).toContain('@actor-c is the sole visual authority for character')
+    expect(entries[0].body).toContain('Use @actor-c as actor-c.')
     expect(entries[0].body).not.toMatch(/@Image\d+/)
     expect(entries[0].body).toContain('No action or Character performance is inferred from connected references')
     expect(entries[0].body).toContain('FINAL-FRAME AND OUTPUT HARD GATE')
@@ -68,6 +68,7 @@ describe('composed provider prompt inspector', () => {
     const request: GenerationRequest = {
       nodeId: 'preview-kling',
       kind: 'video-generator',
+      duration: 9,
       prompt: 'Global direction.',
       videoEngine: 'fal-ai/kling-video/o3/standard/reference-to-video',
       storyboardContext: 'Maintain the same character and location.',

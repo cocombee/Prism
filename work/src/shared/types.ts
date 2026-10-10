@@ -1,3 +1,11 @@
+import type { HiggsfieldJobView, HiggsfieldJobCommand } from './higgsfieldJobs'
+import type { ElevenDialogueTurn, ElevenVoiceSegment } from './elevenDialogue'
+import type { ModelMenuMetadata } from './modelCatalogMenu'
+import type { FalSchemaContract } from './falSchemaBinding'
+import type { HiggsfieldNativeRequest, HiggsfieldPreset } from './higgsfieldNative'
+import type { HiggsfieldNodeState } from './higgsfieldNodeBinding'
+import type { FalNativeRequest } from './falNativeExecution'
+import type { FalNativeNodeState } from './falNodeBinding'
 import type { Edge, Node, Viewport } from '@xyflow/react'
 import type { StoryboardCameraBridgePlan } from './storyboardCameraBridge'
 import type { CharacterControlState } from './resolvedAssetRequest'
@@ -107,6 +115,7 @@ export interface StoryboardDialogueSpan {
 
 export interface StoryboardTypedContinuity {
   continuityGroupId?: string
+  /** Physical cast, including off-camera identities; [] is empty, absence inherits within the same continuity group. */
   activeCharacterTags?: string[]
   excludedCharacterTags?: string[]
   /** Shot 1 may establish state; later records are explicit authored state replacements. */
@@ -164,6 +173,11 @@ export interface StoryboardPanel extends StoryboardTypedContinuity {
 }
 
 export interface StudioNodeData extends Record<string, unknown> {
+  higgsfieldNative?: HiggsfieldNodeState
+  higgsfieldNativePresets?: Record<string, HiggsfieldNodeState>
+  /** Compact exact-model inputs; full schemas remain ephemeral and main-owned. */
+  falNative?: FalNativeNodeState
+  falNativePresets?: Record<string, FalNativeNodeState>
   kind: NodeKind
   title: string
   selectorDeployment?: boolean
@@ -311,8 +325,12 @@ export interface StudioNodeData extends Record<string, unknown> {
   enableOutputSafety?: boolean
   shift?: number
   voice?: string
-  voiceEngine?: 'elevenlabs' | 'fish-audio'
-  fishModel?: 's1' | 's2-pro'
+  voiceEngine?: 'elevenlabs' | 'elevenlabs-direct' | 'fish-audio'
+  voiceModelId?: string
+  elevenSpeechMode?: 'speech' | 'dialogue'
+  elevenDialogueTurns?: ElevenDialogueTurn[]
+  audioProvider?: 'fal' | 'elevenlabs'
+  fishModel?: string
   fishReferenceId?: string
   fishTemperature?: number
   fishTopP?: number
@@ -427,6 +445,9 @@ export interface HistoryEntry {
 export interface GenerationRequest {
   nodeId: string
   kind: NodeKind
+  /** Explicit exact-endpoint schema execution. Never a static model alias or supplied schema. */
+  higgsfieldNative?: HiggsfieldNativeRequest
+  falNative?: FalNativeRequest
   /** Renderer-owned timing evidence; provider adapters must not forward it. */
   timingKey?: string
   estimatedDurationMs?: number
@@ -453,6 +474,10 @@ export interface GenerationRequest {
   builtInStylePrompts?: string[]
   /** Fully composed provider-effective User prompt; adapters may translate only semantic reference tokens. */
   providerPromptOverride?: string
+  /** Exact authored text versus compiler output copied into a native provider field; local metadata only. */
+  providerPromptOwnership?: 'authored' | 'compiled'
+  /** Ephemeral output owner, so creation inputs are not mistaken for layers of an existing Character. */
+  semanticAssetCreation?: { kind: 'character' | 'wardrobe' | 'location' | 'element'; tag: string }
   storyboardShots?: Array<({ panelId?: string; prompt: string; duration: number; shotSize: string; camera: string; audioCue?: string; transitionToNext?: StoryboardTransition; boundaryState?: StoryboardBoundaryState; startSeconds?: number; endSeconds?: number; incomingBridge?: StoryboardCameraBridgePlan; panelNumber?: number } & StoryboardTypedContinuity)>
   /** One-based authored Storyboard panels that are still missing action prose. */
   storyboardIncompletePanels?: number[]
@@ -515,8 +540,12 @@ export interface GenerationRequest {
   enableOutputSafety?: boolean
   shift?: number
   voice?: string
-  voiceEngine?: 'elevenlabs' | 'fish-audio'
-  fishModel?: 's1' | 's2-pro'
+  voiceEngine?: 'elevenlabs' | 'elevenlabs-direct' | 'fish-audio'
+  voiceModelId?: string
+  elevenSpeechMode?: 'speech' | 'dialogue'
+  elevenDialogueTurns?: ElevenDialogueTurn[]
+  audioProvider?: 'fal' | 'elevenlabs'
+  fishModel?: string
   fishReferenceId?: string
   fishTemperature?: number
   fishTopP?: number
@@ -587,6 +616,8 @@ export interface GenerationResult {
   outputPath: string
   outputUrl: string
   outputType: 'image' | 'video' | 'audio'
+  /** All media from one provider-native request; legacy adapters keep the primary fields. */
+  outputs?: Array<{ path: string; url: string; type: 'image' | 'video' | 'audio' }>
 }
 
 export interface ImportedAsset {
@@ -625,6 +656,14 @@ export interface ImportedAsset {
     timeOfDay?: 'day' | 'night'
     provider?: string
     modelId?: string
+    /** Timing stays with managed audio through relocation and portable export. */
+    audioTiming?: {
+      voiceSegments?: ElevenVoiceSegment[]
+      alignment?: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] }
+      normalizedAlignment?: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] }
+    }
+    elevenDialogueInputs?: Array<{ text: string; voiceId: string }>
+    audioOutputFormat?: string
     /** Reusable-asset Create/Edit/Rerun history. Never downstream semantic authority. */
     assetGenerationPrompt?: string
     prompt?: string
@@ -706,7 +745,7 @@ export interface ProjectWorkspace {
   serviceProfileOverrides?: Partial<Record<ServiceProvider, string>>
 }
 
-export type ServiceProvider = 'fal' | 'byteplus' | 'fish' | 'omniroute' | 'openai' | 'anthropic' | 'google' | 'deepseek' | 'moonshot'
+export type ServiceProvider = 'higgsfield' | 'fal' | 'byteplus' | 'fish' | 'omniroute' | 'openai' | 'anthropic' | 'google' | 'deepseek' | 'moonshot' | 'elevenlabs'
 
 export type ServiceProfileStatus = 'connected' | 'disconnected' | 'signed-out'
 
@@ -725,6 +764,8 @@ export interface ServiceProfile {
 }
 
 export interface ServiceProfileRegistry {
+  /** Explicit profile ownership survives deletion; old keys cannot reappear as defaults. */
+  profileManagedProviders?: ServiceProvider[]
   schemaVersion: 1
   localNamingVersion?: 1
   profiles: ServiceProfile[]
@@ -739,7 +780,33 @@ export interface ServiceConnection {
 export interface ServiceModelAvailability {
   provider: ServiceProvider
   verified: boolean
-  models: Array<{ id: string; label: string }>
+  catalogCheckedAt?: string
+  /** Public schema discovery is distinct from account access or executed-engine identity. */
+  catalogSource?: string
+  catalogFingerprint?: string
+  /** Validated current native JSON input contract; public annotations contain no account secrets. */
+  nativeInputSchema?: import('./falSchemaBinding').FalSchemaNode
+  catalogStale?: boolean
+  /** Bounded public document traversal is distinct from complete provider enumeration. */
+  catalogComplete?: boolean
+  models: Array<{
+    id: string
+    label: string
+    category?: string
+    description?: string
+    updatedAt?: string
+    catalog?: ModelMenuMetadata
+    documentationUrl?: string
+    nativeContractFingerprint?: string
+    languages?: Array<{ id: string; label: string }>
+    maxTextLength?: number
+    supportsStyle?: boolean
+    supportsDialogue?: boolean
+    supportsSpeakerBoost?: boolean
+  }>
+  voices?: Array<{ id: string; label: string; previewUrl?: string }>
+  voiceCatalogError?: string
+  catalogError?: string
 }
 
 export interface ServiceAccountStatus {
@@ -788,6 +855,9 @@ export interface PrismAPI {
     save: (provider: ServiceProvider, key: string) => Promise<void>
     remove: (provider: ServiceProvider) => Promise<void>
     models: (provider: ServiceProvider) => Promise<ServiceModelAvailability>
+    higgsfieldPresets: (refresh?: boolean) => Promise<HiggsfieldPreset[]>
+    higgsfieldSchema: (endpointId: string) => Promise<import('./higgsfieldInputContract').HiggsfieldInputContract>
+    falSchema: (endpointId: string) => Promise<FalSchemaContract>
     account: (provider: ServiceProvider) => Promise<ServiceAccountStatus>
     profiles: (provider: ServiceProvider, refresh?: boolean) => Promise<ServiceProfileRegistry>
     addProfile: (provider: ServiceProvider, key: string, expectedProfileId?: string) => Promise<ServiceProfileRegistry>
@@ -797,8 +867,8 @@ export interface PrismAPI {
     selectProjectProfile: (provider: ServiceProvider, profileId?: string) => Promise<ProjectWorkspace>
   }
   workflows: {
-    load: () => Promise<WorkflowDocument | null>
-    save: (document: WorkflowDocument) => Promise<void>
+    load: (owner: import('./workflowSaveOwnership').WorkflowSaveOwner) => Promise<WorkflowDocument | null>
+    save: (document: WorkflowDocument, owner: import('./workflowSaveOwnership').WorkflowSaveOwner) => Promise<void>
   }
 
   assets: {
@@ -841,6 +911,8 @@ export interface PrismAPI {
     rewrite: (provider: 'omniroute' | 'openai' | 'anthropic' | 'google' | 'deepseek' | 'moonshot', text: string, instruction?: string, model?: string) => Promise<string>
   }
   generation: {
+    higgsfieldJobs: () => Promise<HiggsfieldJobView[]>
+    higgsfieldAction: (command: HiggsfieldJobCommand) => Promise<{ job: HiggsfieldJobView; result?: GenerationResult }>
     run: (request: GenerationRequest) => Promise<GenerationResult>
     cancel: (nodeId: string) => Promise<boolean>
     estimate: (request: GenerationRequest) => Promise<GenerationCostEstimate | null>

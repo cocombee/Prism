@@ -1,18 +1,26 @@
+import { effectiveVideoEndpoint, hasExactAuthoredProviderBody, providerPromptOwnershipErrors } from './providerPromptOwnership'
+import { seedanceFinalSectionErrors } from './seedanceFinalSection'
+import { seedancePromptIntegrityFailures, SeedancePromptIntegrityError } from './seedancePromptIntegrity'
+import { completeStructuredSeedanceMaster, structuredSeedanceCoverage } from './seedanceAuthoredMaster'
+export { completeStructuredSeedanceMaster } from './seedanceAuthoredMaster'
 import { cinematicDirection } from './cinematicDirection'
-import { buildContinuityLedger, productionShotSpecSections, seedanceShotSpecSections, type ContinuityLedger } from './shotSpec'
+import { buildContinuityLedger, productionShotSpecSections, seedanceShotSpecSections, type ContinuityLedger, type ProductionContinuityContext } from './shotSpec'
 import type { GenerationRequest } from './types'
 import { resolveVideoModel } from './videoModels'
 import { validateSeedanceDirectorPrompt } from './seedanceDirectorValidation'
 import { providerMotionControlDiagnostic, type ProviderMotionControlDiagnostic } from './providerShutter'
 import {
-  compileNaturalSkinProviderPrompt,
+  naturalSkinPromptAdditions,
   providerNaturalSkinSupportDiagnostic,
   type NaturalSkinProviderSupportDiagnostic,
 } from './naturalSkinRendering'
 import { cameraSupportProviderDiagnostic, type CameraSupportProviderDiagnostic } from './cameraSupportSemantics'
 import { isReferenceExclusive } from './referenceVisualAuthority'
 import { providerVisibleReferences, sameBodyAuthorityReadinessFailures } from './sameBodyAuthority'
+import { seedanceReferenceCandidates } from './referenceCapacity'
 import { propScaleReadinessFailures } from './propScaleAuthority'
+import { providerAudioPromptText } from './requestPreview'
+import { assertKlingNativeStoryboard, groupedKlingStoryboard } from './klingNativeStoryboard'
 
 type Reference = NonNullable<GenerationRequest['references']>[number]
 
@@ -57,7 +65,7 @@ export const PROVIDER_PROMPT_CEILINGS: Partial<Record<PromptFamily, number>> = {
 
 function promptFamily(request: GenerationRequest): PromptFamily {
   if (request.kind !== 'video-generator') return 'generic'
-  const family = resolveVideoModel(request.videoEngine).family
+  const family = resolveVideoModel(effectiveVideoEndpoint(request)).family
   return ['seedance', 'kling', 'veo', 'wan'].includes(family) ? family as PromptFamily : 'generic'
 }
 
@@ -129,7 +137,7 @@ IDENTITY AND STATE: Preserve exact identity, anatomy, wardrobe, props, materials
 FINAL ACCEPTANCE: The output must preserve the intended shot order, identity, geometry, action outcome, timing relationships, and a distinct final composition.
 HARD AVOID: identity blending, face replacement, anatomy or geometry morphing, wardrobe or prop redesign, invented text, logos, subtitles, watermarks, contact sheets, visible storyboard labels, unmotivated camera resets, and continuity resets.`
 
-function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend): PromptBlock[] {
+function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend, continuityContext?: ProductionContinuityContext, family?: PromptFamily): PromptBlock[] {
   const prompt = request.prompt?.trim()
   const connectedVideoAuthority = request.kind === 'video-generator' && Boolean(
     (request.references || []).length
@@ -143,9 +151,9 @@ function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend)
   if (!prompt && !connectedVideoAuthority) throw new Error('Add a prompt before generating media.')
   if (request.kind === 'video-generator') {
     const providerLegend = legend?.body ? `${legend.heading}:\n${legend.body}${legend.footer ? `\n${legend.footer}` : ''}` : undefined
-    const sections = resolveVideoModel(request.videoEngine).family === 'seedance'
+    const sections = (family || resolveVideoModel(request.videoEngine).family) === 'seedance'
       ? seedanceShotSpecSections(request, providerLegend)
-      : productionShotSpecSections(request, providerLegend)
+      : productionShotSpecSections(request, providerLegend, continuityContext)
     return sections.map((section) => ({
       id: `shot-spec-${section.id}`,
       label: section.heading,
@@ -181,13 +189,59 @@ export interface PromptCompileOptions {
   legend?: PromptLegend
   ceiling?: number
   ceilingSource?: string
+  /** Internal projection of a native group against the complete authored ledger. */
+  continuityContext?: ProductionContinuityContext
+}
+
+function visibleNaturalSkinBlocks(request: GenerationRequest, blocks: PromptBlock[]): PromptBlock[] {
+  // Already-approved complete masters and Manual bodies remain authored bytes.
+  if (completeStructuredSeedanceMaster(request.authoredPrompt?.trim() || '')) return blocks
+  const additions = naturalSkinPromptAdditions(request, genericBlockRenderer(blocks))
+  if (!additions.addedPositiveClauses.length && !additions.addedNegativeTerms.length) return blocks
+  const negativeIndex = blocks.findIndex((block) => block.label === 'NEGATIVE PROMPT')
+  const positive: PromptBlock[] = additions.addedPositiveClauses.length ? [{
+    id: 'shot-spec-natural-skin', label: 'NATURAL SKIN TEXTURE', priority: 100, required: true,
+    text: `NATURAL SKIN TEXTURE\n${additions.addedPositiveClauses.join('\n\n')}`,
+  }] : []
+  const result = [...blocks]
+  if (negativeIndex >= 0) {
+    const negative = result.splice(negativeIndex, 1)[0]
+    result.push(...positive, {
+      ...negative,
+      text: [negative.text, additions.addedNegativeTerms.join(', ')].filter(Boolean).join('\n'),
+    })
+  } else {
+    result.push(...positive)
+    if (additions.addedNegativeTerms.length) result.push({
+      id: 'shot-spec-natural-skin-negative', label: 'NEGATIVE PROMPT', priority: 100, required: true,
+      text: `NEGATIVE PROMPT\n${additions.addedNegativeTerms.join(', ')}`,
+    })
+  }
+  return result
 }
 
 export function compileProviderPrompt(request: GenerationRequest, options: PromptCompileOptions = {}): PromptCompilation {
-  const effectiveRequest = { ...request, references: providerVisibleReferences(request) }
+  const ownershipErrors = providerPromptOwnershipErrors(request)
+  if (ownershipErrors.length) throw new Error(ownershipErrors.join(' '))
+  const integrityErrors = seedancePromptIntegrityFailures(request)
+  if (integrityErrors.length) throw new SeedancePromptIntegrityError(integrityErrors)
+  const effectiveRequest = { ...request, ...(request.falNative || request.higgsfieldNative ? { videoEngine: effectiveVideoEndpoint(request) } : {}), references: providerVisibleReferences(request) }
   const family = options.family || promptFamily(effectiveRequest)
   const ceiling = options.ceiling ?? PROVIDER_PROMPT_CEILINGS[family]
-  const rawBlocks = semanticPromptBlocks(effectiveRequest, options.legend)
+  const authored = effectiveRequest.providerPromptOverride ?? (family === 'seedance' && completeStructuredSeedanceMaster(effectiveRequest.authoredPrompt || '') ? effectiveRequest.authoredPrompt?.trim() : undefined)
+  let rawBlocks: PromptBlock[]
+  if (authored !== undefined) {
+    rawBlocks = [{ id: 'authored', label: 'Authored master prompt', priority: 130, required: true, text: authored }]
+  } else {
+    const semantic = semanticPromptBlocks(effectiveRequest, options.legend, options.continuityContext, family)
+    const structured = family === 'seedance'
+      ? applyStructuredSeedanceCompletion({ family, text: genericBlockRenderer(semantic), blocks: semantic, droppedBlocks: [] }, effectiveRequest).blocks
+      : semantic
+    const bound = family === 'seedance'
+      ? translateUnboundSeedanceTags({ family, text: genericBlockRenderer(structured), blocks: structured, droppedBlocks: [] }, effectiveRequest).blocks
+      : structured
+    rawBlocks = visibleNaturalSkinBlocks(effectiveRequest, bound)
+  }
   const measuredCharacterCount = FAMILY_RENDERERS[family](rawBlocks).length
   let blocks = rawBlocks
   const droppedBlocks: string[] = []
@@ -212,10 +266,18 @@ export function compileProviderPrompt(request: GenerationRequest, options: Promp
     blocks = original.filter((block) => kept.has(block))
   }
   const controlDiagnostics: Array<ProviderMotionControlDiagnostic | NaturalSkinProviderSupportDiagnostic | CameraSupportProviderDiagnostic> = [providerNaturalSkinSupportDiagnostic(effectiveRequest)]
-  if (effectiveRequest.kind === 'video-generator') controlDiagnostics.unshift(providerMotionControlDiagnostic(resolveVideoModel(effectiveRequest.videoEngine)))
+  if (effectiveRequest.kind === 'video-generator') controlDiagnostics.unshift(effectiveRequest.higgsfieldNative ? {
+    code: 'filmic-motion-provider-support', severity: 'info', blocking: false,
+    status: 'semantic-prompt-only', captureCadence: 'native-unverified', playbackCadence: 'not-separately-supported', shutter: 'native-unverified',
+    message: 'Native capture cadence and shutter controls are unverified for the selected Higgsfield model. Authored motion remains prompt intent; no native controls were added.',
+  } : providerMotionControlDiagnostic(resolveVideoModel(effectiveRequest.videoEngine)))
   const cameraSupportDiagnostic = cameraSupportProviderDiagnostic((effectiveRequest.storyboardShots || []).map((shot) => shot.camera))
   if (cameraSupportDiagnostic) controlDiagnostics.push(cameraSupportDiagnostic)
   const text = FAMILY_RENDERERS[family](blocks)
+  if (family === 'seedance' && !hasExactAuthoredProviderBody(request)) {
+    const errors = seedanceFinalSectionErrors(text)
+    if (errors.length) throw new SeedancePromptIntegrityError(errors)
+  }
   const blocking = Boolean(ceiling && text.length > ceiling)
   const promptBudgetDiagnostic = ceiling ? {
     modelId: request.videoEngine || family,
@@ -228,7 +290,7 @@ export function compileProviderPrompt(request: GenerationRequest, options: Promp
       ? `Selected model prompt remains ${text.length} characters, above its configured ${ceiling}-character limit after safe deterministic deduplication; mandatory continuity state was preserved without truncation. Shorten authored prose or choose a model with a larger configured limit.`
       : undefined,
   } : undefined
-  return { family, text, blocks, droppedBlocks, ceiling, controlDiagnostics, continuityLedger: effectiveRequest.kind === 'video-generator' ? buildContinuityLedger(effectiveRequest) : undefined, promptBudgetDiagnostic }
+  return { family, text, blocks, droppedBlocks, ceiling, controlDiagnostics, continuityLedger: authored === undefined && effectiveRequest.kind === 'video-generator' ? options.continuityContext?.ledger || buildContinuityLedger(effectiveRequest) : undefined, promptBudgetDiagnostic }
 }
 
 export function compileProviderPromptForSubmission(request: GenerationRequest, options: PromptCompileOptions = {}): PromptCompilation {
@@ -238,8 +300,7 @@ export function compileProviderPromptForSubmission(request: GenerationRequest, o
   if (propScaleFailures.length) throw new Error(`Prop scale authority blocks provider dispatch: ${propScaleFailures.join('; ')}`)
   const compilation = compileProviderPrompt(request, options)
   if (compilation.promptBudgetDiagnostic?.blocking) throw new Error(`Prompt budget blocks provider dispatch: ${compilation.promptBudgetDiagnostic.blockingReason}`)
-  const hidden = compileNaturalSkinProviderPrompt(request, compilation.text)
-  return { ...compilation, text: hidden.text }
+  return compilation
 }
 
 export function resolvedPromptWithReferences(request: GenerationRequest): string {
@@ -349,6 +410,27 @@ function klingLegendFromGuide(referenceGuide: string): PromptLegend | undefined 
 
 /** Builds the exact provider-native Kling shot prompts without dropping global Style or semantic context. */
 export function klingStoryboardPrompts(request: GenerationRequest, referenceGuide = klingProviderReferenceGuide(request)): NonNullable<GenerationRequest['multiPrompt']> | undefined {
+  if (!request.multiPrompt?.length && !request.storyboardShots?.length) return undefined
+  assertKlingNativeStoryboard(request)
+  if (request.storyboardShots?.length) {
+    const ledger = buildContinuityLedger(request)
+    const groups = groupedKlingStoryboard(request.storyboardShots)
+    return groups.map((group, index) => {
+      const globalContext = [request.authoredPrompt, request.storyboardContext].filter(Boolean).join('\n\n')
+      const projected: GenerationRequest = {
+        ...request, prompt: globalContext, authoredPrompt: globalContext,
+        storyboardShots: group.beats, multiPrompt: undefined, duration: group.duration,
+        // Native endpoint frames apply to the whole clip, not every native item.
+        references: request.references?.filter(reference => (reference.slot !== 'start' || index === 0) && (reference.slot !== 'end' || index === groups.length - 1)),
+        ...(index > 0 && request.inputRole === 'start-frame' ? { inputTag: undefined, inputRole: undefined, inputName: undefined } : {}),
+      }
+      const compilation = compileProviderPromptForSubmission(projected, {
+        family: 'kling', legend: klingLegendFromGuide(referenceGuide),
+        continuityContext: { ledger, shotIndices: group.shotIndices },
+      })
+      return { prompt: `NATIVE SHOT ${index + 1} · ${group.duration}s · one unbroken shot\n\n${compilation.text}`, duration: String(group.duration) }
+    })
+  }
   return request.multiPrompt?.map((shot, index) => {
     const shotPrompt = [request.storyboardContext, shot.prompt].filter(Boolean).join('\n\n')
     const storyboardShots = request.storyboardShots?.[index] ? [request.storyboardShots[index]] : undefined
@@ -514,24 +596,6 @@ function appendSeedanceBudgetNote(compilation: PromptCompilation, note: string):
   return { ...compilation, blocks, text: FAMILY_RENDERERS.seedance(blocks) }
 }
 
-function structuredSeedanceCoverage(authored: string) {
-  const has = (pattern: RegExp) => pattern.test(authored)
-  return {
-    format: has(/^FORMAT(?: MODE| AND CUTS)?\b/im), shots: has(/^SHOT\s+\d+\b/im), scene: has(/^SCENE CONTEXT\b/im), references: has(/^ACTIVE REFERENCES\b/im),
-    camera: has(/^CAMERA\b|^CAMERA\s+—|CAMERA POSITION AND OPTICS/im), optics: has(/\b(?:FOV|LENS|OPTICS)\b/i),
-    lighting: has(/^(?:WORLD AND )?LIGHTING\b|^LIGHTING\s*&\s*INTEGRATION/im), style: has(/^STYLE(?: PREFIX)?\b/im),
-    continuity: has(/^CONTINUITY\b|\bLOCK\b|^POSITIVE CONSTRAINTS\b/im), performance: has(/^CHARACTER ACTING\b|^VOICES\b|^SCRIPTED DIALOGUE\b|^LINE ATTRIBUTION\b/im),
-    physics: has(/^PHYSICS\b/im), audio: has(/^AUDIO\b/im), quality: has(/^QUALITY\b|^POSITIVE CONSTRAINTS\b/im), negative: has(/^NEGATIVE PROMPT\b/im),
-  }
-}
-
-function completeStructuredSeedanceMaster(authored: string): boolean {
-  if (!authored) return false
-  const coverage = structuredSeedanceCoverage(authored)
-  return coverage.format && coverage.shots && coverage.scene && coverage.references && coverage.camera && coverage.lighting
-    && coverage.style && coverage.continuity && coverage.performance && coverage.physics && coverage.audio && coverage.quality
-}
-
 function applyStructuredSeedanceCompletion(compilation: PromptCompilation, request: GenerationRequest): PromptCompilation {
   const authored = request.authoredPrompt?.trim() || ''
   if (!authored) return compilation
@@ -561,25 +625,42 @@ function applyStructuredSeedanceCompletion(compilation: PromptCompilation, reque
   return { ...compilation, blocks, text: FAMILY_RENDERERS.seedance(blocks) }
 }
 
+/** The native graph has already fixed each field's order; never select or rank it again. */
+export function compileNativeProviderPrompt(request: GenerationRequest, family: PromptFamily): PromptCompilation {
+  const authored = request.authoredPrompt || ''
+  const compilation = compileProviderPrompt(request.providerPromptOverride === undefined && family === 'seedance' && completeStructuredSeedanceMaster(authored) ? { ...request, providerPromptOverride: authored, providerPromptOwnership: 'compiled' } : request, { family })
+  if (family !== 'seedance') return compilation
+  const references = request.references || []
+  const images = references.filter(reference => (reference.mediaType || 'image') === 'image')
+  const videos = references.filter(reference => reference.mediaType === 'video')
+  const audios = references.filter(reference => reference.mediaType === 'audio')
+  return translateSeedanceCompilation(compilation, request, seedanceProviderBindings(images, videos, audios, Boolean(request.videoEngine?.includes('seedance-2.5'))))
+}
+
 export function providerSeedancePayloadCompilation(request: GenerationRequest): PromptCompilation {
-  const references = providerVisibleReferences(request)
   const model = resolveVideoModel(request.videoEngine)
+  const references = model.mode === 'reference' ? seedanceReferenceCandidates(request) : providerVisibleReferences(request)
   const limits = model.referenceLimits || DEFAULT_SEEDANCE_REFERENCE_LIMITS
   const { images, videos, audios } = selectSeedanceReferences(references, limits)
   const selectedRequest = { ...request, references: [...images, ...videos, ...audios] }
   const bracketTokens = model.id.includes('seedance-2.5')
   const bindings = seedanceProviderBindings(images, videos, audios, bracketTokens)
   const visibleBody = visibleProviderPromptBody(request)
-  const providerBody = compileNaturalSkinProviderPrompt(selectedRequest, visibleBody).text
-  return translateSeedanceCompilation({ family: 'seedance', text: providerBody, blocks: [], droppedBlocks: [], controlDiagnostics: compileProviderPrompt(selectedRequest, { family: 'seedance' }).controlDiagnostics }, selectedRequest, bindings)
+  return translateSeedanceCompilation({ family: 'seedance', text: visibleBody, blocks: [], droppedBlocks: [], controlDiagnostics: compileProviderPrompt(selectedRequest, { family: 'seedance' }).controlDiagnostics }, selectedRequest, bindings)
 }
 
 export function providerPromptPreviewCompilation(request: GenerationRequest): PromptCompilation {
-  if (request.providerPromptOverride !== undefined) return { family: resolveVideoModel(request.videoEngine).family, text: request.providerPromptOverride, blocks: [], droppedBlocks: [] }
+  const integrityErrors = [...providerPromptOwnershipErrors(request), ...seedancePromptIntegrityFailures(request)]
+  if (integrityErrors.length) throw new SeedancePromptIntegrityError(integrityErrors)
+  const audioText = providerAudioPromptText(request)
+  if (audioText !== undefined) return { family: 'generic', text: audioText, blocks: [], droppedBlocks: [] }
+  if (request.providerPromptOverride !== undefined) return { family: promptFamily(request), text: request.providerPromptOverride, blocks: [], droppedBlocks: [] }
   if (!request.prompt?.trim() && request.kind === 'upscaler') {
     return { family: 'generic', text: '[No text prompt — the provider receives the connected source image and upscale controls only.]', blocks: [], droppedBlocks: [] }
   }
-  const references = request.videoEngine?.includes('seedance') ? providerVisibleReferences(request) : request.references || []
+  const references = request.videoEngine?.includes('seedance')
+    ? resolveVideoModel(request.videoEngine).mode === 'reference' ? seedanceReferenceCandidates(request) : providerVisibleReferences(request)
+    : request.references || []
   if (request.videoEngine?.includes('kling-video')) {
     const elements = references.filter((reference) => reference.slot !== 'start' && reference.slot !== 'end' && (reference.role === 'character' || reference.role === 'element' || reference.mediaType === 'video'))
     const appearances = references.filter((reference) => reference.slot !== 'start' && reference.slot !== 'end' && (!reference.mediaType || reference.mediaType === 'image') && !elements.includes(reference))
@@ -606,8 +687,8 @@ export function providerPromptPreviewCompilation(request: GenerationRequest): Pr
     if (!validation.ok) throw new Error(`Seedance Director prompt validation failed: ${validation.errors?.join(' ')}`)
     return visible
   }
-  const budgetNote = omitted.length ? `REFERENCE BUDGET: ${omitted.length} lower-priority source${omitted.length === 1 ? '' : 's'} omitted to satisfy ${model.shortLabel}'s ${limits.images}-image / ${limits.total}-total limit; originals remain in the project asset.` : ''
-  const compilation = applyStructuredSeedanceCompletion(appendSeedanceBudgetNote(compileProviderPrompt(selectedRequest, { family: 'seedance' }), budgetNote), selectedRequest)
+  const budgetNote = omitted.length ? `REFERENCE BUDGET: ${omitted.length} source${omitted.length === 1 ? '' : 's'} exceed ${model.shortLabel}'s ${limits.images}-image / ${limits.total}-total limit. Generation is blocked; this draft previews the selected subset and all originals remain in the project asset.` : ''
+  const compilation = appendSeedanceBudgetNote(compileProviderPrompt(selectedRequest, { family: 'seedance' }), budgetNote)
   const visible = translateUnboundSeedanceTags(compilation, selectedRequest)
   const validation = validateSeedanceDirectorPrompt(visible.text, selectedRequest)
   if (!validation.ok) throw new Error(`Seedance Director prompt validation failed: ${validation.errors?.join(' ')}`)

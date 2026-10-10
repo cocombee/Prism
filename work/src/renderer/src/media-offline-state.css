@@ -23,7 +23,7 @@
 }
 
 .media-offline-state > svg { width: 25px; height: 25px; stroke-width: 1.35; }
-.media-offline-state > strong { font-size: var(--font-node-support-title, 9px); font-weight: 400; letter-spacing: .015em; }
+.media-offline-state > strong { font-size: var(--font-smaller-text); font-weight: var(--font-weight-normal); letter-spacing: .015em; }
 .media-offline-state > button {
   height: 25px;
   padding: 0 9px;
@@ -35,8 +35,8 @@
   border-radius: 7px;
   background: rgba(236, 120, 144, .08);
   color: #ef92a4;
-  font-size: 9px;
-  font-weight: 400;
+  font-size: var(--font-smaller-text);
+  font-weight: var(--font-weight-normal);
   cursor: pointer;
 }
 .media-offline-state > button:hover { background: rgba(236, 120, 144, .15); }
@@ -70,7 +70,7 @@
   border-radius: inherit;
 }
 .media-offline-state.is-compact > svg { width: 18px; height: 18px; }
-.media-offline-state.is-compact > strong { font-size: 9px; }
+.media-offline-state.is-compact > strong { font-size: var(--font-smaller-text); }
 
 .asset-card.is-offline,
 .canvas-asset-list > article.is-offline { border-color: var(--media-offline-border); background: var(--media-offline-background); box-shadow: none; }

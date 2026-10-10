@@ -9,6 +9,43 @@ const catalogs = {
 }
 
 describe('Storyboard assistant provider groups', () => {
+  it('does not restore a saved model after a verified catalog confirms no models are available', () => {
+    const verifiedEmpty = { google: [] }
+    const selected = assistantCatalogsWithSavedSelection(verifiedEmpty, 'google', 'gemini-retired', true)
+    expect(selected).toEqual(verifiedEmpty)
+    expect(resolveAssistantSelection('google', 'gemini-retired', selected)).toBeUndefined()
+    expect(assistantCatalogsWithSavedSelection(verifiedEmpty, 'google', 'gemini-retired', false)).toEqual({ google: [{ id: 'gemini-retired', label: 'Gemini Retired' }] })
+  })
+
+  it('keeps an eligible saved model outside the newest-three shortlist rather than switching a paid route', () => {
+    const live = {
+      openai: [{ id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol' }],
+      anthropic: [
+        { id: 'claude-opus-5.5', label: 'Claude Opus 5.5' },
+        { id: 'claude-sonnet-5.5', label: 'Claude Sonnet 5.5' },
+        { id: 'claude-haiku-5.5', label: 'Claude Haiku 5.5' },
+        { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+      ],
+    }
+    expect(resolveAssistantSelection('anthropic', 'claude-sonnet-5', live)).toEqual({ provider: 'anthropic', model: 'claude-sonnet-5' })
+    const group = assistantModelGroups(live, 'anthropic', 'claude-sonnet-5').find((entry) => entry.provider === 'anthropic')!
+    expect(group.options.map((option) => option.value)).toEqual([
+      'anthropic::claude-opus-5.5', 'anthropic::claude-sonnet-5.5', 'anthropic::claude-haiku-5.5', 'anthropic::claude-sonnet-5',
+    ])
+  })
+
+  it('exposes older eligible models without requiring a saved selection or truncating snapshots', () => {
+    const live = { openai: Array.from({ length: 9 }, (_, index) => ({ id: `gpt-5.${index}`, label: `GPT 5.${index}` })) }
+    const group = assistantModelGroups(live)[0]
+    expect(group.options).toHaveLength(9)
+    expect(group.options.map((option) => option.value)).toContain('openai::gpt-5.0')
+    expect(resolveAssistantSelection('openai', 'gpt-5.0', live)).toEqual({ provider: 'openai', model: 'gpt-5.0' })
+  })
+
+  it('blocks an unavailable saved model instead of falling through to another provider', () => {
+    expect(resolveAssistantSelection('anthropic', 'claude-retired', catalogs)).toBeUndefined()
+    expect(resolveAssistantSelection('google', 'gemini-unavailable', catalogs)).toBeUndefined()
+  })
   it('keeps provider groups independent even when model labels match', () => {
     const groups = assistantModelGroups(catalogs)
     expect(groups.map((group) => group.label)).toEqual(['OmniRoute', 'OpenAI', 'Anthropic Claude', 'Google Gemini'])

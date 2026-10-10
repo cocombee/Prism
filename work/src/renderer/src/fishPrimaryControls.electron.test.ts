@@ -1,0 +1,56 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { createRequire } from 'node:module'
+import { spawnSync } from 'node:child_process'
+import { describe, expect, it } from 'vitest'
+const require = createRequire(import.meta.url)
+const { buildSync } = require(resolve(process.cwd(), 'node_modules/vite/node_modules/esbuild/lib/main.js')) as typeof import('esbuild')
+const electronPath = require('electron') as string
+describe('production Fish primary controls', () => {
+  it('uses owned live engines and format-specific rates, preserves unavailable presets and fits narrow native nodes', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'prism-fish-primary-'))
+    try {
+      const entry = join(directory, 'renderer.tsx'), main = join(directory, 'main.cjs')
+      writeFileSync(entry, `
+import React,{useState,useMemo,useEffect} from 'react';import {createRoot} from 'react-dom/client';import {ReactFlow,ReactFlowProvider} from '@xyflow/react';
+import {NodeCard,NodeRuntimeContext} from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/NodeCardNext'))};
+import {buildGenerationRequest} from ${JSON.stringify(resolve(process.cwd(), 'src/shared/workflowResolver'))};
+import {fishAvailabilityError} from ${JSON.stringify(resolve(process.cwd(), 'src/shared/fishAudio'))};
+window.__data={};window.__controls={};const ids=['s1','s2-pro','s2.1-pro','s2.1-pro-free','drama-3-preview'];const labels=['Fish Audio S1','Fish Audio S2 Pro','Fish Audio S2.1 Pro','Fish Audio S2.1 Pro Free','Fish Audio Drama 3 Preview'];
+const catalog={provider:'fish',verified:true,catalogCheckedAt:new Date().toISOString(),models:ids.map((id,i)=>({id,label:labels[i]}))};const noop=()=>undefined;
+function Case({width}){const [data,setData]=useState({kind:'voiceover',title:'Voiceover',voiceEngine:'fish-audio',fishModel:'s2-pro',fishReferenceId:'fictional-voice',prompt:'  Repeat.\\n\\nRepeat.  ',fishFormat:'mp3',fishSampleRate:44100,fishMp3Bitrate:128,fishOpusBitrate:64,fishVolume:0,runState:'idle'}),[availability,setAvailability]=useState(catalog);
+useEffect(()=>{window.__data[width]=data},[data]);window.__controls[width]={catalog:models=>setAvailability({...catalog,models}),error:()=>fishAvailabilityError(buildGenerationRequest({id:'voice',data,position:{x:0,y:0}},[{id:'voice',data,position:{x:0,y:0}}],[]),availability)};
+const runtime=useMemo(()=>new Proxy({updateNode:(_id,patch)=>setData(current=>({...current,...patch})),updatePrompt:(_id,prompt)=>setData(current=>({...current,prompt})),serviceAvailability:provider=>provider==='fish'?availability:undefined,availableModels:provider=>provider==='fish'?availability.models:[],modelAvailabilityVerified:()=>true,connectedReferenceTags:()=>[],connectedInputRules:()=>[],availablePromptTags:()=>[],connectedInputMedia:()=>undefined,nodeMediaLinkState:()=>undefined,generatedMediaFavorite:()=>false,providerAccount:()=>undefined,providerConnected:()=>true,runReadiness:()=>({disabled:true,tooltip:'Fixture: generation disabled'}),estimateNode:async()=>null,characterLibrary:[],storyboardLibrary:[],semanticLibraries:{element:[],location:[],wardrobe:[],'style-reference':[]}}, {get:(target,key)=>key in target?target[key]:noop}),[availability]);
+return <section data-width={width} style={{width,height:750}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={[{id:'voice-'+width,type:'studio',position:{x:0,y:0},style:{width},data}]} edges={[]} nodeTypes={{studio:NodeCard}} defaultViewport={{x:0,y:0,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></section>}
+const box=e=>{const r=e.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+window.__fixture={click:(width,label)=>document.querySelector('[data-width="'+width+'"] [aria-label="'+label+'"]').click(),choose:label=>[...document.querySelectorAll('[role="option"]')].find(e=>e.textContent.trim()===label).click(),search:value=>{const input=document.querySelector('[aria-label="Search Voice provider and model options"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}))},options:()=>[...document.querySelectorAll('[role="option"]')].map(e=>({label:e.textContent.trim(),disabled:e.disabled})),snapshot:()=>[...document.querySelectorAll('[data-width]')].map(section=>({width:Number(section.dataset.width),node:box(section.querySelector('.studio-node')),controls:[...section.querySelectorAll('.voice-primary-controls button,.voice-primary-controls input')].map(e=>({label:e.getAttribute('aria-label'),selected:e.dataset.equalizedFull||e.textContent.trim(),box:box(e),font:getComputedStyle(e).fontSize,radius:getComputedStyle(e).borderRadius,padding:getComputedStyle(e).paddingLeft}))}))};
+createRoot(document.getElementById('root')).render(<main style={{display:'flex',gap:24}}>{[250,315,375].map(width=><Case key={width} width={width}/>)}</main>);
+`)
+      buildSync({ entryPoints: [entry], outfile: join(directory, 'renderer.js'), bundle: true, format: 'iife', platform: 'browser', target: 'chrome120', nodePaths: [resolve(process.cwd(), 'node_modules')], jsx: 'automatic', loader: { '.png': 'dataurl' }, logLevel: 'silent' })
+      writeFileSync(join(directory, 'index.html'), `<!doctype html><html><head><link rel="stylesheet" href="file://${resolve(process.cwd(), 'node_modules/@xyflow/react/dist/style.css')}"><link rel="stylesheet" href="file://${resolve(process.cwd(), 'src/renderer/src/styles-next.css')}"><style>*{box-sizing:border-box}body{margin:24px;background:#0d0c12;color:#ddd}section[data-width] .studio-node{width:100%}</style></head><body><div id="root"></div><script src="renderer.js"></script></body></html>`)
+      const steps = [
+        "window.__fixture.click(250,'Voice provider and model')", "window.__fixture.search('S2.1')", "window.__fixture.choose('Fish Audio S2.1 Pro')",
+        "window.__fixture.click(250,'Fish Audio Format')", "window.__fixture.choose('OPUS')",
+      ]
+      writeFileSync(main, `
+const {app,BrowserWindow}=require('electron'),fs=require('node:fs'),path=require('node:path');app.setPath('userData',path.join(__dirname,'user-data'));const wait=()=>new Promise(r=>setTimeout(r,150));const finish=(result,code=0)=>{process.stdout.write('FISH_PRIMARY_RESULT:'+JSON.stringify(result)+'\\n');app.exit(code)};
+app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:1200,height:900,webPreferences:{contextIsolation:false,sandbox:false}});let remote=0;win.webContents.session.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(d,cb)=>{remote++;cb({cancel:true})});await win.loadFile(path.join(__dirname,'index.html'));await win.webContents.executeJavaScript('document.fonts.ready');await wait();const js=code=>win.webContents.executeJavaScript(code),result={initial:await js('window.__fixture.snapshot()')};for(const step of ${JSON.stringify(steps)}){await js(step);await wait()}result.unavailableRate=await js('window.__fixture.snapshot()[0]');result.rateError=await js('window.__controls[250].error()');
+await js(${JSON.stringify("window.__fixture.click(250,'Fish Audio Sample Rate')")});await wait();result.rateOptions=await js('window.__fixture.options()');await js(${JSON.stringify("window.__fixture.choose('Default')")});await wait();result.selected=await js('window.__data[250]');result.ready=await js('window.__controls[250].error()===undefined');
+await js(${JSON.stringify("window.__controls[250].catalog([{id:'future-engine',label:'Fish Audio Future Engine'}])")});await wait();result.preserved=await js('window.__data[250]');result.withdrawnError=await js('window.__controls[250].error()');await js(${JSON.stringify("window.__fixture.click(250,'Voice provider and model')")});await wait();await js(${JSON.stringify("window.__fixture.search('Future Engine')")});await wait();result.futureOptions=await js('window.__fixture.options()');await js(${JSON.stringify("window.__fixture.choose('Fish Audio Future Engine')")});await wait();result.futureSelected=await js('window.__data[250]');result.final=await js('window.__fixture.snapshot()');result.remote=remote;
+if(process.env.PRISM_FISH_NATIVE_ARTIFACT_DIR){fs.writeFileSync(path.join(process.env.PRISM_FISH_NATIVE_ARTIFACT_DIR,'Fish Primary Native Evidence.json'),JSON.stringify(result,null,2));fs.writeFileSync(path.join(process.env.PRISM_FISH_NATIVE_ARTIFACT_DIR,'Prism Fish Primary Native.png'),(await win.webContents.capturePage()).toPNG())}finish(result)}).catch(e=>finish({error:e.stack||String(e)},1));
+`)
+      const syntax = spawnSync(process.execPath, ['--check', main], { encoding: 'utf8', timeout: 5000 }); expect(syntax.status, syntax.stderr).toBe(0)
+      const run = spawnSync(electronPath, [main], { cwd: directory, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined }, timeout: 45000 })
+      expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0)
+      const marker = run.stdout.split('\n').find(line => line.startsWith('FISH_PRIMARY_RESULT:')); expect(marker, run.stdout).toBeDefined()
+      const result = JSON.parse(marker!.slice('FISH_PRIMARY_RESULT:'.length))
+      expect(result.error).toBeUndefined(); expect(result.remote).toBe(0)
+      expect(result.rateError).toMatch(/OPUS sample rate/); expect(result.rateOptions).toEqual([{ label: 'Default', disabled: false }, { label: '48 kHz', disabled: false }, { label: 'Unavailable (44100 Hz)', disabled: true }])
+      expect(result.selected.fishModel).toBe('s2.1-pro'); expect(result.selected.fishSampleRate).toBeUndefined(); expect(result.ready).toBe(true)
+      expect(result.preserved).toEqual(result.selected); expect(result.withdrawnError).toMatch(/no longer advertised/)
+      expect(result.futureOptions).toEqual([{ label: 'Fish Audio Future Engine', disabled: false }]); expect(result.futureSelected.fishModel).toBe('future-engine'); expect(result.futureSelected.prompt).toBe('  Repeat.\n\nRepeat.  ')
+      for (const state of [...result.initial, ...result.final]) for (const control of state.controls) { expect(control.box.width, control.label).toBeGreaterThan(0); expect(control.box.left, control.label).toBeGreaterThanOrEqual(state.node.left - 1); expect(control.box.right, control.label).toBeLessThanOrEqual(state.node.right + 1) }
+    } finally { rmSync(directory, { recursive: true, force: true }) }
+  }, 55000)
+})

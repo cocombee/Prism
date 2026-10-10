@@ -17,7 +17,6 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Layers3,
-  Library,
   ListOrdered,
   Link2,
   Maximize2,
@@ -49,7 +48,7 @@ import type { NodeKind } from '../../shared/types'
 export const SEMANTIC_ICONS = {
   project: Folder,
   canvas: LayoutDashboard,
-  assets: Library,
+  assets: Images,
   prompt: MessageSquareText,
   storyboard: Clapperboard,
   character: UserRound,

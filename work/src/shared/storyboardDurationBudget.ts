@@ -1,11 +1,13 @@
 import type { StoryboardPanel } from './types'
+import { STORYBOARD_MIN_PANEL_DURATION } from './storyboardPanels'
 import { formatDurationSeconds } from './videoModels'
 
-export const STORYBOARD_MIN_DURATION = 0.5
+export const STORYBOARD_MIN_DURATION = STORYBOARD_MIN_PANEL_DURATION
+export const STORYBOARD_DURATION_INCREMENT = 0.5
 export const STORYBOARD_DISCONNECTED_MAX_DURATION = 30
 export const STORYBOARD_DURATION_FALLBACK_OPTIONS = Array.from(
-  { length: STORYBOARD_DISCONNECTED_MAX_DURATION / STORYBOARD_MIN_DURATION },
-  (_, index) => Number(((index + 1) * STORYBOARD_MIN_DURATION).toFixed(1)),
+  { length: Math.floor((STORYBOARD_DISCONNECTED_MAX_DURATION - STORYBOARD_MIN_DURATION) / STORYBOARD_DURATION_INCREMENT) + 1 },
+  (_, index) => Number((STORYBOARD_MIN_DURATION + index * STORYBOARD_DURATION_INCREMENT).toFixed(1)),
 )
 
 export interface StoryboardDurationBudgetInput {
@@ -13,6 +15,7 @@ export interface StoryboardDurationBudgetInput {
   mode: 'single' | 'separate'
   targetDuration?: number
   modelDurationOptions: Array<number | string>
+  modelMinimumSeconds?: number
 }
 
 export interface StoryboardDurationOptionBudget {
@@ -41,7 +44,7 @@ export interface StoryboardDurationConflict {
 }
 
 export type StoryboardDurationHelper = {
-  kind: 'exhausted' | 'locked-zero' | 'locked-conflict' | 'overflow'
+  kind: 'exhausted' | 'locked-zero' | 'locked-conflict' | 'overflow' | 'underflow'
   text: string
 }
 
@@ -59,7 +62,7 @@ export interface StoryboardDurationBudgetResult {
 
 function numericDuration(value: StoryboardPanel['duration']): number {
   if (value === 'auto') return 1
-  return Number.isFinite(value) ? Math.max(STORYBOARD_MIN_DURATION, Number(value)) : 1
+  return Number.isFinite(value) ? Number(value) : 1
 }
 
 export function normalizedStoryboardDurationOptions(values: Array<number | string>): number[] {
@@ -70,8 +73,8 @@ export function normalizedStoryboardDurationOptions(values: Array<number | strin
     .sort((left, right) => left - right)
   const maximum = native.length ? Math.max(...native) : STORYBOARD_DISCONNECTED_MAX_DURATION
   return Array.from(
-    { length: Math.max(1, Math.floor(maximum / STORYBOARD_MIN_DURATION + 1e-9)) },
-    (_, index) => Number(((index + 1) * STORYBOARD_MIN_DURATION).toFixed(1)),
+    { length: Math.max(0, Math.floor((maximum - STORYBOARD_MIN_DURATION) / STORYBOARD_DURATION_INCREMENT + 1e-9) + 1) },
+    (_, index) => Number((STORYBOARD_MIN_DURATION + index * STORYBOARD_DURATION_INCREMENT).toFixed(1)),
   )
 }
 
@@ -139,16 +142,17 @@ export function reconcileStoryboardDurationBudget(input: StoryboardDurationBudge
   const conflicts: StoryboardDurationConflict[] = overBudget
     ? [{ panelIndex: Math.max(0, budgets.findIndex((_, index) => sourceDurations.slice(0, index + 1).reduce((sum, duration) => sum + duration, 0) > targetDuration!)), message: `Storyboard timing exceeds the connected Video Generator budget (${formatDurationSeconds(totalDuration)} / ${formatDurationSeconds(targetDuration!)}).` }]
     : []
+  const belowClipMinimum = connected && Number.isFinite(input.modelMinimumSeconds) && totalDuration < input.modelMinimumSeconds!
   const helper: StoryboardDurationHelper | undefined = overBudget
     ? { kind: 'overflow', text: `Timing exceeds Video budget · ${formatDurationSeconds(totalDuration)} / ${formatDurationSeconds(targetDuration!)}` }
-    : undefined
+    : belowClipMinimum ? { kind: 'underflow', text: `Clip requires at least ${formatDurationSeconds(input.modelMinimumSeconds!)} total; authored Storyboard is ${formatDurationSeconds(totalDuration)}. Revise timing explicitly.` } : undefined
 
   return { panels: input.panels, budgets, conflicts, targetOptions, targetDuration, modelPerPanelMax, totalDuration, overBudget, helper }
 }
 
 export function storyboardDurationReadinessError(panels: Array<Pick<StoryboardPanel, 'duration'>>, budget?: number): string | undefined {
   const firstBelowMinimum = panels.findIndex((panel) => panel.duration !== 'auto' && Number(panel.duration) < STORYBOARD_MIN_DURATION)
-  if (firstBelowMinimum >= 0) return `Storyboard panel ${firstBelowMinimum + 1} is below the minimum 0.5s duration.`
+  if (firstBelowMinimum >= 0) return `Storyboard panel ${firstBelowMinimum + 1} is below the minimum 1.0s duration.`
   const total = panels.reduce((sum, panel) => sum + numericDuration(panel.duration), 0)
   return Number.isFinite(budget) && total > budget!
     ? `Storyboard timing ${formatDurationSeconds(total)} exceeds the connected Video Generator budget ${formatDurationSeconds(budget!)}. Reduce a panel or increase Video duration.`

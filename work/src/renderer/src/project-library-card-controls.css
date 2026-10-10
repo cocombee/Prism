@@ -16,16 +16,16 @@
 .project-library-card-shell:focus-within { border-color: #675795; background: #1a181f; box-shadow: 0 17px 40px rgba(0,0,0,.24); }
 .project-library-card-shell > .project-library-preview { height: 150px; margin-bottom: 13px; }
 .project-library-title-row { min-width: 0; height: 22px; margin: 0 42px 0 14px; display: flex; align-items: center; gap: 5px; }
-.project-library-title-row > strong { min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.project-library-title-row > strong { min-width: 0; overflow: hidden; font-size: var(--font-smaller-text); text-overflow: ellipsis; white-space: nowrap; }
 .project-library-title-row > button { width: 20px; height: 20px; flex: 0 0 auto; display: grid; place-items: center; opacity: 0; border: 0; border-radius: 5px; background: transparent; color: #777080; cursor: pointer; transition: opacity .12s, color .12s, background .12s; }
 .project-library-title-row:hover > button,
 .project-library-title-row:focus-within > button { opacity: 1; }
 .project-library-title-row > button:hover { background: rgba(255,255,255,.06); color: #c6b5ff; }
-.project-library-title-row > input { min-width: 0; width: 100%; height: 24px; padding: 0 7px; border: 1px solid #7058b4; border-radius: 6px; outline: 0; background: #0f0e13; color: #eeeaf2; font-size: 12px; font-weight: 700; }
+.project-library-title-row > input { min-width: 0; width: 100%; height: 24px; padding: 0 7px; border: 1px solid #7058b4; border-radius: 6px; outline: 0; background: #0f0e13; color: #eeeaf2; font-size: var(--font-smaller-text); font-weight: var(--font-weight-medium); }
 .project-library-card-shell > small,
 .project-library-card-shell > time { display: block; margin: 0 14px; }
-.project-library-card-shell > small { margin-top: 5px; overflow: hidden; color: #6f6877; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.project-library-card-shell > time { margin-top: 8px; color: #554f5c; font-size: 10px; }
+.project-library-card-shell > small { margin-top: 5px; overflow: hidden; color: #6f6877; font-size: var(--font-smaller-text); text-overflow: ellipsis; white-space: nowrap; }
+.project-library-card-shell > time { margin-top: 8px; color: #554f5c; font-size: var(--font-smaller-text); }
 .project-library-hover-actions { position: absolute; z-index: 4; top: 10px; right: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
 .project-library-card-shell:hover .project-library-hover-actions,
 .project-library-card-shell:focus-within .project-library-hover-actions { opacity: 1; }

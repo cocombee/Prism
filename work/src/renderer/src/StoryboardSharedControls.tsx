@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEv
 import { createPortal } from 'react-dom'
 import { ChevronDown } from 'lucide-react'
 import { measuredFloatingMenuWidth, selectorTriggerFontSize, useContinuousAnchor } from './useContinuousAnchor'
+import { normalizedStoryboardDurationOptions } from '../../shared/storyboardDurationBudget'
 import { storyboardTriggerMenuKeyAction } from '../../shared/storyboardMenuInteraction'
 import { filterAndRankSelectorOptions, selectorSearchKeyAction, setSelectorPortalOpen } from '../../shared/selectorSearch'
 
@@ -11,7 +12,7 @@ export function ShotBoundaryChoice({ shotId, name, value, disabled = false, onCh
 }
 
 export function durationChoices(maximum: number): number[] {
-  return Array.from({ length: Math.max(1, maximum) }, (_, index) => index + 1)
+  return normalizedStoryboardDurationOptions([maximum])
 }
 
 export const STORYBOARD_SHOT_SIZE_OPTIONS = [{ value: 'wide', label: 'Wide' }, { value: 'medium', label: 'Medium' }, { value: 'close-up', label: 'Close-up' }, { value: 'detail', label: 'Detail' }] as const

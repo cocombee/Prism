@@ -82,7 +82,7 @@ describe('Wardrobe semantic asset contract', () => {
     const request = buildGenerationRequest(nodes[2], nodes, edges)
     expect(request.references).toEqual(expect.arrayContaining([expect.objectContaining({ role: 'wardrobe', tag: '@ceremonial-coat', boundCharacterTag: '@idris' })]))
     const preview = providerPromptPreview(request)
-    expect(preview).toContain('@idris is the sole authority for Idris as one complete physical body and one cast member, wearing the appearance governed by @ceremonial-coat on that same body.')
+    expect(preview).toContain('Use @idris as Idris.\nUse @ceremonial-coat for @idris\'s wardrobe.')
     expect(preview).not.toContain('@ceremonial-coat remains worn only by @idris; the connected reference remains sole visual authority.')
     expect(preview).not.toMatch(/@Image\d+/)
     expect(preview).not.toContain('@idris character — identity view; body proportions, wardrobe, accessories')

@@ -284,6 +284,8 @@ export class GenerationLifecycle {
     if (this.controllers.get(nodeId) === controller) this.controllers.delete(nodeId)
   }
 
+  isRunning(nodeId: string): boolean { return this.controllers.has(nodeId) }
+
   cancel(nodeId: string): boolean {
     const controller = this.controllers.get(nodeId)
     if (!controller) return false
