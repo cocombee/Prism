@@ -87,12 +87,13 @@ describe('node input port contracts', () => {
     for (const kind of ['wardrobe', 'element'] as const) expect(nodeInputPorts({ kind })).toEqual([expect.objectContaining({ id: 'style-in', signal: 'style', label: 'Creation Style (Optional)' })])
     expect(nodeInputPorts({ kind: 'style-reference' })).toEqual([])
     expect(nodeInputPorts({ kind: 'storyboard' })).toEqual([
-      expect.objectContaining({ id: 'style-in', signal: 'style', maxConnections: 1 }),
       expect.objectContaining({ id: 'character-in', signal: 'image', icon: 'character-reference' }),
 
       expect.objectContaining({ id: 'element-in', signal: 'image', icon: 'element-reference' }),
       expect.objectContaining({ id: 'location-in', signal: 'image', icon: 'location-reference' }),
       expect.objectContaining({ id: 'reference-in', signal: 'image', icon: 'image-reference' }),
+      expect.objectContaining({ id: 'video-reference-in', signal: 'video', icon: 'reference-video' }),
+      expect.objectContaining({ id: 'audio-reference-in', signal: 'audio', icon: 'reference-audio' }),
     ])
     expect(nodeInputPorts({ kind: 'storyboard' }).slice(1).every((port) => port.maxConnections === undefined)).toBe(true)
     expect(nodeInputPorts({ kind: 'storyboard-asset' }).map((port) => port.id)).toEqual(['storyboard-in'])

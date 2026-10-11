@@ -22,6 +22,8 @@ export interface FalNativeVideoFooterOption {
 
 export interface FalNativeVideoFooterControl {
   key: FalNativeVideoFooterField
+  /** Provider payload key, when a verified timing descriptor uses a different name. */
+  fieldKey?: string
   label: string
   control: FalNativeVideoFooterControlType
   schema: FalSchemaNode
@@ -196,20 +198,24 @@ export function projectFalNativeVideoFooterControls(
   state: FalNativeVideoFooterState | Pick<FalNativeNodeState, 'values' | 'drafts'>,
 ): FalNativeVideoFooterControl[] {
   if (!contract || !state || !state.values || typeof state.values !== 'object') return []
-  return projectNativeVideoFooterFields(describeFalRuntimeInputs(contract).fields, state)
+  const runtime=describeFalRuntimeInputs(contract)
+  const bindings=runtime.timing?.kind==='seconds' ? {duration:runtime.timing.field} : {}
+  return projectNativeVideoFooterFields(runtime.fields, state, bindings)
 }
 
 /** Shared projection for schema-owned native routes from any provider. */
 export function projectNativeVideoFooterFields(
   runtimeFields: readonly FalRuntimeField[],
   state: FalNativeVideoFooterState | Pick<FalNativeNodeState, 'values' | 'drafts'>,
+  bindings: Partial<Record<FalNativeVideoFooterField,string>> = {},
 ): FalNativeVideoFooterControl[] {
   if (!state || !state.values || typeof state.values !== 'object') return []
   const fields = new Map(runtimeFields.map(field => [field.key, field]))
   const controls: FalNativeVideoFooterControl[] = []
 
   for (const key of FAL_NATIVE_VIDEO_FOOTER_FIELD_ORDER) {
-    const field = fields.get(key)
+    const fieldKey=bindings[key] || key
+    const field = fields.get(fieldKey)
     if (!field) continue
     const schemaControl = supportedControl(field)
     if (!schemaControl || key === 'generate_audio' && schemaControl !== 'boolean') continue
@@ -224,10 +230,10 @@ export function projectNativeVideoFooterFields(
     const numericValues = numericRange?.status === 'ready' ? numericRange.values : undefined
     const control: FalNativeVideoFooterControlType = numericValues ? 'choice' : schemaControl
 
-    const hasValue = own(state.values, key)
-    const value = hasValue ? state.values[key] : undefined
-    const hasDraft = Boolean(state.drafts && own(state.drafts, key))
-    const draft = hasDraft ? state.drafts?.[key] : undefined
+    const hasValue = own(state.values, fieldKey)
+    const value = hasValue ? state.values[fieldKey] : undefined
+    const hasDraft = Boolean(state.drafts && own(state.drafts, fieldKey))
+    const draft = hasDraft ? state.drafts?.[fieldKey] : undefined
     const { hasDefault, value: defaultValue } = uniqueDefault(field.schema)
     const { options, selectedToken } = optionsFor(key, field, control, field.nullable, hasDefault, defaultValue, hasValue, value, numericValues)
     const label = key === 'aspect_ratio' ? 'Aspect Ratio'
@@ -237,7 +243,7 @@ export function projectNativeVideoFooterFields(
             : 'Sound'
 
     controls.push({
-      key, label, control, schema: JSON.parse(JSON.stringify(field.schema)) as FalSchemaNode,
+      key, ...(fieldKey!==key?{fieldKey}:{}), label, control, schema: JSON.parse(JSON.stringify(field.schema)) as FalSchemaNode,
       required: field.required, nullable: field.nullable,
       hasValue, ...(hasValue ? { value } : {}), hasDraft, ...(hasDraft ? { draft } : {}),
       hasDefault, ...(hasDefault ? { defaultValue } : {}), selectedToken, options,

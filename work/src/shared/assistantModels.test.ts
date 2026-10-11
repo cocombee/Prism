@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { curatedAssistantModels, isTextAssistantModelEligible, latestModelReleases } from './assistantModels'
+import { curatedAssistantModels, isTextAssistantModelEligible, latestModelReleases, latestAssistantMenuModels } from './assistantModels'
+import { latestAssistantModelGroups, resolveAssistantSelection } from './assistantProviderSelection'
+
+describe('latest-only text Revamp menus', () => {
+  const models = (...ids: string[]) => ids.map(id => ({ id, label: id }))
+  it('keeps the latest generation and its available tiers without older releases or snapshots', () => {
+    const menu = latestAssistantMenuModels(models('gpt-6.1-sol', 'gpt-6.1-luna', 'gpt-6.1-sol-2026-10-08', 'gpt-6-astra', 'gpt-4o', 'gpt-4o-2024-11-20'))
+    expect(menu.map(model => model.id)).toEqual(['gpt-6.1-sol-2026-10-08', 'gpt-6.1-luna', 'gpt-6-astra'])
+  })
+  it('keeps the latest release of each named Claude family', () => {
+    expect(latestAssistantMenuModels(models('claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-5', 'claude-3-5-sonnet')).map(model => model.id)).toEqual(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
+  })
+  it('removes non-text engines and keeps only the latest Gemini generation', () => {
+    const menu = latestAssistantMenuModels(models('gemini-3.8-pro', 'gemini-3.8-flash', 'gemini-3.7-pro', 'gemini-3.8-nano-banana', 'lyria-3', 'imagen-5', 'gpt-live-1'))
+    expect(menu.map(model => model.id)).toEqual(['gemini-3.8-pro', 'gemini-3.8-flash'])
+  })
+  it('retains exact provider routes and existing saved selections outside the reduced menu', () => {
+    const catalogs = { openai: models('gpt-6.1-sol', 'gpt-6-astra'), omniroute: models('openai/gpt-6.1-sol', 'openai/gpt-6-astra') }
+    expect(latestAssistantModelGroups(catalogs).flatMap(group => group.options.map(option => option.value))).toEqual(['omniroute::openai/gpt-6.1-sol', 'omniroute::openai/gpt-6-astra', 'openai::gpt-6.1-sol', 'openai::gpt-6-astra'])
+    expect(resolveAssistantSelection('openai', 'gpt-6-astra', catalogs)).toEqual({ provider: 'openai', model: 'gpt-6-astra' })
+  })
+  it('does not invent generations for independently named unversioned models', () => {
+    expect(latestAssistantMenuModels(models('custom-model', 'another-model')).map(model => model.id)).toEqual(['another-model', 'custom-model'])
+  })
+})
 
 describe('latest direct prompt-model catalogs', () => {
   it('does not offer image-output GPT Image models as text assistants while retaining vision language models', () => {

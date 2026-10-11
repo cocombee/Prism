@@ -30,6 +30,16 @@ const occupied = (row: ReturnType<typeof allocateMixedControlRows>[number]) =>
   row.controls.reduce((sum, control) => sum + control.width, 0) + row.gap * Math.max(0, row.controls.length - 1)
 
 describe('node-wide whole-group fluid control optimizer', () => {
+  it('wraps an editable voice ID beneath its model on narrow nodes, preserving action widths and gap', () => {
+    const controls: MixedControlInput[] = [selector('model', 176), { id: 'voice', kind: 'editable-field', intrinsicWidth: 132 }]
+    const rows = allocateMixedControlRows(controls, 232, 7, { minRows: 1, maxRows: 2, firstId: 'model' })
+    expect(rows.map(row => row.controls.map(control => control.id))).toEqual([['model'], ['voice']])
+    expect(rows.map(row => row.controls[0].width)).toEqual([232, 232])
+    expect(validateControlLayout('Voice', controls, rows, 232)).toEqual({ valid: true, reasons: [] })
+    const wide = allocateMixedControlRows(controls, 380, 7, { minRows: 1, maxRows: 2, firstId: 'model' })
+    expect(wide).toHaveLength(1)
+    expect(occupied(wide[0])).toBe(380)
+  })
   it('intersects one shared gap interval across rows with different control counts', () => {
     expect(sharedGapIntervalForRows([
       { minimumWidths: [20, 20, 20], maximumWidths: [24, 24, 24] },

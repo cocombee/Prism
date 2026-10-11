@@ -23,6 +23,7 @@ function runHarness(connected = true) {
     import { createRoot } from 'react-dom/client'
     import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
     import { NodeCard, NodeRuntimeContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/NodeCardNext.tsx'))}
+    import { ProviderAvailabilityContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/ProviderAvailabilityContext.tsx'))}
     import { StoryboardNode } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/UtilityNodes.tsx'))}
     import { applyGeneratorLocalDurationPatch } from ${JSON.stringify(resolve(process.cwd(), 'src/shared/storyboardDurationMutation.ts'))}
     import { buildGenerationRequest } from ${JSON.stringify(resolve(process.cwd(), 'src/shared/workflowResolver.ts'))}
@@ -60,14 +61,14 @@ function runHarness(connected = true) {
         setDuration:(duration)=>runtime.updateNode('video',{duration,autoDuration:false}),
         save:()=>setSaved(stable(nodes)),reload:()=>setNodes(current=>saved?stable(saved):current),
       }},[runtime,nodes,saved])
-      return <Boundary><main data-root-app data-canvas-mounted><ReactFlowProvider><NodeRuntimeContext.Provider value={runtime}>
+      return <Boundary><main data-root-app data-canvas-mounted><ReactFlowProvider><ProviderAvailabilityContext.Provider value={{mediaConnected:{fal:true,byteplus:true,openai:true,google:true,higgsfield:true,elevenlabs:true,fish:true},promptConnected:{openai:true,anthropic:true,google:true,omniroute:true,deepseek:true,moonshot:true}}}><NodeRuntimeContext.Provider value={runtime}>
         <div style={{width:1200,height:1800}}><ReactFlow nodes={nodes} edges={connected?[edge]:[]} nodeTypes={{storyboard:StoryboardNode,studio:NodeCard}} defaultViewport={{x:60,y:60,zoom:1}} nodesDraggable={false} nodesConnectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></div>
-      </NodeRuntimeContext.Provider></ReactFlowProvider></main></Boundary>
+      </NodeRuntimeContext.Provider></ProviderAvailabilityContext.Provider></ReactFlowProvider></main></Boundary>
     }
     window.__caught=[];window.__resolverErrors=[];window.__consoleErrors=[];const originalError=console.error;console.error=(...args)=>{window.__consoleErrors.push(args.map(String).join(' '));originalError(...args)}
     createRoot(document.getElementById('root')).render(<Harness/>)
   `)
-  buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader:{'.png':'dataurl'}, logLevel:'silent' })
+  buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader: { '.svg': 'dataurl','.png':'dataurl'}, logLevel:'silent' })
   const styles = resolve(process.cwd(), 'src/renderer/src/styles-next.css')
   const flowStyles = resolve(process.cwd(), 'node_modules/@xyflow/react/dist/style.css')
   writeFileSync(html, `<!doctype html><html><head><link rel="stylesheet" href="file://${flowStyles}"><link rel="stylesheet" href="file://${styles}"><style>*{box-sizing:border-box}html,body,#root{width:100%;height:100%;margin:0}body{background:#111;color:#ddd}</style></head><body><div id="root"></div><script src="./renderer.js"></script></body></html>`)

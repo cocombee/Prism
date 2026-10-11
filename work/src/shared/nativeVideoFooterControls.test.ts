@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { compileFalSchemaContract } from './falSchemaBinding'
 import { projectFalNativeVideoFooterControls, projectNativeVideoFooterFields } from './nativeVideoFooterControls'
 import { describeFalRuntimeInputs } from './falRuntimeInputs'
+import { editNativeInputValue } from './nativeInputValue'
 
 const fixture = JSON.parse(readFileSync(new URL('falSchemaMedia.fixtures.json', import.meta.url), 'utf8')) as {
   models: Array<{ endpoint_id: string; openapi: unknown }>
@@ -19,6 +20,17 @@ function deepFreeze<T>(value: T): T {
 }
 
 describe('native video footer schema projection', () => {
+  it('uses verified seconds aliases in the Duration footer while preserving the provider payload key and drafts', () => {
+    const schema={endpointId:'fixture/video/alias',category:'image-to-video',schemaPath:'/fixture',input:{type:'object',properties:{clip_length:{type:'integer',title:'Duration',description:'Duration of the generated video in seconds.',minimum:1,maximum:15,default:5}}},output:{type:'object'}} as const
+    const state={values:{clip_length:7,seed:0},drafts:{clip_length:'invalid authored draft'}}
+    const before=JSON.stringify([schema,state])
+    const [control]=projectFalNativeVideoFooterControls(schema,state)
+    expect(control).toMatchObject({key:'duration',fieldKey:'clip_length',value:7,draft:'invalid authored draft',defaultValue:5})
+    expect(control.options).toContainEqual(expect.objectContaining({token:'value:9',value:9}))
+    const next=editNativeInputValue(state,control.fieldKey!, '9','number')
+    expect(next.values).toEqual({clip_length:9,seed:0});expect(next.drafts).toEqual({});expect(next.values).not.toHaveProperty('duration')
+    expect(JSON.stringify([schema,state])).toBe(before)
+  })
   it('does not treat boolean fields named FPS or Duration as cinematic scalar controls', () => {
     const fields = describeFalRuntimeInputs({ ...contract, input: { type: 'object', properties: { fps: { type: 'boolean', default: true }, duration: { enum: [false, true] } } } }).fields
     expect(projectNativeVideoFooterFields(fields, { values: { fps: true, duration: false } })).toEqual([])

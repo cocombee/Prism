@@ -16,7 +16,7 @@ import {
 } from './naturalSkinRendering'
 import { cameraSupportProviderDiagnostic, type CameraSupportProviderDiagnostic } from './cameraSupportSemantics'
 import { isReferenceExclusive } from './referenceVisualAuthority'
-import { providerVisibleReferences, sameBodyAuthorityReadinessFailures } from './sameBodyAuthority'
+import { isTypedAppearanceLayer, providerVisibleReferences, sameBodyAuthorityReadinessFailures } from './sameBodyAuthority'
 import { seedanceReferenceCandidates } from './referenceCapacity'
 import { propScaleReadinessFailures } from './propScaleAuthority'
 import { providerAudioPromptText } from './requestPreview'
@@ -25,7 +25,7 @@ import { assertKlingNativeStoryboard, groupedKlingStoryboard } from './klingNati
 type Reference = NonNullable<GenerationRequest['references']>[number]
 
 export type PromptFamily = 'generic' | 'seedance' | 'kling' | 'veo' | 'wan'
-export type PromptBlockId = 'authored' | 'style' | 'reference-legend' | 'authority' | 'direction' | 'gates' | `shot-spec-${string}`
+export type PromptBlockId = 'authored' | 'style' | 'reference-legend' | 'authority' | 'reference-roles' | 'direction' | 'gates' | `shot-spec-${string}`
 
 export interface PromptBlock {
   id: PromptBlockId
@@ -101,6 +101,7 @@ export function referenceRoleInstructions(references: NonNullable<GenerationRequ
     const key = reference.tag || '@character'
     characterGroups.set(key, [...(characterGroups.get(key) || []), reference])
   }
+  const boundWardrobe = new Set(references.filter(reference => (reference.role === 'wardrobe' || reference.appearanceScope === 'wardrobe') && reference.boundCharacterTag).map(reference => reference.boundCharacterTag!))
   const characterInstructions = [...characterGroups.entries()].map(([tag, group]) => {
     const sourceViews = [...new Set(group.flatMap((reference) => reference.sourceViews || (reference.view ? [reference.view] : [])))]
     const views = sourceViews.length ? sourceViews.join(', ') : group.map((reference) => reference.name).filter(Boolean).join(', ')
@@ -111,7 +112,10 @@ export function referenceRoleInstructions(references: NonNullable<GenerationRequ
       ? `one hidden compiled reference sheet containing ${sourceViews.length} coordinated views${views ? ` (${views})` : ''}`
       : `${group.length} coordinated reference image${group.length === 1 ? '' : 's'}${views ? ` (${views})` : ''}`
     const layoutGuard = compiledSheet ? ' Treat every panel as a view of the same person; never render the sheet layout, gutters, or multiple copies of the person in the output.' : ''
-    return `${tag} is one character shown in ${presentation}.${layoutGuard} Character Identity: preserve this exact person independently of every other connected character. ${facialViews.length ? 'Use the front, profile, both three-quarter, smile, and neutral views as the sole face/head identity authority.' : 'Use the clearest visible face as the sole face/head identity authority.'} ${bodyViews.length ? 'Use front, side, and rear full-body plus back views for body proportions, wardrobe construction, accessories, and rear continuity only.' : ''} Preserve the same head shape, facial proportions, age, skin tone, visible hair or hijab/headwear, natural asymmetry, body proportions, wardrobe construction, accessories, and defining features in every shot and after every occlusion. Never blend identities, replace the face, redesign clothing, or reset the character between shots. Narrative prominence comes only from the written shot prompt, never from a permanent role stored on this asset.`
+    const identityInstruction = `${tag} is one character shown in ${presentation}.${layoutGuard} Character Identity: preserve this exact person independently of every other connected character. ${facialViews.length ? 'Use the front, profile, both three-quarter, smile, and neutral views as the sole face/head identity authority.' : 'Use the clearest visible face as the sole face/head identity authority.'} ${bodyViews.length ? 'Use front, side, and rear full-body plus back views for body proportions, wardrobe construction, accessories, and rear continuity only.' : ''} Preserve the same head shape, facial proportions, age, skin tone, visible hair or hijab/headwear, natural asymmetry, body proportions, wardrobe construction, accessories, and defining features in every shot and after every occlusion. Never blend identities, replace the face, redesign clothing, or reset the character between shots. Narrative prominence comes only from the written shot prompt, never from a permanent role stored on this asset.`
+    return boundWardrobe.has(tag)
+      ? identityInstruction.replace('body proportions, wardrobe construction, accessories, and rear continuity only', 'body proportions and rear continuity only; the bound Wardrobe owns garment and accessory design').replace('body proportions, wardrobe construction, accessories, and defining features', 'body proportions and defining features') + ` The separately bound Wardrobe is the sole clothing and accessory authority for ${tag}; never inherit clothing from the Character sheet.`
+      : identityInstruction
   })
   const otherInstructions = references.filter((reference) => reference.role !== 'character').map((reference, index) => {
     const label = reference.tag || `@reference-${index + 1}`
@@ -120,6 +124,7 @@ export function referenceRoleInstructions(references: NonNullable<GenerationRequ
     if (reference.role === 'storyboard' || reference.authority === 'storyboard-map') return `${label} is the Storyboard Map authority. Read its panels in the authored order as an editorial, continuity, composition, and shot-design map—not as one literal frame. Each panel interior defines one separate full-screen shot. Reconstruct clean scene detail from the panel interior; never render the storyboard sheet, borders, gutters, panel numbers, timecodes, captions, or labels. Preserve the intended shot order, subject direction, causal state changes, motivated transitions, and distinct final composition.`
     if (reference.authority === 'motion-camera') return `${label} is the Motion and Camera authority only. Preserve its camera geometry, physical path, speed curve, stabilization, performance timing, motion cadence, and temporal rhythm. Do not copy subject identity, wardrobe, location, material, color, or general appearance unless the written prompt explicitly assigns that role.`
     if (reference.authority === 'audio-timing') return `${label} is the Sound and Timing authority only. Preserve its speech, sound event, rhythm, pacing, and synchronization cues. Never derive visual identity, appearance, camera, wardrobe, object design, or location from this audio.`
+    if (isTypedAppearanceLayer(reference)) return `${label} is the ${reference.appearanceScope || 'assigned appearance'} authority for ${reference.boundCharacterTag || 'its explicitly assigned character'} only. Preserve the exact selected layer in its assigned scope; never derive another person, separate body, or unassigned appearance from it.`
     if (reference.role === 'location') return `${label} is the location authority; preserve its environment, layout, atmosphere, perspective, lighting direction, and stable scene geometry.`
     if (reference.role === 'wardrobe') return `${label} is the wardrobe authority${reference.boundCharacterTag ? ` and governs the wardrobe of ${reference.boundCharacterTag}` : ''}; preserve garment identity, silhouette, construction, materials, colors, patterns, layering, fit, accessories, and worn state on that bound character across every shot. Never copy the depicted person's identity or apply this wardrobe to another character without its own explicit Wardrobe connection.`
     if (reference.role === 'element') return `${label} is the element authority; preserve the object's design, materials, proportions, markings, construction, and attachment state.`
@@ -136,6 +141,23 @@ CAMERA AND EDIT: Use physically motivated camera movement and motivated cuts on 
 IDENTITY AND STATE: Preserve exact identity, anatomy, wardrobe, props, materials, markings, environment layout, and accumulated state through every shot and occlusion.
 FINAL ACCEPTANCE: The output must preserve the intended shot order, identity, geometry, action outcome, timing relationships, and a distinct final composition.
 HARD AVOID: identity blending, face replacement, anatomy or geometry morphing, wardrobe or prop redesign, invented text, logos, subtitles, watermarks, contact sheets, visible storyboard labels, unmotivated camera resets, and continuity resets.`
+
+/** Generated-body appendix only: actual typed connections, never filename-derived appearance. */
+function connectedReferenceRoles(request: GenerationRequest): PromptBlock[] {
+  if (request.kind !== 'video-generator') return []
+  const references = request.references || []
+  const roles = referenceRoleInstructions(references.filter(reference => reference.tag !== request.inputTag || request.inputRole !== 'source-video'))
+  const rules = [...new Set((request.connectionRules || []).filter(rule => {
+    const reference = references.find(reference => reference.tag === rule.tag)
+    if (!reference && rule.tag !== request.inputTag) return false
+    if (reference?.authority === 'motion-camera' || reference?.authority === 'audio-timing') return !/^(?:AUTO(?: → [A-Z]+)?|GUIDE|LOCK) RULE/.test(rule.rule) && !/^Image Reference$/.test(rule.label)
+    return true
+  }).map(rule => `${rule.tag} — ${rule.label}: ${rule.rule}`))]
+  const source = request.inputTag && (request.inputRole === 'source-video' || !references.some(reference => reference.tag === request.inputTag))
+    ? `${request.inputTag} is the ${request.inputRole === 'source-video' ? 'source video authority; continue from its exact final state without regenerating its beginning' : request.inputRole === 'start-frame' ? 'starting frame authority; begin at its exact composition and physical state' : 'source image authority; preserve its base content and change only what is authored'}.` : ''
+  const text = [roles, source, ...rules].filter(Boolean).join('\n')
+  return text ? [{ id: 'reference-roles', label: 'Reference roles', priority: 119, required: true, text: `REFERENCE ROLES\n${text}` }] : []
+}
 
 function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend, continuityContext?: ProductionContinuityContext, family?: PromptFamily): PromptBlock[] {
   const prompt = request.prompt?.trim()
@@ -240,7 +262,7 @@ export function compileProviderPrompt(request: GenerationRequest, options: Promp
     const bound = family === 'seedance'
       ? translateUnboundSeedanceTags({ family, text: genericBlockRenderer(structured), blocks: structured, droppedBlocks: [] }, effectiveRequest).blocks
       : structured
-    rawBlocks = visibleNaturalSkinBlocks(effectiveRequest, bound)
+    rawBlocks = [...visibleNaturalSkinBlocks(effectiveRequest, bound), ...connectedReferenceRoles(effectiveRequest)]
   }
   const measuredCharacterCount = FAMILY_RENDERERS[family](rawBlocks).length
   let blocks = rawBlocks

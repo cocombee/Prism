@@ -23,7 +23,7 @@ function panelSetting(value: StoryboardPanel['duration'] | StoryboardPanel['shot
   return value === undefined || value === 'auto' ? fallback : String(value)
 }
 
-export type StoryboardConnectedContextRole = 'Character' | 'Appearance' | 'Location' | 'Element/Prop' | 'Style' | 'Image Reference'
+export type StoryboardConnectedContextRole = 'Character' | 'Appearance' | 'Location' | 'Element/Prop' | 'Style' | 'Image Reference' | 'Video Reference' | 'Audio Reference'
 
 export interface StoryboardConnectedContextEntry {
   role: StoryboardConnectedContextRole
@@ -92,6 +92,9 @@ function connectedContextRole(node: StudioNode): StoryboardConnectedContextRole 
   if (node.data.kind === 'style-reference') return 'Style'
 
   const activeResult = node.data.generatedResults?.[Math.min(Math.max(node.data.activeResultIndex || 0, 0), Math.max(0, (node.data.generatedResults?.length || 1) - 1))]
+  const mediaType = activeResult?.type || node.data.outputType
+  if (mediaType === 'video' || (node.data.referenceAssets || []).some(asset => asset.mimeType.startsWith('video/')) || /\.(mp4|mov|webm|m4v)$/i.test(node.data.assetPath || node.data.outputPath || '') || node.data.kind === 'router' && node.data.routeSignal === 'video' || node.data.kind === 'list' && node.data.listSignal === 'video') return 'Video Reference'
+  if (mediaType === 'audio' || (node.data.referenceAssets || []).some(asset => asset.mimeType.startsWith('audio/')) || /\.(wav|mp3|m4a|aac|ogg|flac)$/i.test(node.data.assetPath || node.data.outputPath || '') || node.data.kind === 'router' && node.data.routeSignal === 'audio' || node.data.kind === 'list' && node.data.listSignal === 'audio') return 'Audio Reference'
   const hasImageAsset = (node.data.referenceAssets || []).some((asset) => asset.mimeType.startsWith('image/') || asset.category === 'image')
   const hasImagePath = Boolean((node.data.assetPath || node.data.outputPath || '').match(MEDIA_EXTENSION))
   const ordinaryImage = node.data.outputType === 'image'
@@ -165,17 +168,27 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
   const effectiveCast = scope ? resolvedCast[scopedPanels.findIndex(panel => panel.id === scope.id)] : undefined
   const activeCharacterTags = new Set(effectiveCast?.tags || [])
   const excludedCharacterTags = new Set(scope?.excludedCharacterTags || [])
-  const directEdges = edges.filter((edge) => edge.target === storyboardId)
-  const directSourceIds = new Set(directEdges.map((edge) => edge.source))
-  const appearanceEdges = edges.filter((edge) => directSourceIds.has(edge.target) && ['wardrobe', 'element'].includes(byId.get(edge.source)?.data.kind || ''))
-  const entries: StoryboardConnectedContextEntry[] = [...directEdges, ...appearanceEdges].flatMap((edge) => {
+  const contextEdges: Edge[] = []
+  const visited = new Set<string>()
+  const collect = (targetId: string) => {
+    if (visited.has(targetId)) return
+    visited.add(targetId)
+    for (const edge of edges.filter(edge => edge.target === targetId)) {
+      const source = byId.get(edge.source)
+      if (!source || source.data.kind === 'style-reference') continue
+      contextEdges.push(edge)
+      if (['character', 'wardrobe', 'element', 'location', 'router', 'list'].includes(source.data.kind)) collect(source.id)
+    }
+  }
+  collect(storyboardId)
+  const entries: StoryboardConnectedContextEntry[] = contextEdges.flatMap((edge) => {
     if (seenSources.has(edge.source)) return []
     seenSources.add(edge.source)
     const source = byId.get(edge.source)
     if (!source) return []
     const role = connectedContextRole(source)
-    if (!role) return []
-    const safeName = safeDisplayName(role === 'Image Reference' ? activeMediaName(source.data) : source.data.title)
+    if (!role || role === 'Style') return []
+    const safeName = safeDisplayName(['Image Reference', 'Video Reference', 'Audio Reference'].includes(role) ? activeMediaName(source.data) : source.data.title)
     const name = safeName || role
     const explicitTag = safeCanvasTag(source.data.referenceTag)
     const derivedTag = safeName ? safeCanvasTag(workflowTag({
@@ -187,9 +200,11 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
     }, 'asset')) : undefined
     const tag = explicitTag || derivedTag
     if (role === 'Character' && (tag && excludedCharacterTags.has(tag) || effectiveCast?.known && (!tag || !activeCharacterTags.has(tag)))) return []
-    const owner = source.data.appearanceOwnerCharacterTag || (role === 'Appearance' ? safeCanvasTag(byId.get(edge.target)?.data.referenceTag) : undefined)
+    const connectedOwner = role === 'Appearance' && byId.get(edge.target)?.data.kind === 'character' ? (() => { const target = byId.get(edge.target); const name = target && safeDisplayName(target.data.title); return safeCanvasTag(target?.data.referenceTag) || (target && name ? safeCanvasTag(workflowTag({ kind: target.data.kind, title: name }, 'asset')) : undefined) })() : undefined
+    const owner = connectedOwner || source.data.appearanceOwnerCharacterTag
+    if (role === 'Appearance' && scope?.id && source.data.appearanceShotIds?.length && !source.data.appearanceShotIds.includes(scope.id)) return []
     if (role === 'Appearance' && owner && (excludedCharacterTags.has(owner) || effectiveCast?.known && !activeCharacterTags.has(owner))) return []
-    const referenceExclusive = Boolean(tag && role !== 'Style' && hasConnectedVisualMedia(source))
+    const referenceExclusive = Boolean(tag && hasConnectedVisualMedia(source))
     return [{
       role,
       tag,
@@ -213,7 +228,7 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
   const prose = authoredPrompt.replace(/@[\p{L}\p{N}_-]+/gu, ' ')
   const aliasMatches = new Map<string, Array<{ index: number; alias: string }>>()
   entries.forEach((entry, index) => {
-    if (entry.tag && authoredTags.has(entry.tag.toLocaleLowerCase())) return
+    if (entry.role === 'Style' || entry.tag && authoredTags.has(entry.tag.toLocaleLowerCase())) return
     for (const alias of entry.aliases.filter((candidate) => promptContainsAlias(prose, candidate))) {
       const key = alias.toLocaleLowerCase()
       aliasMatches.set(key, [...(aliasMatches.get(key) || []), { index, alias }])
@@ -243,6 +258,20 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
     entry.insertionHint = entry.tag
       ? `Authoritative missing setting: the final prompt must contain ${entry.tag} exactly once; preserve its identity and add no unhinted context.`
       : 'Authoritative missing setting: the final prompt must preserve the connected Location name; never invent a tag.'
+  }
+
+  const characters = entries.filter(entry => entry.role === 'Character')
+  // The typed cast wins. A sole connected character is unambiguous only when no contradictory cast is declared.
+  for (const entry of characters.filter(entry => effectiveCast?.known || characters.length === 1)) {
+    if (!entry.tag || authoredTags.has(entry.tag.toLocaleLowerCase())) continue
+    entry.requiredInsertion = true
+    entry.insertionHint = `Active connected Character: mention ${entry.tag} at its existing performance point; never add a person, action, or appearance description.`
+  }
+  for (const entry of entries.filter(entry => entry.role === 'Appearance' && entry.appearanceScope === 'wardrobe' && ['explicit-replacement', 'explicit-delta'].includes(entry.appearanceSelection || ''))) {
+    const owner = characters.find(character => character.tag === entry.appearanceOwnerCharacterTag)
+    if (!owner?.tag || owner.characterAuthorityMode !== 'identity-body-with-layers' || !entry.tag || authoredTags.has(entry.tag.toLocaleLowerCase())) continue
+    entry.requiredInsertion = true
+    entry.insertionHint = `Assigned wardrobe: ${entry.tag} is worn by ${owner.tag} only; preserve the typed assignment and do not infer identity from the wardrobe.`
   }
 
   if (!entries.length) return { entries, text: '' }
@@ -315,6 +344,9 @@ export function storyboardSemanticTaggingPolicy(): string {
   directorProvenance('revamp-hidden-policy', SEEDANCE_REFERENCE_EXCLUSIVE_IDS)
   return `PROVIDER-SEMANTIC TAGGING POLICY:
 - Resolve meaning in any language, dialect, slang, transliteration, colloquial spelling, or minor misspelling. Reason from typed role, safe connected name and weak aliases, the full panel prose, and the full ordered sequence context; exact token equality alone is insufficient. Connected visual captions and metadata are identification/search data only and never appearance authority.
+- Video Reference controls only its assigned camera/motion/performance timing; Audio Reference controls only assigned sound/speech/timing. Mention their existing semantic tags only when the authored shot assigns their use; never infer identity, wardrobe, location, events or dialogue from metadata. Actual media pass downstream to model-owned sockets and limits.
+- Style is look/feel context only: never insert a Style tag into shot prose or treat Style as Character, Appearance, Location, Element/Prop or Image Reference. The generator receives Style through its dedicated look/feel routing.
+- Automatically mention the unambiguous active connected Character, its explicitly assigned Wardrobe, and sole connected Location. Preserve typed cast, exclusions, wardrobe owner and shot scope. Elements/Props, ordinary image references, audio and video require an authored tag or an explicit natural-language use/mention; connection alone never adds them to the action.
 - If exactly one connected authority is semantically unambiguous and relevant at point of use, replace the first natural-language mention with its exact canonical Canvas tag.
 - If multiple connected authorities are plausible, do not guess or tag. Leave ambiguous natural-language prose untagged.
 - Never create an unconnected tag, alter canonical spelling or case, expose manifest syntax, or translate or rewrite surrounding prose merely for tagging. Never change identity, design, action, or ownership.
@@ -346,11 +378,11 @@ export function storyboardDirectorBaselinePolicy(): string {
   directorProvenance('revamp-hidden-policy', STORYBOARD_DIRECTOR_BASELINE_IDS)
   return `CANONICAL DIRECTOR BASELINE POLICY (HIDDEN):
 - Provenance: Director profile SOUL; Seedance ${SEEDANCE_DIRECTOR_SOURCE_VERSION}; SHA-256 ${SEEDANCE_DIRECTOR_SOURCE_HASH}; Cinematography selection contract source 171c726835e8afe106ed5f98a3496095c118de4b32f643d94c26c095f26059f4; explicit-only Style router and Kodak visual-art LOOK. Prompt Structure SD-PS-001–SD-PS-012; Attribute Breakdown SD-AB-001–SD-AB-025. The 158-record library and provisional/future options remain retrieval-only and non-executable.
-- Refine only authored action, camera, performance, physical-lighting, focus, and explicit connected/approved Style wording inside the existing PERMITTED EDITS. Preserve the authored prompt as the authority and make no change when it is already complete and executable.
-- Never invent measurements, lens values, lighting, audio, dialogue, identity, wardrobe, props, setting, transitions, or continuity state. Quantify only an authored measurable intent or a selected camera control whose physical meaning is already fixed by the panel metadata.
+- Refine only authored action, camera, performance, physical-lighting, focus, and explicit connected/approved Style wording inside the existing PERMITTED EDITS. Preserve the authored prompt as the authority; sparse prose needs the shot-specific development below, while a fully developed executable take may remain unchanged.
+- Never invent measurements, lens values, lighting, audio, dialogue, identity, wardrobe, props, setting, transitions, or continuity state. Timing of the existing action may be developed within the selected duration as permitted below. Quantify only an authored measurable intent or a selected camera control whose physical meaning is already fixed by the panel metadata.
 - Express a moving camera as coherent physical behavior: path and viewing axis, subject relation, pace or curve, stabilization, endpoint composition, and readable settle. Keep static camera static and never substitute zoom-like scale change for translation.
 - Keep action world-space, causal, and physically legible. Preserve contact, attachment, incoming/outgoing state, screen direction, pose, eyeline, object position, and accumulated consequence wherever the authored action depends on them.
-- Protect authored establishment, decisive action, consequence, reaction, endpoint, and hold timing inside the fixed panel duration. Do not move the decisive event onto the final frame or manufacture timing where none is authored.
+- Protect authored establishment, decisive action, consequence, reaction, endpoint, and hold timing inside the fixed panel duration. Do not move the decisive event onto the final frame. When developing sparse prose, stage the existing action within the selected panel duration without changing any authored timing.
 - If the authored action requires a discrete state change that cannot remain visibly continuous, clarify the existing transition only through a motivated fully concealed or out of frame moment; never create a cut, change Cut/Continue metadata, or expose a replacement in view.
 - Exact connected semantic anchors remain the canonical authority at point of use. Provider ordinal tokens, hidden metadata, universal style defaults, unsupported platform claims, and diagnostic batch behavior never belong in returned panel prose.`
 }
@@ -367,6 +399,37 @@ function storyboardCameraMovementPolicy(camera: string | undefined): string {
   return `DOLLY DOWN SLOW POLICY (HIDDEN):
 The camera makes a markedly slow, deliberate dolly straight downward, preserving the authored subject framing and viewing side throughout the descent.
 This is the sole camera path. Do not expand it with around, past, across, wrapping, crane-around, speed ramps, new subject movement, push/pull/lateral reframing, or a new camera side. Do not invent numeric speed, distance, duration, height, acceleration, or timing. Preserve its arrived endpoint; never return to the starting composition.`
+}
+
+/** Shared by Shot and All so both receive the actual editing rules. */
+export function storyboardShotDevelopmentPolicy(): string {
+  return `SHOT-SPECIFIC DEVELOPMENT (HIDDEN):
+- Turn sparse prose into a directed take, not just a grammar correction. Preserve the user's intended action and emotional meaning; make them visible through restrained, coherent performance rather than inventing a new story beat.
+- Describe the selected shot size as an executable crop: identify the face, gesture, contact or environment visible within it. Use the selected lens only when supplied; if naming it in prose, use the explicit form '50mm lens' with the actual selected value. Do not change the selected framing or choose a new lens, camera body, aperture or visual style.
+- Elaborate the existing action's pace, weight, balance, contact, anticipation, follow-through and readable endpoint where relevant. Translate an authored feeling such as thinking into observable gaze, expression, breathing or posture. These are execution details of the same action, not new events, identities, props or locations.
+- Develop the selected camera's physical relationship to that action. Keep static camera fixed; for a moving camera clarify its existing path, viewing axis and endpoint without adding another move or inventing measurements.
+- Shape the same action across the selected panel duration with a readable opening, progression and ending state. Use compact timing in natural prose when useful, contained within that duration; do not add shot/beat headings, cuts, dialogue, or actions belonging to another panel. Continuous action may continue at the endpoint rather than being forced to stop.
+- Keep details specific to this panel and compatible with connected references and neighbouring state. Do not pad with generic cinematic adjectives, impose lighting/grade/audio defaults, invent weather or costume, or repeat hidden metadata.
+
+PERMITTED EDITS ONLY:
+- Visible action: clarify choreography, timing, contact, physical causality, and readable action order without changing who does what or inventing a new event.
+- Camera movement: clarify only the selected camera move, its physical path, axis, target, pace, endpoint, and hold. If the selected camera is static, keep it static.
+- Blend permitted camera/action edits into the existing prose so the result reads as one smooth cinematic prompt, not disconnected production notes.
+
+PRESERVATION RULES:
+- Preserve every existing semantic @tag exactly; never rename, remove, invent, or ordinally translate a tag.
+- Preserve headings, SHOT/BEAT structure, HARD CUT placement, exact quoted dialogue, speaker attribution, voice wording, locks, period, geography, physical state, British spelling, negative/positive constraints, FPS, and authored shutter angle/speed.
+- Revise performance, physical lighting, focus, or Style wording only when that exact domain is already authored, selected, or connected; never create a new domain, emotion, event, intensity, light, focus action, or Style. An authored action or feeling permits its restrained observable performance details under SHOT-SPECIFIC DEVELOPMENT.
+- Everything outside visible action, camera movement, and those already-owned domains plus exact manifest-hinted connected anchors is frozen byte-for-byte.
+- The only semantic-insertion exception is each exact connected required-anchor marked by hidden manifest metadata. Every required anchor must appear exactly once; replace its surviving matched safe alias with the canonical tag. Never alter those authorities’ identities or designs, and never add unhinted context.
+- Do not otherwise add or alter Character identity, wardrobe, props, Location, environment, period, style, lighting, dialogue, voice, audio, music, continuity locks, negative constraints, duration, shot size, or transition metadata.
+- Preserve this panel's duration, shot size, and camera metadata; use the sequence context only to prevent contradictions or continuity drift.
+- Transition metadata is immutable and compiler-owned. Never add, remove, rename, or contradict the listed transition.
+- A CONTINUE boundary stays inside the same unbroken shot: do not add a SHOT heading, HARD CUT, dissolve, reset, or viewpoint teleport.
+- A HARD CUT boundary is emitted once by the compiler: do not duplicate it inside returned panel prose.
+- Never add a new Continuity:, Transition:, SHOT, CUT, or BEAT label, and never narrate that subjects are ready for a cut or the next shot. Existing authored headings remain unchanged.
+- Do not merge this panel with another panel, rewrite a neighbouring panel, add a new shot, or change the number/order of shots.
+- A short sentence that merely names an action, feeling, or camera label is a draft, not a complete directed take. Develop it with useful shot-specific execution detail. Return it byte-for-byte unchanged only when that detail is already present and no permitted improvement remains.`
 }
 
 export function storyboardRewriteInstruction(panels: StoryboardPanel[], panelId: string, connectedContext = ''): string {
@@ -405,25 +468,7 @@ ${storyboardSemanticTaggingPolicy()}
 
 ${storyboardSequenceMentionPolicy()}
 
-PERMITTED EDITS ONLY:
-- Visible action: clarify choreography, timing, contact, physical causality, and readable action order without changing who does what or inventing a new event.
-- Camera movement: clarify only the selected camera move, its physical path, axis, target, pace, endpoint, and hold. If the selected camera is static, keep it static.
-- Blend permitted camera/action edits into the existing prose so the result reads as one smooth cinematic prompt, not disconnected production notes.
-
-PRESERVATION RULES:
-- Preserve every existing semantic @tag exactly; never rename, remove, invent, or ordinally translate a tag.
-- Preserve headings, SHOT/BEAT structure, HARD CUT placement, exact quoted dialogue, speaker attribution, voice wording, locks, period, geography, physical state, British spelling, negative/positive constraints, FPS, and authored shutter angle/speed.
-- Revise performance, physical lighting, focus, or Style wording only when that exact domain is already authored, selected, or connected; never create a new domain, emotion, event, intensity, light, focus action, or Style.
-- Everything outside visible action, camera movement, and those already-owned domains plus exact manifest-hinted connected anchors is frozen byte-for-byte.
-- The only semantic-insertion exception is each exact connected required-anchor marked by hidden manifest metadata. Every required anchor must appear exactly once; replace its surviving matched safe alias with the canonical tag. Never alter those authorities’ identities or designs, and never add unhinted context.
-- Do not otherwise add or alter Character identity, wardrobe, props, Location, environment, period, style, lighting, dialogue, voice, audio, music, continuity locks, negative constraints, duration, shot size, or transition metadata.
-- Preserve this panel's duration, shot size, and camera metadata; use the sequence context only to prevent contradictions or continuity drift.
-- Transition metadata is immutable and compiler-owned. Never add, remove, rename, or contradict the listed transition.
-- A CONTINUE boundary stays inside the same unbroken shot: do not add a SHOT heading, HARD CUT, dissolve, reset, or viewpoint teleport.
-- A HARD CUT boundary is emitted once by the compiler: do not duplicate it inside returned panel prose.
-- Never add a new Continuity:, Transition:, SHOT, CUT, or BEAT label, and never narrate that subjects are ready for a cut or the next shot. Existing authored headings remain unchanged.
-- Do not merge this panel with another panel, rewrite a neighbouring panel, add a new shot, or change the number/order of shots.
-- If visible action and the selected camera movement are already clear and executable, return it byte-for-byte unchanged.
+${storyboardShotDevelopmentPolicy()}
 - Return only the revised current panel prompt with its internal line breaks intact; no analysis, preface, markdown fence, or summary.`
 }
 
@@ -461,6 +506,7 @@ export function isCompleteStructuredStoryboardPrompt(value: string): boolean {
 export function storyboardRewriteTargets(panels: StoryboardPanel[], panelId?: string): StoryboardPanel[] {
   return panels.filter((panel) => !panel.locked
     && (!panelId || panel.id === panelId)
+    && (Boolean(panelId) || !panel.revampedPrompt?.trim())
     && panel.prompt.trim()
     && !isCompleteStructuredStoryboardPrompt(panel.prompt))
 }
@@ -509,7 +555,7 @@ export function storyboardBatchRewriteInstruction(panels: StoryboardPanel[], con
   const sequence = batch.context.map((panel) => {
     const transition = panel.boundary === 'final-continue' ? 'FINAL PANEL · OUTGOING CONTINUE HOOK; DO NOT INVENT THE NEXT PANEL' : panel.boundary === 'continue' ? 'TRANSITION AFTER: CONTINUE IN SAME UNBROKEN TAKE' : panel.boundary === 'hard-cut' ? 'TRANSITION AFTER: HARD CUT' : 'FINAL PANEL'
     const context = contexts.get(panel.id)?.text.trim()
-    return `PANEL ID: ${panel.id} · ${panel.editable ? 'EDITABLE' : 'READ-ONLY'} · ${panel.duration}s · ${panel.shotSize} · ${panel.camera}${panel.locked ? ' · LOCKED' : ''} · ${transition}\n${panel.prompt.trim() || '[empty]'}${context ? `\n${context}` : ''}`
+    return `PANEL ID: ${panel.id} · ${panel.editable ? 'EDITABLE' : 'READ-ONLY'} · ${panel.duration}s · ${panel.shotSize}${panel.lensMm !== undefined ? ` · ${selectedLensInstruction(panel.lensMm)}` : ''} · ${panel.camera}${panel.locked ? ' · LOCKED' : ''} · ${transition}\n${panel.prompt.trim() || '[empty]'}${context ? `\n${context}` : ''}`
   }).join('\n\n')
 
   return `Revise the editable Storyboard panels as one coherent ordered sequence using one response.
@@ -530,6 +576,8 @@ ${batch.targets.map((panel) => [storyboardCameraSupportPolicy(panel.camera, pane
 ${storyboardSemanticTaggingPolicy()}
 
 ${storyboardSequenceMentionPolicy()}
+
+${storyboardShotDevelopmentPolicy()}
 
 Apply the same PERMITTED EDITS and PRESERVATION RULES as single-panel Revamp to each editable panel independently. Preserve panel IDs, order, timing, duration, shot size, camera, lock state, Cut/Continue/final boundaries, exact authored tags, dialogue, SHOT/BEAT/HARD CUT structure, connected authority, and continuity. Validate each panel only against its own connected-context manifest. Never copy internal IDs, JSON keys, manifest syntax, or metadata into prompt prose.
 
@@ -646,8 +694,15 @@ export function validateStoryboardRewrite(source: string, rewritten: string, con
     if (introducedAppearance) throw new Error(`Revamp introduced unapproved appearance attribute: ${introducedAppearance}`)
   }
   const scaleEntries = (context?.entries || []).filter((entry) => entry.propScaleAuthority)
-  const sourceScaleChanges = matchCount(source, PROP_SCALE_CHANGE)
-  const rewrittenScaleChanges = matchCount(groundedRewrite, PROP_SCALE_CHANGE)
+  // A selected focal length describes camera optics, not the size of a prop.
+  // Exempt only lens-qualified uses of that exact selected value; other measurements stay guarded.
+  const selectedLens = typedContinuity?.lensMm
+  const lensPattern = selectedLens !== undefined && Number.isFinite(selectedLens) && selectedLens > 0
+    ? new RegExp(`\\b${escapedPattern(String(selectedLens))}\\s*mm(?=\\s+(?:lens|focal length)\\b)|(?<=\\blens[: ]{1,3})${escapedPattern(String(selectedLens))}\\s*mm\\b`, 'gi')
+    : undefined
+  const withoutSelectedLens = (text: string) => lensPattern ? text.replace(lensPattern, '') : text
+  const sourceScaleChanges = matchCount(withoutSelectedLens(source), PROP_SCALE_CHANGE)
+  const rewrittenScaleChanges = matchCount(withoutSelectedLens(groundedRewrite), PROP_SCALE_CHANGE)
   if (scaleEntries.length && rewrittenScaleChanges > sourceScaleChanges) throw new Error('Revamp contradicted explicit prop-scale authority.')
   if (!scaleEntries.length && rewrittenScaleChanges > sourceScaleChanges) throw new Error('Revamp invented prop scale without typed approved authority.')
   for (const value of typedContinuityAuthoredValues(typedContinuity)) {
@@ -678,7 +733,7 @@ export function validateStoryboardRewrite(source: string, rewritten: string, con
   const rewrittenTags = tagOccurrences(groundedRewrite)
   const canonicalTags = new Map<string, string>()
   for (const tag of [...sourceTags, ...(context?.entries.flatMap((entry) => entry.tag ? [entry.tag] : []) || [])]) canonicalTags.set(tag.toLocaleLowerCase(), tag)
-  const allowedProviderSemanticTags = new Set((context?.entries || []).filter((entry) => entry.tag && entry.semanticTagCandidate).map((entry) => entry.tag!.toLocaleLowerCase()))
+  const allowedProviderSemanticTags = new Set((context?.entries || []).filter((entry) => entry.role !== 'Style' && entry.tag && entry.semanticTagCandidate).map((entry) => entry.tag!.toLocaleLowerCase()))
   const sourceTagKeys = new Set(sourceTags.map((tag) => tag.toLocaleLowerCase()))
 
   for (const sourceTag of new Set(sourceTags)) {

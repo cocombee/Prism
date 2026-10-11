@@ -67,7 +67,7 @@ import {
 } from 'lucide-react'
 import type { CharacterView, ElementView, GenerationCostEstimate, ImportedAsset, SemanticAssetAvailability, ServiceAccountStatus, ServiceModelAvailability, ServiceProvider, StudioNode, StudioNodeData } from '../../shared/types'
 import type { AssistantProvider } from '../../shared/assistantModels'
-import { ASSISTANT_PROVIDER_GROUPS, assistantModelGroups, resolveAssistantSelection, type AssistantCatalogs } from '../../shared/assistantProviderSelection'
+import { ASSISTANT_PROVIDER_GROUPS, latestAssistantModelGroups, resolveAssistantSelection, type AssistantCatalogs } from '../../shared/assistantProviderSelection'
 import { closedVideoModelLabel, defaultVideoRatio, formatDurationSeconds, knownOutputFrameRate, motionCadenceOptions, normalizedMotionCadence, resolvedVideoRatio, resolveVideoModel, videoModelDurationInventory, VIDEO_MODELS, VIDEO_MODEL_MENU_SECTIONS } from '../../shared/videoModels'
 import { normalizedGeneratorDurationPatch } from '../../shared/storyboardVideoSync'
 import { generationServiceProvider } from '../../shared/generationServiceProvider'
@@ -108,7 +108,7 @@ import { nextVideoPromptRovingMode, videoPromptRovingTabIndex, type VideoPromptM
 import { MediaOfflineState, type MediaOfflineVisualState } from './MediaOfflineState'
 import { useHorizontalAssetSelector } from './useHorizontalAssetSelector'
 import { acceptedAssetBatch, assetBatchDisplayName, removeSavedBatchRow, type AssetBatchInspection, type AssetBatchKind } from '../../shared/assetBatch'
-import { admittedModelCatalogMenu, flatModelCatalogMenu, POPULAR_VIDEO_FEATURED_POLICY, POPULAR_IMAGE_MODEL_POLICY } from '../../shared/flatModelCatalogMenu'
+import { admittedModelCatalogMenu, flatModelCatalogMenu, POPULAR_VIDEO_FEATURED_POLICY, POPULAR_IMAGE_MODEL_POLICY, LATEST_TEXT_MODEL_MENU_POLICY } from '../../shared/flatModelCatalogMenu'
 import { modelCatalogMenu, modelReleaseNeedsExpansion, visibleModelCatalogOptions, type ModelMenuMetadata } from '../../shared/modelCatalogMenu'
 import { filterAndRankSelectorOptions, selectorSearchKeyAction, setSelectorPortalOpen } from '../../shared/selectorSearch'
 import { migrateSemanticAssetLifecycleMetadata } from '../../shared/semanticAssetLifecycleMigration'
@@ -276,7 +276,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   onChange: (value: string) => void
 }) {
   const availability = useContext(ProviderAvailabilityContext)
-  const flatCatalog = catalog && (requestedFlatCatalog || /^(?:Video model|.*image model|Image engine|Image editing engine)$/i.test(ariaLabel))
+  const flatCatalog = catalog && (promptCatalog || requestedFlatCatalog || /^(?:Video model|.*image model|Image engine|Image editing engine)$/i.test(ariaLabel))
   const groups = catalog || suppliedGroups.some(group => group.service) ? filterProviderModelGroups(suppliedGroups, promptCatalog ? availability.promptConnected : availability.mediaConnected) : suppliedGroups
   const owner = useContext(FluidSelectorSessionContext)
   const sessionKey = `${owner?.controlId || ''}::${ariaLabel}`
@@ -302,8 +302,17 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
     const company = option.provider || modelCompanyFor(option.value, option.label)
     return { ...option, catalog: option.catalog || { service: group.label, company: company && companyNames[company] || group.label, release: option.label } }
   }) })))
-  const mediaMenuPolicy = catalogFlow === 'video' || /^video model$/i.test(ariaLabel) ? POPULAR_VIDEO_FEATURED_POLICY : POPULAR_IMAGE_MODEL_POLICY
-  const flatProjection = flatModelCatalogMenu(catalogProviders, value, 5, flatCatalog ? mediaMenuPolicy : {})
+  const mediaMenuPolicy = promptCatalog ? LATEST_TEXT_MODEL_MENU_POLICY : catalogFlow === 'video' || /^video model$/i.test(ariaLabel) ? POPULAR_VIDEO_FEATURED_POLICY : POPULAR_IMAGE_MODEL_POLICY
+  const projectedCatalog = flatModelCatalogMenu(catalogProviders, value, 5, flatCatalog ? mediaMenuPolicy : {})
+  // Latest text families and their discovered effort order are already admitted.
+  // Media predecessor promotion must never split a text family's thinking choices.
+  const projectedRows = new Map(projectedCatalog.rows.map(row => [row.option.value, row]))
+  const promptGroups = promptCatalog ? groups.map(group => ({ label: group.label, rows: group.options.flatMap(option => {
+    const row = projectedRows.get(option.value)
+    return row ? [row] : []
+  }) })).filter(group => group.rows.length) : []
+  const promptRows = promptGroups.flatMap(group => group.rows)
+  const flatProjection = promptCatalog ? { ...projectedCatalog, featured: [], all: promptRows, rows: promptRows, allGroups: promptGroups } : projectedCatalog
   const catalogModelCompany = (option: GroupedMenuOption | undefined, fallbackValue = '') => {
     if (flatCatalog) {
       const host = option?.catalog?.service.toLowerCase()
@@ -353,7 +362,11 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
       return
     }
     const measuredWidth = measuredFloatingMenuWidth(buttonRef.current!, groups.flatMap((group) => [group.label, ...group.options.map((option) => option.label)]), catalog ? 280 : fittedWidth ?? 0, 360, 44)
-    const width = Math.min(window.innerWidth - 16, Math.max(rect.width, measuredWidth))
+    // Once mounted, include the actual popup padding, icons and selected check.
+    // Closed footer fields may truncate; a short choice popup must fit its labels.
+    const menu = resultsRef.current?.closest<HTMLElement>('.grouped-menu-select-menu')
+    const mountedWidth = menu ? Math.max(0, ...Array.from(menu.querySelectorAll<HTMLElement>('section > button > .selector-option-label')).map(label => Math.ceil(label.scrollWidth + menu.getBoundingClientRect().width - label.getBoundingClientRect().width))) : 0
+    const width = Math.min(window.innerWidth - 16, Math.max(rect.width, measuredWidth, Math.min(360, mountedWidth)))
     const fontSize = selectorTriggerFontSize(buttonRef.current!)
     const above = Math.max(0, rect.top - 12)
     const below = Math.max(0, window.innerHeight - rect.bottom - 12)
@@ -497,7 +510,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   }
   const renderOption = (option: GroupedMenuOption, modeLabel: string | false = false, isNew = false) => {
     const company = catalogModelCompany(option)
-    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} title={`${option.label}${option.catalog?.service ? ` · ${option.catalog.service}` : ''} · ${option.value}`} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu(); buttonRef.current?.focus() }}>{company ? <CompanyIcon provider={company} /> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || <span className="model-company-logo-placeholder" aria-hidden="true" />}<span>{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
+    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu(); buttonRef.current?.focus() }}>{company ? <CompanyIcon provider={company} /> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || (catalog || groups.some(group => group.options.some(item => item.aspectRatioPreview || item.provider || item.iconPath)) ? <span className="model-company-logo-placeholder" aria-hidden="true" /> : null)}<span className="selector-option-label">{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
   }
 
   return <>
@@ -1094,7 +1107,7 @@ export function VoiceModelSelect({ data, models, onChange, className = '', falAv
   const value = data.voiceEngine === 'fish-audio' ? `fish-audio::${data.fishModel || 's2-pro'}` : data.voiceEngine === 'elevenlabs-direct' ? `elevenlabs-direct::${data.voiceModelId || ''}` : 'elevenlabs'
   const label = data.voiceEngine === 'elevenlabs-direct' ? models.find((model) => model.id === data.voiceModelId)?.label || data.voiceModelId || 'Choose ElevenLabs model' : data.voiceEngine === 'fish-audio' ? fishAvailability?.models.find(model => model.id === (data.fishModel || 's2-pro'))?.label || `Fish Audio ${data.fishModel || 's2-pro'}` : 'ElevenLabs Eleven v3'
   const groups = falAvailability ? liveFalModelGroups('voice', falAvailability, voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined), data.falNative) : voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined)
-  return <GroupedMenuSelect catalog className={className} ariaLabel="Voice provider and model" defaultLabel="ElevenLabs Eleven v3" displayLabel={data.falNative?.label || label} fillTrack value={data.falNative ? `fal-native::${data.falNative.endpointId}` : value} groups={groups} onChange={(selection) => { if (selection.startsWith('fal-native::')) { onFalSelect?.(selection.slice(12)); return } const patch = voiceModelSelectionPatch(selection, data, models, fishAvailability?.catalogStale ? [] : fishAvailability?.models || []); if (patch) onChange({ ...preserveFalNativeSelection(data), ...patch }) }} />
+  return <GroupedMenuSelect catalog className={className} ariaLabel="Voice provider and model" defaultLabel={data.voiceEngine === 'fish-audio' ? label : "ElevenLabs Eleven v3"} displayLabel={data.falNative?.label || label} fillTrack value={data.falNative ? `fal-native::${data.falNative.endpointId}` : value} groups={groups} onChange={(selection) => { if (selection.startsWith('fal-native::')) { onFalSelect?.(selection.slice(12)); return } const patch = voiceModelSelectionPatch(selection, data, models, fishAvailability?.catalogStale ? [] : fishAvailability?.models || []); if (patch) onChange({ ...preserveFalNativeSelection(data), ...patch }) }} />
 }
 
 export function SoundModelSelect({ data, onChange, className = '', falAvailability, onFalSelect }: { data: StudioNodeData; onChange(patch: Partial<StudioNodeData>): void; className?: string; falAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
@@ -1279,19 +1292,20 @@ function NativeVideoFooterField<T extends NativeVideoFooterState>({ control, sta
         : control.key === 'resolution' ? 'Video Resolution'
           : `Model ${control.label}`
   const title = control.key === 'duration' ? 'Duration in seconds' : control.label
+  const fieldKey=control.fieldKey || control.key
   if (control.key === 'sound' || control.key === 'generate_audio') {
     const current = Object.prototype.hasOwnProperty.call(state.values, control.key) ? state.values[control.key] : control.hasDefault ? control.defaultValue : undefined
     const active = control.key === 'generate_audio' ? current === true : typeof current === 'string' && current.toLowerCase() === 'on'
     const onOption = control.options.find(option => option.kind === 'value' && (control.key === 'generate_audio' ? option.value === true : typeof option.value === 'string' && option.value.toLowerCase() === 'on'))
     const offOption = control.options.find(option => option.kind === 'value' && (control.key === 'generate_audio' ? option.value === false : typeof option.value === 'string' && option.value.toLowerCase() === 'off'))
     const next = active ? offOption : onOption
-    return <button type="button" className={`compact-settings compact-options compact-sound ${active ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={active} title={title} disabled={running || !next || next.value === undefined} onClick={() => { if (next?.value !== undefined) onChange(updateNativeFooterChoice(state, control.key, next.token)) }}><Volume2 size={14} /></button>
+    return <button type="button" className={`compact-settings compact-options compact-sound ${active ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={active} title={title} disabled={running || !next || next.value === undefined} onClick={() => { if (next?.value !== undefined) onChange(updateNativeFooterChoice(state, fieldKey, next.token)) }}><Volume2 size={14} /></button>
   }
 
   if (control.control === 'number' || control.control === 'text') {
     const value = control.hasDraft ? control.draft : control.hasValue && control.value !== null ? String(control.value) : ''
     const placeholder = control.hasDefault ? nativeVideoFooterOptionLabel(control, { token: '', kind: 'value', label: '', value: control.defaultValue }) : undefined
-    return <input className="voice-primary-input" aria-label={accessibleLabel} title={title} type={control.control === 'number' ? 'number' : 'text'} step={control.schema.multipleOf || (control.schema.type === 'integer' ? 1 : 'any')} value={value} placeholder={placeholder} disabled={running} onChange={event => onChange(editNativeInputValue(state, control.key, event.target.value, control.control === 'number' ? 'number' : 'text'))} />
+    return <input className="voice-primary-input" aria-label={accessibleLabel} title={title} type={control.control === 'number' ? 'number' : 'text'} step={control.schema.multipleOf || (control.schema.type === 'integer' ? 1 : 'any')} value={value} placeholder={placeholder} disabled={running} onChange={event => onChange(editNativeInputValue(state, fieldKey, event.target.value, control.control === 'number' ? 'number' : 'text'))} />
   }
 
   const options = control.options.map(option => ({ value: option.token, label: nativeVideoFooterOptionLabel(control, option), disabled: option.disabled }))
@@ -1300,7 +1314,7 @@ function NativeVideoFooterField<T extends NativeVideoFooterState>({ control, sta
   const displayLabel = control.selectedToken === '@default'
     ? nativeVideoFooterOptionLabel(control, { token: control.selectedToken, kind: 'default', label: '', value: control.defaultValue })
     : selected ? nativeVideoFooterOptionLabel(control, selected) : control.selectedToken === '@missing' ? 'Missing' : 'Unavailable · review'
-  return <SimpleMenuSelect className={control.key === 'resolution' ? 'compact-resolution' : control.key === 'fps' ? 'compact-fps' : ''} ariaLabel={accessibleLabel} accessibleLabel={`${accessibleLabel}: ${displayLabel}`} title={title} defaultLabel={control.hasDefault ? displayLabel : control.options[0]?.label || control.label} displayLabel={displayLabel} fillTrack value={control.selectedToken} options={options} onChange={token => onChange(updateNativeFooterChoice(state, control.key, token))} />
+  return <SimpleMenuSelect className={control.key === 'resolution' ? 'compact-resolution' : control.key === 'fps' ? 'compact-fps' : ''} ariaLabel={accessibleLabel} accessibleLabel={`${accessibleLabel}: ${displayLabel}`} title={title} defaultLabel={control.hasDefault ? displayLabel : control.options[0]?.label || control.label} displayLabel={displayLabel} fillTrack value={control.selectedToken} options={options} onChange={token => onChange(updateNativeFooterChoice(state, fieldKey, token))} />
 }
 
 function nativeVideoOutputFrameRate(controls: readonly FalNativeVideoFooterControl[]): number | undefined {
@@ -1529,6 +1543,8 @@ interface NodeRuntime {
   importStoryboardPanel: (id: string, panelId: string) => void
   openStyleChooser: (id: string) => void
   rewriteStoryboardPanel: (id: string, panelId?: string) => void
+  availablePromptModels?: (provider: AssistantProvider) => ServiceModelAvailability['models']
+  promptProviderAccount?: (provider: ServiceProvider) => ServiceAccountStatus | undefined
   availableModels: (provider: ServiceProvider) => ServiceModelAvailability['models']
   serviceAvailability?: (provider: ServiceProvider) => ServiceModelAvailability | undefined
   modelAvailabilityVerified: (provider: ServiceProvider) => boolean
@@ -1914,16 +1930,16 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const showsAssetTag = hasMaterializedAsset(data) || reusableEditorDirty
   const Icon = meta.icon
   const enhanceCatalogs: AssistantCatalogs = data.kind === 'prompt'
-    ? Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availableModels(provider) || []]))
+    ? Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availablePromptModels?.(provider) || runtime?.availableModels(provider) || []]))
     : {}
   const enhanceSelection = resolveAssistantSelection(data.assistantProvider, data.assistantModelId, enhanceCatalogs)
   const enhanceProvider: AssistantProvider = enhanceSelection?.provider || ASSISTANT_PROVIDER_GROUPS.find(({ id: provider }) => provider === data.assistantProvider)?.id || 'openai'
-  const enhanceGroups = assistantModelGroups(enhanceCatalogs, data.assistantProvider, data.assistantModelId)
+  const enhanceGroups = latestAssistantModelGroups(enhanceCatalogs)
     .map((group) => ({ provider: group.provider, label: group.label, models: group.options.map((option) => ({ id: option.value.slice(option.value.indexOf('::') + 2), label: option.label })) }))
   const enhanceModels = enhanceGroups.find((group) => group.provider === enhanceProvider)?.models || []
   const enhanceModel = enhanceSelection?.model || ''
-  const enhanceModelLabel = enhanceModels.find((model) => model.id === enhanceModel)?.label || 'Choose Model'
-  const enhanceAccount = data.kind === 'prompt' ? runtime?.providerAccount(enhanceProvider) : undefined
+  const enhanceModelLabel = enhanceModels.find((model) => model.id === enhanceModel)?.label || (enhanceModel ? modelDisplayName(enhanceModel) : 'Choose Model')
+  const enhanceAccount = data.kind === 'prompt' ? runtime?.promptProviderAccount?.(enhanceProvider) || runtime?.providerAccount(enhanceProvider) : undefined
   const errorProvider: ServiceProvider = data.kind === 'prompt' ? enhanceProvider : generationServiceProvider(data)
   const displayError = compactProviderError(data.error, errorProvider)
   const enhanceBlocked = Boolean(enhanceAccount && ['credit-required', 'temporarily-limited', 'unavailable'].includes(enhanceAccount.state))
@@ -1993,7 +2009,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       ? projectNativeVideoFooterFields(higgsfieldVideoSchemaFields || [], data.higgsfieldNative)
       : []
   const nativeVideoFooterControls = nativeVideoFooterControlsWithOneSound(rawNativeVideoFooterControls)
-  const nativeVideoFooterFieldKeys = new Set(nativeVideoFooterControls.map(control => control.key))
+  const nativeVideoFooterFieldKeys = new Set(nativeVideoFooterControls.map(control => control.fieldKey || control.key))
   if (nativeVideoFooterControls.some(control => control.key === 'sound' || control.key === 'generate_audio')) {
     nativeVideoFooterFieldKeys.add('sound')
     nativeVideoFooterFieldKeys.add('generate_audio')
@@ -2251,11 +2267,14 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         : !elementReferences.some((asset) => asset.metadata?.elementView === ELEMENT_ANCHOR_VIEW)
           ? costTooltip
           : costTooltip
+  const styleBuildCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({id:provider})=>[provider,runtime?.availablePromptModels?.(provider) || runtime?.availableModels(provider) || []]))
+  const styleBuildSelection = resolveAssistantSelection(data.assistantProvider,data.stylePromptModelId,styleBuildCatalogs)
+  const styleBuildAccount = styleBuildSelection ? runtime?.promptProviderAccount?.(styleBuildSelection.provider) || runtime?.providerAccount(styleBuildSelection.provider) : undefined
   const styleBuildFailures = [
     !(data.styleDescription || '').trim() ? 'add the required short description' : '',
     !assetGenerationPrompt.trim() ? 'add custom Style wording' : '',
-    providerDisconnected ? 'connect fal.ai in Connections' : '',
-    providerBlocked ? providerAccount?.message || 'fal.ai is unavailable' : '',
+    !styleBuildSelection ? 'connect a text provider in Connections' : '',
+    styleBuildAccount && ['credit-required','temporarily-limited','unavailable'].includes(styleBuildAccount.state) ? styleBuildAccount.message || 'The Revamp connection is unavailable' : '',
   ].filter(Boolean)
   const styleBuildTooltip = running
     ? generationTimeLeft || 'Estimating time left…'
@@ -2379,7 +2398,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           {enhanceOpen && <div className="prompt-enhance-popover prompt-enhance-inline">
             <div className="prompt-enhance-compact">
               <div className="prompt-enhance-model-picker">
-                <GroupedMenuSelect catalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Enhance model" defaultLabel="GPT 6.1 Sol" value={`${enhanceProvider}::${enhanceModel || ''}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map((group) => ({ label: group.label, options: group.models.map((model) => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined, progress: undefined }) }} />
+                <GroupedMenuSelect catalog promptCatalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Enhance model" defaultLabel="GPT 6.1 Sol" value={`${enhanceProvider}::${enhanceModel || ''}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map((group) => ({ label: group.label, options: group.models.map((model) => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined, progress: undefined }) }} />
               </div>
               <button className="prompt-enhance-round" title="Connections" aria-label="Open Connections" onClick={() => runtime?.openConnections(enhanceProvider, enhanceModelLabel)}><Settings size={13} /></button>
               <button className="prompt-enhance-apply" title="Apply Enhancement" aria-label="Apply Enhancement" disabled={enhanceBlocked || !enhanceModel || !(data.prompt || '').trim() || data.runState === 'running'} onClick={() => runtime?.runAssistantNode(id)}>{data.runState === 'running' ? <LoaderCircle size={11} className="spin" /> : 'Apply'}</button>
@@ -2717,7 +2736,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           controls={[
             { id: 'model', kind: 'selector', defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} fishAvailability={runtime?.serviceAvailability?.('fish')} models={runtime?.availableModels('elevenlabs') || []} onChange={(patch) => runtime?.updateNode(id, patch)} /></label> },
             data.voiceEngine === 'fish-audio'
-              ? { id: 'voice', kind: 'intrinsic', intrinsicWidth: 132, node: <label className="voice-primary-voice-field"><span>Voice ID</span><input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" value={data.fishReferenceId || ''} onChange={(event) => runtime?.updateNode(id, { fishReferenceId: event.target.value, error: undefined })} placeholder="Reference ID (required)" /></label> }
+              ? { id: 'voice', kind: 'editable-field', intrinsicWidth: 132, node: <label className="voice-primary-voice-field"><span>Voice ID</span><input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" style={{width:'100%'}} value={data.fishReferenceId || ''} onChange={(event) => runtime?.updateNode(id, { fishReferenceId: event.target.value, error: undefined })} placeholder="Reference ID (required)" /></label> }
               : { id: 'voice', kind: 'selector', intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><SimpleMenuSelect className="voice-primary-voice" ariaLabel="ElevenLabs voice" defaultLabel="Adam" fillTrack value={usesBuiltInElevenVoice ? elevenVoiceValue : '__custom'} options={[...ELEVEN_V3_BUILT_IN_VOICES.map((voice) => ({ value: voice, label: voice })), { value: '__custom', label: 'Custom voice name / ID' }]} onChange={(voice) => runtime?.updateNode(id, { voice: voice === '__custom' ? '' : voice, error: undefined })} /></label> },
           ] as FluidGroupControl<'model' | 'voice'>[]}
         />
@@ -2741,12 +2760,12 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           ariaLabel="Fish Audio Output Controls"
           gap={7}
           allocation={{ minRows: 1, maxRows: 3 }}
-          recalculationKey={`${data.fishFormat || 'mp3'}:${data.fishSampleRate || 44100}:${data.fishMp3Bitrate || 128}:${data.fishOpusBitrate ?? 48}:${data.fishVolume ?? 0}:${data.speed ?? 1}`}
+          recalculationKey={`${data.fishFormat || 'mp3'}:${data.fishSampleRate || 44100}:${data.fishMp3Bitrate || 128}:${data.fishOpusBitrate ?? -1000}:${data.fishVolume ?? 0}:${data.speed ?? 1}`}
           controls={[
             { id: 'format', kind: 'selector', intrinsicWidth: 52, node: <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish Audio Format" defaultLabel="MP3" fillTrack value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label> },
             { id: 'sample-rate', kind: 'selector', intrinsicWidth: 70, node: <label><span>Sample Rate</span><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" defaultLabel="44.1 kHz" fillTrack value={data.fishSampleRate === undefined ? '@default' : String(data.fishSampleRate)} options={fishSampleRateOptions(data.fishFormat, data.fishSampleRate)} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label> },
             ...((data.fishFormat || 'mp3') === 'mp3' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" defaultLabel="128 kbps" fillTrack value={String(data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', data.fishMp3Bitrate ?? 128)} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label> }] : []),
-            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? 48)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? 48)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
+            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? -1000)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? -1000)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
             { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label><span>Speed</span><SimpleMenuSelect ariaLabel="Fish Audio Speed" defaultLabel="1×" fillTrack value={String(data.speed ?? 1)} options={fishNumberOptions(Array.from({ length: 31 }, (_, i) => Number((0.5 + i / 20).toFixed(2))), data.speed ?? 1, '×', 0.5, 2)} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
             { id: 'volume', kind: 'selector', intrinsicWidth: 52, node: <label><span>Volume</span><SimpleMenuSelect ariaLabel="Fish Audio Volume" defaultLabel="0 dB" fillTrack value={String(data.fishVolume ?? 0)} options={fishNumberOptions(Array.from({ length: 41 }, (_, i) => i - 20), data.fishVolume ?? 0, ' dB', -20, 20)} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label> },
           ]}

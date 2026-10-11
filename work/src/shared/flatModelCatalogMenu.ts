@@ -56,6 +56,12 @@ export const POPULAR_IMAGE_MODEL_POLICY: FlatModelCatalogMenuPolicy = {
   groupByProvider: true,
 }
 
+/** Text families/efforts are already admitted by latestAssistantMenuModels; never prune them again here. */
+export const LATEST_TEXT_MODEL_MENU_POLICY: FlatModelCatalogMenuPolicy = {
+  groupByProvider: true,
+  featuredFamilyPriority: [],
+}
+
 function normalizeFamilyName(value: string): string {
   let normalized = value.toLowerCase().replace(/[^a-z0-9]/g, '')
   // BytePlus is the serving host prefix in some discovery display names.

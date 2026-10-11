@@ -1,6 +1,7 @@
 import type { GenerationRequest, ServiceModelAvailability } from './types'
 export const FISH_CATALOG_TTL = 10 * 60_000
 export const FISH_LEGACY_DEFAULT_MODEL = 's2-pro'
+export const FISH_DEFAULT_MODEL = 's2.1-pro'
 // Fish gives a date without a timezone. Stop at the earliest global start of
 //31 December rather than risking its documented S1→S2.1 server substitution.
 export const FISH_S1_RETIREMENT = Date.parse('2026-12-30T10:00:00Z')
@@ -44,7 +45,7 @@ export function compileFishAudioRequest(request: GenerationRequest, availability
   if (!['mp3', 'opus', 'wav', 'pcm'].includes(format)) throw new Error('Choose a supported Fish Audio format.')
   const sampleRate = request.fishSampleRate ?? (format === 'opus' ? 48000 : 44100)
   if (!fishSampleRates(format).includes(sampleRate)) throw new Error(`Choose a supported ${format.toUpperCase()} sample rate.`)
-  const mp3 = request.fishMp3Bitrate ?? 128, opus = request.fishOpusBitrate ?? 48
+  const mp3 = request.fishMp3Bitrate ?? 128, opus = request.fishOpusBitrate ?? -1000
   if (format === 'mp3' && ![64, 128, 192].includes(mp3)) throw new Error('Choose a supported Fish Audio MP3 bitrate.')
   if (format === 'opus' && ![-1000, 24, 32, 48, 64].includes(opus)) throw new Error('Choose a supported Fish Audio Opus bitrate.')
   const latency = request.fishLatency ?? 'normal'
@@ -53,7 +54,7 @@ export function compileFishAudioRequest(request: GenerationRequest, availability
     text: request.prompt, reference_id: request.fishReferenceId.trim(),
     temperature: number(request.fishTemperature, 0.7, 0, 1, 'Expressiveness'), top_p: number(request.fishTopP, 0.7, 0, 1, 'Diversity'),
     prosody: { speed: number(request.speed, 1, 0.5, 2, 'Speed'), volume: number(request.fishVolume, 0, -20, 20, 'Volume'), ...(modelId !== 's1' ? { normalize_loudness: boolean(request.fishNormalizeLoudness, true, 'loudness normalization') } : {}) },
-    normalize: boolean(request.fishNormalize, true, 'text normalization'), chunk_length: number(request.fishChunkLength, 200, 100, 300, 'Chunk length', true),
+    normalize: boolean(request.fishNormalize, true, 'text normalization'), chunk_length: number(request.fishChunkLength, 300, 100, 300, 'Chunk length', true),
     format, sample_rate: sampleRate, ...(format === 'mp3' ? { mp3_bitrate: mp3 } : {}), ...(format === 'opus' ? { opus_bitrate: opus === -1000 ? opus : opus * 1000 } : {}), latency,
   } }
 }

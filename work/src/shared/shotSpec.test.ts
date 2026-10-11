@@ -190,7 +190,7 @@ describe('production shot specification', () => {
     expect(compiled.blocks.filter((block) => block.required).map((block) => block.label)).toEqual([
       'REFERENCE AUTHORITY', 'SUBJECT AND PERFORMANCE', 'CAMERA',
       'TIMELINE AND CONTINUOUS ACTION', 'IDENTITY AND ANATOMY CONTINUITY',
-      'CAMERA, FRAMING, AND OPTICAL HARD GATE', 'FINAL-FRAME AND OUTPUT HARD GATE', 'NEGATIVE PROMPT',
+      'CAMERA, FRAMING, AND OPTICAL HARD GATE', 'FINAL-FRAME AND OUTPUT HARD GATE', 'NEGATIVE PROMPT', 'Reference roles',
     ])
     expect(compiled.text.match(/Scar over left brow/g)).toHaveLength(1)
     expect(compiled.text.match(/Use @hero as the Character./g)).toHaveLength(1)
@@ -668,7 +668,7 @@ describe('production shot specification', () => {
     expect(timeline.match(/Your order is ready\./g)).toHaveLength(1)
     expect(timeline).toContain('DIALOGUE CONTINUATION · order-line · audio continues while mouth may be outside crop')
     expect(timeline.match(/^HARD CUT\.$/gm)).toHaveLength(6)
-    expect(compiled.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
+    expect(compiled.blocks.at(-1)?.label).toBe('Reference roles')
     expect(compiled.text).not.toMatch(/@Image\d+|@Video\d+|@Audio\d+|\[(?:Image|Video|Audio)\d+\]/)
     expect(providerPromptPreviewCompilation(request).text).toBe(compiled.text)
     expect(visibleProviderPromptBody(request)).toBe(compiled.text)
@@ -676,7 +676,7 @@ describe('production shot specification', () => {
     expect(providerPayload).not.toContain('@owner')
     expect(providerPayload).not.toContain('@outsider')
     expect(providerPayload).toMatch(/\[(?:Image|Video|Audio)\d+\]/)
-    expect(providerPayload.split('\n\n').at(-1)).toMatch(/^NEGATIVE PROMPT\n/)
+    expect(providerPayload.split('\n\n').at(-1)).toMatch(/^REFERENCE ROLES\n/)
   })
 
   it('projects future-only typed continuity only when its owning shot becomes current', () => {

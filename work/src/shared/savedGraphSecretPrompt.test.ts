@@ -53,7 +53,7 @@ describe('saved graph secret Seedance prompt', () => {
     expect(scene).not.toContain('@video-01-scene-01-telefon-pintar-customer')
     const props = preview.blocks.find((block) => block.label === 'WARDROBE, ACCESSORY, AND PROP CONTINUITY')!.text
     expect(props).toContain('@video-01-scene-01-telefon-pintar-customer')
-    expect(preview.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
+    expect(preview.blocks.at(-1)?.label).toBe('Reference roles')
 
     const payload = providerSeedancePayloadCompilation(request)
     expect(payload.text).toContain('Use [Image2] as actor-c.')

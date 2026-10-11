@@ -31,7 +31,7 @@ function pipelineFixture() {
   const storyboard = node('board', 'storyboard', { storyboardDuration: 10, storyboardPanels: panels.map((panel) => ({ ...panel })) })
   const video = node('video', 'video-generator', { videoEngine: 'bytedance/seedance-2.5/reference-to-video', duration: 10, promptMode: 'auto', resolution: '720p' })
   const nodes = [wardrobe, prop, character, location, style, storyboard, video]
-  const edges = [edge('coat', 'maya', 'wardrobe-in'), edge('case', 'maya', 'element-in'), edge('maya', 'station', 'character-in'), edge('station', 'board', 'location-in'), edge('look', 'board', 'style-in'), edge('board', 'video', 'storyboard-in')]
+  const edges = [edge('coat', 'maya', 'wardrobe-in'), edge('case', 'maya', 'element-in'), edge('maya', 'station', 'character-in'), edge('station', 'board', 'location-in'), edge('look', 'video', 'style-in'), edge('board', 'video', 'storyboard-in')]
   return { nodes, edges, video, panels }
 }
 

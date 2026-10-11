@@ -81,11 +81,12 @@ export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine'
     case 'element': return [{ ...style(86), label: 'Creation Style (Optional)' }]
     case 'style-reference': return []
     case 'storyboard': return [
-      { ...style(86), label: 'Style Reference' },
-      { id: 'character-in', signal: 'image', label: 'Character Reference', top: 126, icon: 'character-reference' },
-      { id: 'element-in', signal: 'image', label: 'Element Reference', top: 166, icon: 'element-reference' },
-      { id: 'location-in', signal: 'image', label: 'Location Reference', top: 206, icon: 'location-reference' },
-      { id: 'reference-in', signal: 'image', label: 'Image Reference', top: 246, icon: 'image-reference' },
+      { id: 'character-in', signal: 'image', label: 'Character Reference', top: 86, icon: 'character-reference' },
+      { id: 'element-in', signal: 'image', label: 'Element Reference', top: 126, icon: 'element-reference' },
+      { id: 'location-in', signal: 'image', label: 'Location Reference', top: 166, icon: 'location-reference' },
+      { id: 'reference-in', signal: 'image', label: 'Image Reference', top: 206, icon: 'image-reference' },
+      { id: 'video-reference-in', signal: 'video', label: 'Video Reference', top: 246, icon: 'reference-video' },
+      { id: 'audio-reference-in', signal: 'audio', label: 'Audio Reference', top: 286, icon: 'reference-audio' },
     ]
     case 'storyboard-asset': return [{ id: 'storyboard-in', signal: 'storyboard', label: 'Storyboard', top: 54, maxConnections: 1 }]
     case 'list': return [{ id: 'input', signal: 'mixed', label: 'Generated or Imported Media Batch', top: 86, icon: 'media-collection' }]

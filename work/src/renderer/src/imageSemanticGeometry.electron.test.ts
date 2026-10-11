@@ -25,6 +25,7 @@ describe('direct production Image and semantic control geometry', () => {
       import { createRoot } from 'react-dom/client'
       import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
       import { NodeCard, NodeRuntimeContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/NodeCardNext.tsx'))}
+    import { ProviderAvailabilityContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/ProviderAvailabilityContext.tsx'))}
 
       window.__errors=[]
       window.addEventListener('error', event => { if (!String(event.message).includes('ResizeObserver loop')) window.__errors.push(event.error?.stack || event.message) })
@@ -48,7 +49,7 @@ describe('direct production Image and semantic control geometry', () => {
         ['image-openai-jpeg',image('openai','gpt-image-2','jpeg','1K'),1],
         ...semanticKinds.flatMap(kind=>[[kind+'-single',semantic(kind),1],[kind+'-single-z08',semantic(kind),.8]]),
       ]
-      function Mount({name,data,zoom}){const nodes=[{id:name,type:'studio',position:{x:0,y:0},style:{width:315},data}];return <section data-case={name} data-zoom={zoom} style={{width:350,height:650}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard}} defaultViewport={{x:0,y:0,zoom}} minZoom={.1} maxZoom={2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></section>}
+      function Mount({name,data,zoom}){const nodes=[{id:name,type:'studio',position:{x:0,y:0},style:{width:315},data}];return <section data-case={name} data-zoom={zoom} style={{width:350,height:650}}><ProviderAvailabilityContext.Provider value={{mediaConnected:{fal:true,byteplus:true,openai:true,google:true,higgsfield:true,elevenlabs:true,fish:true},promptConnected:{openai:true,anthropic:true,google:true,omniroute:true,deepseek:true,moonshot:true}}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard}} defaultViewport={{x:0,y:0,zoom}} minZoom={.1} maxZoom={2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></ProviderAvailabilityContext.Provider></section>}
       function App(){return <main>{cases.map(([name,data,zoom])=><Mount key={name} name={name} data={data} zoom={zoom}/>)}</main>}
       const box=element=>{const r=element.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}}
       const painted=wrapper=>wrapper.querySelector('[data-equalized-default],.quantity-stepper,.play-tooltip-anchor,:scope > button,:scope > label')||wrapper
@@ -63,7 +64,7 @@ describe('direct production Image and semantic control geometry', () => {
       createRoot(document.getElementById('root')).render(<App/>)
     `)
 
-    buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader:{'.png':'dataurl'}, logLevel:'silent' })
+    buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader: { '.svg': 'dataurl','.png':'dataurl'}, logLevel:'silent' })
     writeFileSync(html, `<!doctype html><html><head><link rel="stylesheet" href="file://${resolve(process.cwd(), 'src/renderer/src/styles-next.css')}"><style>*{box-sizing:border-box}body{margin:20px;background:#111;color:#ddd}main{display:grid;grid-template-columns:repeat(3,350px);gap:36px;align-items:start}</style></head><body><div id="root"></div><script src="renderer.js"></script></body></html>`)
     writeFileSync(main, `const{app,BrowserWindow}=require('electron');const path=require('node:path');const finish=(v,c=0)=>{process.stdout.write('IMAGE_SEMANTIC_GEOMETRY:'+JSON.stringify(v)+'\\n');app.exit(c)};app.setPath('userData',path.join(${JSON.stringify(directory)},'user'));app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:1200,height:1500,webPreferences:{contextIsolation:false,sandbox:false}});await win.loadFile(${JSON.stringify(html)});finish(await win.webContents.executeJavaScript('window.__probe()'))}).catch(e=>finish({error:e.stack||String(e)},1))`)
     const run=spawnSync(electronPath,[main],{cwd:directory,encoding:'utf8',env:{...process.env,ELECTRON_RUN_AS_NODE:undefined},timeout:50_000})

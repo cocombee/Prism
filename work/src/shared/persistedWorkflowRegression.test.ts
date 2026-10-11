@@ -150,7 +150,7 @@ describe('persisted Misi Delivery prompt regression', () => {
     const wardrobeEdges = fixture.edges.filter((edge) => byId.get(edge.source)?.data.kind === 'wardrobe' && byId.get(edge.target)?.data.kind === 'character')
     expect(wardrobeEdges.length).toBeGreaterThanOrEqual(2)
     for (const edge of wardrobeEdges) expect(edge).toMatchObject({ sourceHandle: 'media-out', targetHandle: 'wardrobe-in' })
-    expect(activeAppSource).toContain("new Set<NodeKind>(['character', 'wardrobe', 'element', 'location', 'style-reference'])")
+    expect(activeAppSource).toContain("new Set<NodeKind>(['character', 'wardrobe', 'element', 'location'])")
     expect(activeAppSource).toContain("category === 'wardrobe' ? 'wardrobe'")
   })
 

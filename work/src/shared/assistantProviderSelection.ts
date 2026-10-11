@@ -1,4 +1,4 @@
-import { availableAssistantModels, isTextAssistantModelEligible, type AssistantModelOption, type AssistantProvider } from './assistantModels'
+import { availableAssistantModels, latestAssistantMenuModels, isTextAssistantModelEligible, type AssistantModelOption, type AssistantProvider } from './assistantModels'
 import { modelDisplayName } from './modelNames'
 
 export type AssistantCatalogs = Partial<Record<AssistantProvider, AssistantModelOption[]>>
@@ -51,6 +51,13 @@ export function resolveAssistantSelection(
   if (savedModel && PROVIDERS.some(({ id }) => id === savedProvider)) return undefined
   const first = groups[0]?.options[0]
   return first ? { provider: groups[0].provider, model: first.value.slice(first.value.indexOf('::') + 2) } : undefined
+}
+
+export function latestAssistantModelGroups(catalogs: AssistantCatalogs) {
+  return PROVIDERS.flatMap(({ id, label }) => {
+    const models = latestAssistantMenuModels(catalogs[id] || [])
+    return models.length ? [{ provider: id, label, options: models.map(model => ({ value: `${id}::${model.id}`, label: model.label, provider: id })) }] : []
+  })
 }
 
 export const ASSISTANT_PROVIDER_GROUPS = PROVIDERS

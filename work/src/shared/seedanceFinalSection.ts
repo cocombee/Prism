@@ -9,7 +9,7 @@ const SECTION_HEADINGS = new Set([
   'LINE ATTRIBUTION', 'LOCATION MAP', 'LOOK AND CAPTURE CHARACTER', 'NATURAL SKIN TEXTURE',
   'NEGATIVE PROMPT', 'OPENING-FRAME HARD LOCK', 'OPTICS', 'PERFORMANCE', 'PHYSICS',
   'POSITIVE CONSTRAINTS', 'POSITIVE LOCKS', 'QUALITY', 'REFERENCE AUTHORITY', 'REFERENCE MAP',
-  'SCENE CONTEXT', 'SCENE, VEHICLE, AND ENVIRONMENT CONTINUITY', 'SCRIPTED DIALOGUE',
+  'REFERENCE ROLES', 'SCENE CONTEXT', 'SCENE, VEHICLE, AND ENVIRONMENT CONTINUITY', 'SCRIPTED DIALOGUE',
   'STATE LEDGER', 'STYLE', 'STYLE PREFIX', 'SUBJECT AND PERFORMANCE',
   'TIMELINE AND CONTINUOUS ACTION', 'VOICES', 'WARDROBE, ACCESSORY, AND PROP CONTINUITY',
   'WORLD AND LIGHTING',
@@ -76,10 +76,13 @@ export function seedanceFinalSectionErrors(body: string): string[] {
   const errors: string[] = []
   if (!negatives.length) errors.push('NEGATIVE PROMPT is required as an exact section heading.')
   if (negatives.length > 1) errors.push(`NEGATIVE PROMPT must occur once; found headings at lines ${negatives.map(boundary => boundary.line).join(', ')}.`)
+  const roles = boundaries.filter(boundary => boundary.heading === 'REFERENCE ROLES' && !boundary.malformed)
+  if (roles.length > 1) errors.push('REFERENCE ROLES must occur once as the final appendix.')
+  if (roles.length && boundaries.at(-1) !== roles[0]) errors.push('REFERENCE ROLES must be the final appendix.')
   for (const boundary of boundaries) {
     if (boundary.malformed && (boundary.heading === 'NEGATIVE PROMPT' || negatives.length && boundary.line > negatives[0].line)) {
       errors.push(`Unsupported section-heading syntax at line ${boundary.line}: ${boundary.heading}. Preserve the authored text for review; it was not rewritten.`)
-    } else if (!boundary.malformed && negatives.length && boundary.line > negatives[0].line && boundary.heading !== 'NEGATIVE PROMPT') {
+    } else if (!boundary.malformed && negatives.length && boundary.line > negatives[0].line && boundary.heading !== 'NEGATIVE PROMPT' && boundary.heading !== 'REFERENCE ROLES') {
       errors.push(`NEGATIVE PROMPT must be the final section; ${boundary.heading} follows at line ${boundary.line}.`)
     }
   }

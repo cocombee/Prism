@@ -87,7 +87,10 @@ const api: PrismAPI = {
     relinkMissing: () => ipcRenderer.invoke('assets:relink-missing'),
   },
   assistant: {
-    rewrite: (provider, text, instruction, model) => ipcRenderer.invoke('assistant:rewrite', provider, text, instruction, model),
+    connection: provider => ipcRenderer.invoke('assistant:connection', provider),
+    configure: (provider, mode, signIn) => ipcRenderer.invoke('assistant:configure', provider, mode, signIn),
+    cancel: requestId => ipcRenderer.invoke('assistant:cancel', requestId),
+    rewrite: (provider, text, instruction, model, options) => ipcRenderer.invoke('assistant:rewrite', provider, text, instruction, model, options),
   },
   generation: {
     higgsfieldJobs: () => ipcRenderer.invoke('generation:higgsfield-jobs'),

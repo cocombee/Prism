@@ -9,6 +9,7 @@ import {
   storyboardBatchRewriteInstruction,
   storyboardBatchTargets,
   storyboardDirectorBaselinePolicy,
+  storyboardShotDevelopmentPolicy,
   STORYBOARD_DIRECTOR_BASELINE_IDS,
   storyboardRewriteInstruction,
   storyboardSemanticTaggingPolicy,
@@ -28,6 +29,20 @@ const panels: StoryboardPanel[] = [
   { id: 'two', prompt: `SHOT PRIORITY\n@actor-c stays sharp.\nBEAT 1 — HOLD\nThe camera waits.`, duration: 4, shotSize: 'medium', camera: 'pan-right', transitionToNext: 'hard-cut' },
   { id: 'three', prompt: '@actor-c turns back.', duration: 1, shotSize: 'close-up', camera: 'static', locked: true },
 ]
+
+describe('Style is look/feel context, not shot reference tagging', () => {
+  it('excludes obsolete Style connections from Storyboard context and asset tagging', () => {
+    const board = testNode('board-style', {kind:'storyboard'})
+    const style = testNode('style', {kind:'style-reference',title:'cinematic-naturalism',referenceTag:'@cinematic-naturalism',stylePrompt:'Subtle grain and restrained naturalism.'})
+    const source = 'I walk in the desert, thinking.'
+    const manifest = buildStoryboardConnectedContextManifest(board.id,[board,style],[{id:'style-edge',source:style.id,target:board.id} as Edge],source)
+    expect(manifest.entries).toEqual([])
+    expect(manifest.text).not.toContain('Subtle grain')
+    expect(manifest.text).not.toContain('@cinematic-naturalism')
+    expect(validateStoryboardRewrite(source,source,manifest)).toBe(source)
+    expect(() => validateStoryboardRewrite(source,source+' @cinematic-naturalism',manifest)).toThrow('unconnected tag')
+  })
+})
 
 describe('Storyboard connected context manifest', () => {
   it('excludes unrelated connected Characters from a typed continuity-group Revamp target', () => {
@@ -107,7 +122,7 @@ describe('Storyboard connected context manifest', () => {
 
     const manifest = buildStoryboardConnectedContextManifest('board', nodes, edges, 'The phone waits on the desk while @mara enters.')
 
-    expect(manifest.entries.map((entry) => entry.role)).toEqual(['Character', 'Location', 'Element/Prop', 'Style', 'Image Reference'])
+    expect(manifest.entries.map((entry) => entry.role)).toEqual(['Character', 'Location', 'Element/Prop', 'Image Reference'])
     expect(manifest.text).toContain('CONNECTED CONTEXT MANIFEST')
     expect(manifest.text).toContain('anchor=@mara')
     expect(manifest.text).toContain('role=Image Reference')
@@ -452,6 +467,47 @@ describe('Storyboard canonical Director baseline policy', () => {
   })
 })
 
+describe('Shot development and already-revamped batch targeting', () => {
+  const draft: StoryboardPanel = { id: 'panel-draft-02', prompt: 'i walk on the desert thinking', duration: 5, shotSize: 'close-up', lensMm: 50, camera: 'static' }
+  const developed: StoryboardPanel = { ...draft, id: 'panel-developed-01', prompt: 'Original scene.', originalPrompt: 'Original scene.', revampedPrompt: 'A developed take.', selectedPromptVersion: 'original' }
+  const contexts = new Map([[draft.id, { entries: [], text: '' }], [developed.id, { entries: [], text: '' }]])
+
+  it('supplies full development and preservation rules to both transports', () => {
+    const policy = storyboardShotDevelopmentPolicy()
+    for (const instruction of [storyboardRewriteInstruction([draft], draft.id), storyboardBatchRewriteInstruction([draft], contexts)]) {
+      expect(instruction).toContain(policy)
+      expect(instruction).toContain('Translate an authored feeling such as thinking into observable gaze')
+      expect(instruction).toContain('A short sentence that merely names an action, feeling, or camera label is a draft')
+      expect(instruction).toContain('Preserve every existing semantic @tag exactly')
+      expect(instruction).toContain('Do not otherwise add or alter Character identity, wardrobe, props, Location')
+      expect(instruction).toContain('50mm')
+    }
+    expect(storyboardRewriteTargets([draft])).toEqual([draft])
+  })
+
+  it('accepts the selected lens without allowing invented lenses or prop measurements', () => {
+    const output = 'I walk through the desert, my gaze lowered in thought, held in a static close-up through a 50mm lens.'
+    expect(validateStoryboardRewrite(draft.prompt, output, contexts.get(draft.id), draft, [draft])).toBe(output)
+    expect(() => validateStoryboardRewrite(draft.prompt, output.replace('50mm', '85mm'), contexts.get(draft.id), draft, [draft])).toThrow('Revamp invented prop scale')
+    expect(() => validateStoryboardRewrite(draft.prompt, output + ' A 50mm stone rests nearby.', contexts.get(draft.id), draft, [draft])).toThrow('Revamp invented prop scale')
+    expect(() => validateStoryboardRewrite(draft.prompt, output, contexts.get(draft.id), { ...draft, lensMm: undefined })).toThrow('Revamp invented prop scale')
+  })
+
+  it('skips saved results in All even with Original selected, but permits explicit Shot', () => {
+    const sequence = [developed, draft]
+    expect(storyboardRewriteTargets(sequence)).toEqual([draft])
+    expect(storyboardRewriteTargets(sequence, developed.id)).toEqual([developed])
+    expect(storyboardRewriteTargets([developed])).toEqual([])
+    expect(storyboardRewriteTargets([{ ...draft, revampedPrompt: '  ' }])).toHaveLength(1)
+    expect(storyboardBatchTargets(sequence).context.map(panel => [panel.id, panel.editable])).toEqual([['panel-developed-01', false], ['panel-draft-02', true]])
+    const instruction = storyboardBatchRewriteInstruction(sequence, contexts)
+    expect(instruction).toContain('PANEL ID: panel-developed-01 · READ-ONLY')
+    expect(instruction).toContain('REVAMP ALL TARGET ORDER: panel-draft-02')
+    expect(applyStoryboardBatchResponse(sequence, new Map([['panel-draft-02', 'I walk through the desert, my gaze lowered in thought.']]), contexts).panels[0]).toBe(developed)
+    expect(() => applyStoryboardBatchResponse(sequence, new Map([['panel-developed-01', 'Replacement.'], ['panel-draft-02', 'New take.']]), contexts)).toThrow('Invalid Storyboard batch response.')
+  })
+})
+
 describe('Storyboard assistant rewrite contract', () => {
   it('rejects a Revamp All panel that drops one authored typed continuity value and applies zero mutations', () => {
     const typedPanels: StoryboardPanel[] = [{
@@ -530,7 +586,7 @@ describe('Storyboard assistant rewrite contract', () => {
     expect(instruction).toContain('Do not otherwise add or alter Character identity, wardrobe, props, Location, environment, period, style, lighting, dialogue, voice, audio, music, continuity locks, negative constraints, duration, shot size, or transition metadata')
     expect(instruction).not.toContain('Everything outside visible action and camera movement is frozen byte-for-byte')
     expect(instruction).not.toContain('subject, action, environment, composition, lighting, camera, audio, continuity, and constraints')
-    expect(instruction).toContain('return it byte-for-byte unchanged')
+    expect(instruction).toContain('Return it byte-for-byte unchanged only when that detail is already present')
     expect(instruction).toContain('Return only the revised current panel prompt')
     expect(instruction).toContain('Transition metadata is immutable and compiler-owned')
   })

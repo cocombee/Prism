@@ -24,6 +24,7 @@ describe('mounted Video prompt ownership control', () => {
       import { createRoot } from 'react-dom/client'
       import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
       import { NodeCard, NodeRuntimeContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/NodeCardNext.tsx'))}
+    import { ProviderAvailabilityContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/ProviderAvailabilityContext.tsx'))}
 
       const autoPrompt = 'LOCKED PROVIDER PROMPT\\n\\nPreserve exact connected Storyboard timing, identity, camera, and continuity.'
       const initialData = { kind:'video-generator', title:'Video Generator', videoEngine:'bytedance/seedance-2.5/reference-to-video', promptMode:'manual', manualPromptDraft:'User draft', manualPromptSeeded:true, prompt:'User draft', runState:'idle', aspectRatio:'16:9', duration:4, resolution:'480p', quantity:1, generateAudio:true }
@@ -43,7 +44,7 @@ describe('mounted Video prompt ownership control', () => {
           characterLibrary: [], storyboardLibrary: [], semanticLibraries: {element:[],location:[],wardrobe:[],'style-reference':[]},
         }, { get(target,property) { return property in target ? target[property] : noop } }), [data])
         const nodes=[{id:'video',type:'studio',position:{x:0,y:0},style:{width:315},data}]
-        return <section data-video-case style={{width:315,height:700}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard}} defaultViewport={{x:0,y:0,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></section>
+        return <section data-video-case style={{width:315,height:700}}><ProviderAvailabilityContext.Provider value={{mediaConnected:{fal:true,byteplus:true,openai:true,google:true,higgsfield:true,elevenlabs:true,fish:true},promptConnected:{openai:true,anthropic:true,google:true,omniroute:true,deepseek:true,moonshot:true}}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard}} defaultViewport={{x:0,y:0,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></ProviderAvailabilityContext.Provider></section>
       }
       const rect = element => { const value=element.getBoundingClientRect(); return {left:value.left,right:value.right,top:value.top,bottom:value.bottom,width:value.width,height:value.height,cx:value.left+value.width/2,cy:value.top+value.height/2} }
       window.__ownership = {
@@ -54,7 +55,7 @@ describe('mounted Video prompt ownership control', () => {
       }
       createRoot(document.getElementById('root')).render(<Harness/>)
     `)
-    buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader:{'.png':'dataurl'}, logLevel:'silent' })
+    buildSync({ entryPoints:[entry], outfile:bundle, bundle:true, format:'iife', platform:'browser', target:'chrome120', nodePaths:[resolve(process.cwd(),'node_modules')], jsx:'automatic', loader: { '.svg': 'dataurl','.png':'dataurl'}, logLevel:'silent' })
     const styles = resolve(process.cwd(), 'src/renderer/src/styles-next.css')
     const flowStyles = resolve(process.cwd(), 'node_modules/@xyflow/react/dist/style.css')
     writeFileSync(html, `<!doctype html><html><head><link rel="stylesheet" href="file://${flowStyles}"><link rel="stylesheet" href="file://${styles}"><style>*{box-sizing:border-box}html,body,#root{margin:0;width:100%;height:100%}body{background:#111;color:#ddd}</style></head><body><div id="root"></div><script src="./renderer.js"></script></body></html>`)

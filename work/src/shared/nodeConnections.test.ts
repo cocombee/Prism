@@ -146,7 +146,7 @@ describe('typed node connections', () => {
     expect(outputSignalFor({ kind: 'upload', outputType: 'audio' })).toBe('audio')
     expect(outputSignalFor({ kind: 'output', outputType: 'video' })).toBe('video')
     expect(outputSignalFor({ kind: 'upload', outputType: undefined })).toBe('mixed')
-    expect(compatibleNodeTargets({ kind: 'video-generator', outputType: 'video' })).toEqual(['video-generator', 'list', 'gallery', 'router'])
+    expect(compatibleNodeTargets({ kind: 'video-generator', outputType: 'video' })).toEqual(['video-generator', 'list', 'gallery', 'storyboard', 'router'])
     expect(outputSignalFor({ kind: 'upscaler', upscalerModel: 'realesrgan-video' })).toBe('video')
     expect(compatibleTargetHandle({ kind: 'music-generator', outputType: 'audio' }, 'list')).toBe('input')
   })
@@ -186,10 +186,10 @@ describe('typed node connections', () => {
     expect(compatibleNodeSources(video, 'storyboard-in')).not.toContain('list')
   })
 
-  it('routes semantic styles into the dedicated storyboard style port', () => {
+  it('keeps Style on rendering owners and excludes Storyboard', () => {
     const style = { kind: 'style-reference' as const, outputType: 'image' as const }
-    expect(compatibleNodeTargets(style)).toContain('storyboard')
-    expect(compatibleTargetHandle(style, 'storyboard')).toBe('style-in')
+    expect(compatibleNodeTargets(style)).not.toContain('storyboard')
+    expect(compatibleTargetHandle(style, 'storyboard')).toBe('')
     expect(compatibleNodeTargets(style)).not.toContain('storyboard-asset')
     expect(compatibleTargetHandle(style, 'image-generator')).toBe('style-in')
     expect(compatibleTargetHandle(style, 'video-generator')).toBe('style-in')
@@ -261,7 +261,7 @@ describe('typed node connections', () => {
 
   it('routes audio only to typed audio consumers and rejects generic visual sockets', () => {
     const audio = { kind: 'music-generator' as const, outputType: 'audio' as const }
-    expect(compatibleNodeTargets(audio)).toEqual(['video-generator', 'list', 'gallery', 'router'])
+    expect(compatibleNodeTargets(audio)).toEqual(['video-generator', 'list', 'gallery', 'storyboard', 'router'])
     expect(compatibleTargetHandle(audio, 'video-generator')).toBe('audio-reference-in')
     expect(connectionCompatibilityError(audio, { kind: 'video-generator', videoEngine: 'bytedance/seedance-2.0/reference-to-video' }, 'media-out', 'audio-reference-in')).toBeNull()
     expect(connectionCompatibilityError(audio, { kind: 'video-generator', videoEngine: 'bytedance/seedance-2.0/reference-to-video' }, 'media-out', 'image-in')).toContain('Audio can connect only')

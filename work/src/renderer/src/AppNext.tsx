@@ -1,3 +1,6 @@
+import { directStoryboardStyles, detachStoryboardStyleNodes } from '../../shared/storyboardStyleRouting'
+import { PromptRewriteScope } from './promptRewriteScope'
+import { SUBSCRIPTION_PROVIDERS, type PromptConnectionView, type PromptBillingMode } from '../../shared/promptConnection'
 import { createStoryboardPanel } from '../../shared/storyboardPanels'
 import { ProviderAvailabilityContext } from './ProviderAvailabilityContext'
 import { higgsfieldJobReadinessFailures, type HiggsfieldJobsView, type HiggsfieldJobCommand } from '../../shared/higgsfieldJobs'
@@ -9,7 +12,7 @@ import { HiggsfieldContractStore } from './higgsfieldContractStore'
 import { workflowSaveOwner } from '../../shared/workflowSaveOwnership'
 import { createWorkflowSaveCoordinator, type WorkflowSaveSnapshot } from './workflowSaveCoordinator'
 import { loadProjectActivationState } from './projectActivationState'
-import { fishAvailabilityError, fishSampleRateOptions, fishBitrateOptions } from '../../shared/fishAudio'
+import { FISH_DEFAULT_MODEL, fishAvailabilityError, fishSampleRateOptions, fishBitrateOptions } from '../../shared/fishAudio'
 import { isElevenDialogue } from '../../shared/elevenDialogue'
 import { generationCallCount, generationResultMedia, nativeVideoQuantityAvailable, runNativeVideoBatch } from '../../shared/generationResultMedia'
 import { FalContractStore } from './falContractStore'
@@ -186,7 +189,7 @@ import { applyLogicalAssetRenameToNode, assetDisplayName, isReusableAsset, media
 import { activeGeneratedResult, generatedResultName } from '../../shared/generatedMedia'
 import { pruneAssetDeployments } from '../../shared/assetDeployment'
 import { characterAssetsForMode, filterAssetsByFinalOrigin, groupSemanticAssets, hydrateSemanticAssetViews, semanticAssetCollectionKey, withoutPromotedSourceDuplicates, type SemanticAssetCollection } from '../../shared/semanticAssetCollections'
-import { alignedNodePositions, centeredNodePosition, centeredStoryboardPairPositions, duplicateNodePosition, nodeLayoutSize, normalizeLinkedNodeSpacing, normalizeStandardNodeWidths, STANDARD_NODE_WIDTH, type NodeAlignment } from '../../shared/canvasLayout'
+import { alignedNodePositions, centeredNodePosition, duplicateNodePosition, nodeLayoutSize, normalizeStandardNodeWidths, STANDARD_NODE_WIDTH, type NodeAlignment } from '../../shared/canvasLayout'
 import { expandGroupedPositionChanges, toggleNodeGroup } from '../../shared/canvasGrouping'
 import { assignElementView, ELEMENT_ANCHOR_VIEW, ELEMENT_VIEWS, elementCompletionPrompt, elementViewAssets, missingElementViews } from '../../shared/elementViews'
 import { generatorBatchType, isBatchGenerator, listItemsSignature, synchronizeListBatchItems } from '../../shared/listBatch'
@@ -552,17 +555,17 @@ function initialData(kind: NodeKind): StudioNodeData {
     voiceEngine: kind === 'voiceover' ? 'elevenlabs-direct' : undefined,
     audioProvider: kind === 'sound-effects' ? 'elevenlabs' : undefined,
     languageCode: undefined,
-    fishModel: kind === 'voiceover' ? 's2-pro' : undefined,
+    fishModel: kind === 'voiceover' ? FISH_DEFAULT_MODEL : undefined,
     fishTemperature: kind === 'voiceover' ? 0.7 : undefined,
     fishTopP: kind === 'voiceover' ? 0.7 : undefined,
     fishVolume: kind === 'voiceover' ? 0 : undefined,
     fishNormalizeLoudness: kind === 'voiceover' ? true : undefined,
     fishNormalize: kind === 'voiceover' ? true : undefined,
-    fishChunkLength: kind === 'voiceover' ? 200 : undefined,
+    fishChunkLength: kind === 'voiceover' ? 300 : undefined,
     fishFormat: kind === 'voiceover' ? 'mp3' : undefined,
     fishSampleRate: kind === 'voiceover' ? 44100 : undefined,
     fishMp3Bitrate: kind === 'voiceover' ? 128 : undefined,
-    fishOpusBitrate: kind === 'voiceover' ? 48 : undefined,
+    fishOpusBitrate: kind === 'voiceover' ? -1000 : undefined,
     fishLatency: kind === 'voiceover' ? 'normal' : undefined,
     stability: kind === 'voiceover' ? 0.5 : undefined,
     similarityBoost: kind === 'voiceover' ? 0.75 : undefined,
@@ -761,6 +764,9 @@ export function App() {
   const higgsfieldJobOwner = useRef('')
   const [higgsfieldPresetState, setHiggsfieldPresetState] = useState<HiggsfieldPresetView & { current?: () => boolean }>({})
   const [falContracts, setFalContracts] = useState<Record<string, { contract?: FalSchemaContract; error?: string; loading?: boolean; current: () => boolean }>>({})
+  const [promptConnections,setPromptConnections]=useState<Partial<Record<AssistantProvider,PromptConnectionView>>>({})
+  const [promptConnectionRevision,setPromptConnectionRevision]=useState(0)
+  const promptRefreshRevision=useRef(0)
   const [serviceAccounts, setServiceAccounts] = useState<Partial<Record<ServiceProvider, ServiceAccountStatus>>>({})
   const [serviceProfiles, setServiceProfiles] = useState<ServiceProfileRegistry>({ schemaVersion: 1, profiles: [], defaults: {} })
   const [serviceDrafts, setServiceDrafts] = useState<Record<ServiceProvider, string>>(emptyServiceDrafts)
@@ -787,6 +793,42 @@ export function App() {
   const [activePageId, setActivePageId] = useState('')
   const [canvases, setCanvases] = useState<WorkspaceCanvas[]>([])
   const [activeCanvasId, setActiveCanvasId] = useState('')
+
+  const promptGraphRef=useRef({project:'',canvas:'',page:'',nodes:[] as StudioNode[],edges:[] as Edge[]})
+  promptGraphRef.current={project:project?.rootPath || '',canvas:activeCanvasId,page:activePageId,nodes,edges}
+  const promptRewriteScope=useRef<PromptRewriteScope | null>(null)
+  if(!promptRewriteScope.current)promptRewriteScope.current=new PromptRewriteScope(()=>promptGraphRef.current,id=>window.prism.assistant.cancel(id),()=>crypto.randomUUID())
+  useEffect(()=>{promptRewriteScope.current!.invalidate();return()=>{promptRewriteScope.current!.invalidate()}},[project?.rootPath,activeCanvasId,activePageId])
+  useEffect(()=>{
+    const revision=++promptRefreshRevision.current;let active=true
+    for(const {id:provider}of ASSISTANT_PROVIDER_GROUPS)void window.prism.assistant.connection(provider).then(connection=>{
+      if(active&&promptRefreshRevision.current===revision)setPromptConnections(previous=>({...previous,[provider]:connection}))
+    }).catch(()=>undefined)
+    return()=>{active=false}
+  },[project?.id,project?.rootPath,serviceProfiles,serviceConnections,promptConnectionRevision,settingsOpen])
+  const availablePromptModels=useCallback((provider:AssistantProvider)=>{
+    const connection=promptConnections[provider]
+    if(!connection)return []
+    return connection?.mode==='subscription' ? connection.catalog?.models || [] : serviceConnections[provider] ? serviceModels[provider]?.models || [] : []
+  },[promptConnections,serviceConnections,serviceModels])
+  const promptProviderAccount=useCallback((provider:ServiceProvider):ServiceAccountStatus | undefined=>{
+    const connection=promptConnections[provider as AssistantProvider]
+    return connection?.mode==='subscription'?{provider,state:connection.ready?'ready':'unavailable',message:connection.error || connection.label,checkedAt:new Date().toISOString()}:serviceAccounts[provider]
+  },[promptConnections,serviceAccounts])
+  const configurePromptConnection=useCallback(async(provider:AssistantProvider,mode:PromptBillingMode,signIn=false)=>{
+    if(serviceBusy)return;setServiceBusy(true);setServiceError('')
+    const cancelled=new Set(promptRewriteScope.current!.invalidate(provider))
+    if(cancelled.size)setNodes(current=>current.map(node=>cancelled.has(node.id)?{...node,data:{...node.data,runState:'idle',progress:undefined}}:node))
+    const owned=serviceResponseScope.current!.capture(provider)
+    try{const connection=await window.prism.assistant.configure(provider,mode,signIn);if(owned()){setPromptConnections(previous=>({...previous,[provider]:connection}));setPromptConnectionRevision(value=>value+1)}}catch(error){if(owned())setServiceError(error instanceof Error?error.message:'Could not change Revamp connection.')}finally{setServiceBusy(false)}
+  },[serviceBusy,setNodes])
+  const requestPromptRewrite=useCallback(async(nodeId:string,provider:AssistantProvider,text:string,instruction:string,model:string)=>{
+    const request=promptRewriteScope.current!.begin(nodeId,provider)
+    try{const connection=await window.prism.assistant.connection(provider);request.assertCurrent();if(!connection.ready)throw new Error(connection.error || 'Connect this Revamp provider first.');const output=await window.prism.assistant.rewrite(provider,text,instruction,model,{requestId:request.requestId,connectionLease:connection.lease});request.assertCurrent();return{output,canApply:request.canApply}}catch(error){
+      try{request.assertCurrent()}catch(stale){setNodes(current=>!request.canReset()?current:current.map(node=>node.id===nodeId?{...node,data:{...node.data,runState:'idle',progress:undefined}}:node));throw stale}
+      throw error
+    }finally{request.finish()}
+  },[setNodes])
 
   const refreshServiceAccount = useCallback(async (provider: ServiceProvider, ownsOperation: () => boolean) => {
     if (!ownsOperation()) return
@@ -1400,6 +1442,7 @@ export function App() {
         try {
         serviceResponseScope.current!.invalidate()
         serviceAvailabilityStop.current?.()
+        setPromptConnections({})
         setServiceModels({})
         setServiceAccounts({})
         loaded.current = false
@@ -1437,7 +1480,7 @@ export function App() {
           activePageId: document.activePageId || sourcePages[0].id,
           updatedAt: document.updatedAt,
         }]
-        let migratedCanvases = sourceCanvases.map((canvas) => ({ ...canvas, pages: canvas.pages.map((page) => ({ ...page, nodes: recoverInterruptedGenerationNodes(normalizeStandardNodeWidths(normalizeLinkedNodeSpacing(page.nodes.map(migrateLegacyShotNode).map(mergeAssistantIntoPrompt).map(migrateRetiredProductNode).map(migrateGeneratableAssetNode)))) })) }))
+        let migratedCanvases = sourceCanvases.map((canvas) => ({ ...canvas, pages: canvas.pages.map((page) => ({ ...page, nodes: recoverInterruptedGenerationNodes(normalizeStandardNodeWidths(detachStoryboardStyleNodes(page.nodes.map(migrateLegacyShotNode).map(mergeAssistantIntoPrompt).map(migrateRetiredProductNode).map(migrateGeneratableAssetNode)))) })) }))
         const migratedAssetRecords = new Map<string, ImportedAsset>()
         for (const { asset } of assetStatus) {
           if (!isReusableAsset(asset)) continue
@@ -1950,7 +1993,8 @@ export function App() {
     }
   }, [appView, fitView, focusRenderedNode, getNodes, redoCanvas, setEdges, setNodes, undoCanvas, zoomIn, zoomOut])
 
-  const updateNode = useCallback((id: string, patch: Partial<StudioNodeData>) => {
+  const updateNode = useCallback((id: string, patch: Partial<StudioNodeData>, canApply: (current: StudioNode[]) => boolean = () => true) => {
+    if(!canApply(promptGraphRef.current.nodes))return
     const sourceBeforePatch = nodes.find((node) => node.id === id)
     const durationOnly = sourceBeforePatch?.data.kind === 'video-generator'
       && Object.keys(patch).every((key) => key === 'duration' || key === 'autoDuration')
@@ -1976,20 +2020,8 @@ export function App() {
       if (reconciliation.removed.length) setConnectionNotice(reconciliation.removed.map(({ message }) => message).join(' '))
       window.requestAnimationFrame(() => updateNodeInternals(id))
     }
-    const nextStyleData = sourceBeforePatch?.data.kind === 'style-reference' ? { ...sourceBeforePatch.data, ...effectivePatch } : undefined
-    const linkedStoryboard = nextStyleData?.linkedStoryboardId && nodes.find((node) => node.id === nextStyleData.linkedStoryboardId && node.data.kind === 'storyboard')
-    const styleReady = Boolean(nextStyleData && (nextStyleData.stylePresetId || (nextStyleData.stylePrompt || nextStyleData.prompt || '').trim() || (nextStyleData.referenceAssets || []).length))
-    if (linkedStoryboard && styleReady) {
-      setEdges((current) => {
-        const alreadyConnected = current.some((edge) => edge.source === id && edge.target === linkedStoryboard.id && edge.targetHandle === 'style-in')
-        if (alreadyConnected) return current
-        return [
-          ...current.filter((edge) => !(edge.target === linkedStoryboard.id && edge.targetHandle === 'style-in')),
-          { id: crypto.randomUUID(), source: id, sourceHandle: 'media-out', target: linkedStoryboard.id, targetHandle: 'style-in', animated: false, style: { stroke: '#d38cff', strokeWidth: 2 } },
-        ]
-      })
-    }
     setNodes((current) => {
+      if(!canApply(current))return current
       const source = current.find((node) => node.id === id)
       const updatedSourceData = source ? { ...source.data, ...effectivePatch } : undefined
       const styleTargets = source?.data.kind === 'style-reference'
@@ -2171,56 +2203,7 @@ export function App() {
   }, [setNodes, higgsfieldSchema])
 
   useEffect(() => {
-    setNodes((current) => current.map((node) => {
-      if (node.data.kind !== 'storyboard') return node
-      const styleEdge = edges.find((edge) => edge.target === node.id && edge.targetHandle === 'style-in')
-      const styleSource = current.find((candidate) => candidate.id === styleEdge?.source && candidate.data.kind === 'style-reference')
-      const stylePrompt = styleSource?.data.stylePrompt || styleSource?.data.prompt
-      const referenceTag = styleSource?.data.referenceTag
-      if (node.data.stylePrompt === stylePrompt && node.data.referenceTag === referenceTag) return node
-      return { ...node, data: { ...node.data, stylePrompt, referenceTag } }
-    }))
-  }, [edges, setNodes])
-
-
-  useEffect(() => {
-    setNodes((current) => {
-      const storyboardIds = new Set(current.filter((node) => node.data.kind === 'storyboard').map((node) => node.id))
-      const linkedByStyle = new Map(edges
-        .filter((edge) => edge.targetHandle === 'style-in' && storyboardIds.has(edge.target))
-        .map((edge) => [edge.source, edge.target]))
-      const onlyStoryboardId = storyboardIds.size === 1 ? [...storyboardIds][0] : undefined
-      let changed = false
-      const next = current.map((node) => {
-        if (node.data.kind !== 'style-reference') return node
-        const existingIsStoryboard = Boolean(node.data.linkedStoryboardId && storyboardIds.has(node.data.linkedStoryboardId))
-        const linkedStoryboardId = linkedByStyle.get(node.id) || (existingIsStoryboard ? node.data.linkedStoryboardId : onlyStoryboardId)
-        if (node.data.linkedStoryboardId === linkedStoryboardId) return node
-        changed = true
-        return { ...node, data: { ...node.data, linkedStoryboardId } }
-      })
-      return changed ? next : current
-    })
-  }, [edges, setNodes])
-
-  useEffect(() => {
-    const restorable = nodes.filter((node) => node.data.kind === 'style-reference'
-      && node.data.linkedStoryboardId
-      && (node.data.stylePresetId || (node.data.stylePrompt || node.data.prompt || '').trim() || (node.data.referenceAssets || []).length)
-      && nodes.some((candidate) => candidate.id === node.data.linkedStoryboardId && candidate.data.kind === 'storyboard'))
-    if (!restorable.length) return
-    setEdges((current) => {
-      let next = current
-      for (const styleNode of restorable) {
-        const storyboardId = styleNode.data.linkedStoryboardId!
-        if (next.some((edge) => edge.source === styleNode.id && edge.target === storyboardId && edge.targetHandle === 'style-in')) continue
-        next = [
-          ...next.filter((edge) => !(edge.target === storyboardId && edge.targetHandle === 'style-in')),
-          { id: crypto.randomUUID(), source: styleNode.id, sourceHandle: 'media-out', target: storyboardId, targetHandle: 'style-in', animated: false, style: { stroke: '#d38cff', strokeWidth: 2 } },
-        ]
-      }
-      return next
-    })
+    setEdges(current => directStoryboardStyles(nodes, current))
   }, [nodes, setEdges])
 
   const deleteNode = useCallback((id: string) => {
@@ -2628,15 +2611,7 @@ export function App() {
     const visibleCanvasWidth = window.innerWidth - (assetBrowserOpen && appView === 'canvas' ? 378 : 0)
     const visibleCenter = screenToFlowPosition({ x: visibleCanvasWidth / 2, y: 64 + (window.innerHeight - 64) / 2 })
     const position = palettePosition || centeredNodePosition(visibleCenter, kind)
-    if (kind === 'storyboard') {
-      const pair = centeredStoryboardPairPositions(palettePosition || visibleCenter)
-      const styleId = createNode('style-reference', pair.style)
-      const storyboardId = createNode('storyboard', pair.storyboard)
-      updateNode(styleId, { title: 'Creation Style', linkedStoryboardId: storyboardId })
-      setEdges((current) => addEdge({ id: crypto.randomUUID(), source: styleId, sourceHandle: 'media-out', target: storyboardId, targetHandle: 'style-in', animated: false, style: { stroke: '#d38cff', strokeWidth: 2 } }, current))
-    } else {
-      createNode(kind, position)
-    }
+    createNode(kind, position)
     setPaletteOpen(false)
     setPaletteQuery('')
     setPalettePosition(null)
@@ -2761,7 +2736,7 @@ export function App() {
           nodeId = createNode(source.data.kind, position)
           updateNode(nodeId, { ...structuredClone(source.data), groupId: undefined, error: undefined })
           if (source.data.kind === 'storyboard') {
-            const upstreamKinds = new Set<NodeKind>(['character', 'wardrobe', 'element', 'location', 'style-reference'])
+            const upstreamKinds = new Set<NodeKind>(['character', 'wardrobe', 'element', 'location'])
             const incoming = (sourcePage?.edges || []).filter((edge) => edge.target === source.id)
             const clonedSources = new Map<string, string>()
             for (const incomingEdge of incoming) {
@@ -2775,7 +2750,7 @@ export function App() {
               updateNode(dependencyId, {
                 ...structuredClone(dependency.data),
                 groupId: undefined,
-                linkedStoryboardId: dependency.data.kind === 'style-reference' ? nodeId : undefined,
+                linkedStoryboardId: undefined,
                 error: undefined,
               })
             }
@@ -3706,20 +3681,23 @@ export function App() {
     if (!source) return
     const text = localAssetGenerationPrompt(source.data).trim()
     if (!text) { updateNode(nodeId, { error: 'Describe the visual style first.' }); return }
-    const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, serviceModels[provider]?.models || []])) as AssistantCatalogs
+    const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availablePromptModels(provider)])) as AssistantCatalogs
     const selection = resolveAssistantSelection(source.data.assistantProvider, source.data.stylePromptModelId, assistantCatalogs)
     if (!selection) { setSettingsOpen(true); updateNode(nodeId, { error: 'Connect OmniRoute or a direct text provider before building a Style prompt.' }); return }
     const { provider, model } = selection
     const ownsServiceOperation = serviceResponseScope.current!.capture(provider)
     updateNode(nodeId, { runState: 'running', progress: `Building private Style prompt with ${providerDisplayName(provider)}…`, error: undefined })
     try {
-      const output = await window.prism.assistant.rewrite(provider, text, 'Convert the input into one reusable visual-style instruction for image and video generation. Describe only medium, rendering, palette, lighting, texture, lens or finish where relevant. Never add characters, subjects, locations, actions, story events, camera movement, or copyrighted artist and franchise names. Preserve the user intent. Return only the final style instruction.', model)
-      updateNode(nodeId, { prompt: undefined, stylePrompt: output, assistantProvider: provider, stylePromptModelId: model, runState: 'complete', progress: 'Style prompt ready', styleSavedAt: undefined, error: undefined })
+      const rewrite = await requestPromptRewrite(nodeId, provider, text, 'Convert the input into one reusable visual-style instruction for image and video generation. Describe only medium, rendering, palette, lighting, texture, lens or finish where relevant. Never add characters, subjects, locations, actions, story events, camera movement, or copyrighted artist and franchise names. Preserve the user intent. Return only the final style instruction.', model)
+      const output = rewrite.output
+      if (!rewrite.canApply(promptGraphRef.current.nodes)) throw new DOMException('The prompt context changed.','AbortError')
+      updateNode(nodeId,{prompt:undefined,stylePrompt:output,assistantProvider:provider,stylePromptModelId:model,runState:'complete',progress:'Style prompt ready',styleSavedAt:undefined,error:undefined},rewrite.canApply)
     } catch (error) {
+      if(error instanceof DOMException && error.name==='AbortError')return
       updateNode(nodeId, { runState: 'error', progress: undefined, error: error instanceof Error ? error.message : String(error) })
       void refreshServiceAccount(provider, ownsServiceOperation)
     }
-  }, [nodes, refreshServiceAccount, serviceModels, updateNode])
+  }, [nodes, refreshServiceAccount, serviceModels, availablePromptModels, requestPromptRewrite, updateNode])
 
   const saveStylePreset = useCallback(async (nodeId: string, rawName: string) => {
     const source = nodes.find((node) => node.id === nodeId && node.data.kind === 'style-reference')
@@ -3777,7 +3755,7 @@ export function App() {
       updateNode(nodeId, { runState: 'complete', error: undefined, progress: 'Storyboard already complete.' })
       return
     }
-    const rawAssistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, serviceModels[provider]?.models || []])) as AssistantCatalogs
+    const rawAssistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availablePromptModels(provider)])) as AssistantCatalogs
     const assistantCatalogs = assistantCatalogsWithSavedSelection(rawAssistantCatalogs, source.data.assistantProvider, source.data.assistantModelId, Boolean(source.data.assistantProvider && serviceModels[source.data.assistantProvider]?.verified))
     const selection = resolveAssistantSelection(source.data.assistantProvider, source.data.assistantModelId, assistantCatalogs)
     if (!selection) { updateNode(nodeId, { runState: 'error', progress: undefined, error: 'Could not revamp, check connection.' }); return }
@@ -3786,14 +3764,21 @@ export function App() {
     try {
       updateNode(nodeId, { runState: 'running', progress: `Revamping ${targets.length} panel${targets.length === 1 ? '' : 's'}`, error: undefined })
       const connectedContexts = new Map(activePanels.map((panel) => [panel.id, buildStoryboardConnectedContextManifest(nodeId, nodes, edges, panel.prompt, panel)]))
+      let canApply:(current:StudioNode[])=>boolean=()=>false
       let rewritten: Map<string, string>
       if (panelId) {
         const target = targets[0]
         const connectedContext = connectedContexts.get(target.id)!
-        const result = await window.prism.assistant.rewrite(provider, target.prompt, storyboardRewriteInstruction(activePanels, target.id, connectedContext.text), model)
+        const rewrite = await requestPromptRewrite(nodeId, provider, target.prompt, storyboardRewriteInstruction(activePanels, target.id, connectedContext.text), model)
+        canApply=rewrite.canApply
+        const result = rewrite.output
+        if (!rewrite.canApply(promptGraphRef.current.nodes)) throw new DOMException('The prompt context changed.','AbortError')
         rewritten = new Map([[target.id, validateStoryboardRewrite(target.prompt, result, connectedContext, target, activePanels)]])
       } else {
-        const result = await window.prism.assistant.rewrite(provider, activePanels.map((panel) => panel.prompt).join('\n\n'), storyboardBatchRewriteInstruction(activePanels, connectedContexts), model)
+        const rewrite = await requestPromptRewrite(nodeId, provider, activePanels.map((panel) => panel.prompt).join('\n\n'), storyboardBatchRewriteInstruction(activePanels, connectedContexts), model)
+        canApply=rewrite.canApply
+        const result = rewrite.output
+        if (!rewrite.canApply(promptGraphRef.current.nodes)) throw new DOMException('The prompt context changed.','AbortError')
         rewritten = parseStoryboardBatchResponse(result, targets.map((panel) => panel.id))
       }
       const outcome = panelId
@@ -3802,7 +3787,7 @@ export function App() {
       const successful = applySuccessfulStoryboardRevamps(panels, new Map(outcome.panels
         .filter((panel, index) => panel.prompt !== activePanels[index].prompt)
         .map((panel) => [panel.id, panel.prompt])))
-      setNodes((current) => current.map((node) => node.id !== nodeId ? node : ({
+      setNodes((current) => !canApply(current) ? current : current.map((node) => node.id !== nodeId ? node : ({
         ...node,
         data: {
           ...node.data,
@@ -3818,32 +3803,25 @@ export function App() {
         },
       })))
     } catch (error) {
+      if(error instanceof DOMException && error.name==='AbortError')return
       updateNode(nodeId, { runState: 'error', progress: undefined, error: 'Could not revamp, check connection.' })
     } finally {
       storyboardRewriteInFlight.current.delete(nodeId)
     }
-  }, [edges, nodes, serviceModels, setNodes, updateNode])
+  }, [edges, nodes, serviceModels, availablePromptModels, requestPromptRewrite, setNodes, updateNode])
 
-  const connectStyleNode = useCallback((storyboardId: string, styleNodeId: string) => {
-    const previousStyleEdge = edges.find((edge) => edge.target === storyboardId && edge.targetHandle === 'style-in')
-    const previousStyle = nodes.find((node) => node.id === previousStyleEdge?.source)
-    const styleEdge: Edge = { id: crypto.randomUUID(), source: styleNodeId, sourceHandle: 'media-out', target: storyboardId, targetHandle: 'style-in', animated: false, style: { stroke: '#d38cff', strokeWidth: 2 } }
-    setEdges((current) => [...current.filter((edge) => !(edge.target === storyboardId && edge.targetHandle === 'style-in')), styleEdge])
-    setNodes((current) => current.map((node) => node.id === styleNodeId
-      ? { ...node, data: { ...node.data, linkedStoryboardId: storyboardId } }
-      : node.id === previousStyle?.id && previousStyle.id !== styleNodeId
-        ? { ...node, data: { ...node.data, linkedStoryboardId: undefined } }
-        : node))
-    if (previousStyle && previousStyle.id !== styleNodeId && previousStyle.data.kind === 'style-reference' && !previousStyle.data.stylePrompt && !previousStyle.data.prompt && !(previousStyle.data.referenceAssets || []).length) {
-      setNodes((current) => current.filter((node) => node.id !== previousStyle.id))
-    }
-    updateNode(storyboardId, { error: undefined })
+  const connectStyleNode = useCallback((targetId: string, styleNodeId: string) => {
+    const target = nodes.find(node => node.id === targetId)
+    if (target?.data.kind !== 'video-generator') return
+    const styleEdge: Edge = { id: crypto.randomUUID(), source: styleNodeId, sourceHandle: 'media-out', target: targetId, targetHandle: 'style-in', animated: false, style: { stroke: '#d38cff', strokeWidth: 2 } }
+    setEdges(current => [...current.filter(edge => !(edge.target === targetId && edge.targetHandle === 'style-in')), styleEdge])
+    updateNode(targetId, { error: undefined })
     setStyleChooserNodeId(null)
-  }, [edges, nodes, setEdges, setNodes, updateNode])
+  }, [nodes, setEdges, updateNode])
 
-  const styleNodeForStoryboard = useCallback((storyboardId: string) => {
+  const styleNodeForGenerator = useCallback((storyboardId: string) => {
     const storyboard = nodes.find((node) => node.id === storyboardId)
-    if (!storyboard) return null
+    if (storyboard?.data.kind !== 'video-generator') return null
     const existingEdge = edges.find((edge) => edge.target === storyboardId && edge.targetHandle === 'style-in')
     const existingStyle = nodes.find((node) => node.id === existingEdge?.source && node.data.kind === 'style-reference')
     const styleId = existingStyle?.id || createNode('style-reference', { x: storyboard.position.x - 370, y: storyboard.position.y + 50 })
@@ -3851,16 +3829,16 @@ export function App() {
     return styleId
   }, [connectStyleNode, createNode, edges, nodes])
 
-  const openCustomStyleForStoryboard = useCallback((storyboardId: string) => {
-    const styleId = styleNodeForStoryboard(storyboardId)
+  const openCustomStyleForGenerator = useCallback((storyboardId: string) => {
+    const styleId = styleNodeForGenerator(storyboardId)
     if (!styleId) return
     updateNode(styleId, { styleEditorOpen: true })
     setNodes((current) => current.map((node) => ({ ...node, selected: node.id === styleId })))
     setStyleChooserNodeId(null)
-  }, [setNodes, styleNodeForStoryboard, updateNode])
+  }, [setNodes, styleNodeForGenerator, updateNode])
 
-  const applyPresetStyleToStoryboard = useCallback((storyboardId: string, preset: (typeof STYLE_PRESETS)[number]) => {
-    const styleId = styleNodeForStoryboard(storyboardId)
+  const applyPresetStyleToGenerator = useCallback((storyboardId: string, preset: (typeof STYLE_PRESETS)[number]) => {
+    const styleId = styleNodeForGenerator(storyboardId)
     if (!styleId) return
     updateNode(styleId, {
       title: preset.title,
@@ -3873,7 +3851,7 @@ export function App() {
       styleEditorOpen: false,
     })
     connectStyleNode(storyboardId, styleId)
-  }, [connectStyleNode, styleNodeForStoryboard, updateNode])
+  }, [connectStyleNode, styleNodeForGenerator, updateNode])
 
   const addPresetStyleToCanvas = useCallback((preset: (typeof STYLE_PRESETS)[number]) => {
     const styleId = createNode('style-reference')
@@ -4471,6 +4449,7 @@ export function App() {
   }, [activeCanvasId, activePageId, commitOriginGraph, graphAtOrigin, patchOriginNode])
 
   const stopNode = useCallback(async (id: string) => {
+    if(promptRewriteScope.current!.cancel(id)){updateNode(id,{runState:'idle',progress:undefined,error:undefined});return}
     const token = nativeVideoBatchTokens.current.get(id)
     if (token) token.cancelled = true
     await window.prism.generation.cancel(id)
@@ -5941,20 +5920,24 @@ export function App() {
     const incoming = edges.find((edge) => edge.target === nodeId && (edge.targetHandle === 'prompt' || edge.targetHandle === 'text-in'))
     const source = nodes.find((candidate) => candidate.id === incoming?.source)
     const text = node.data.prompt || source?.data.assistantOutput || source?.data.prompt || ''
-    const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availableModels(provider)])) as AssistantCatalogs
+    const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availablePromptModels(provider)])) as AssistantCatalogs
     const selection = resolveAssistantSelection(node.data.assistantProvider, node.data.assistantModelId, assistantCatalogs)
     if (!selection) { updateNode(nodeId, { error: 'Connect OmniRoute or a direct text provider and refresh its available models first.' }); return }
     const { provider, model } = selection
     updateNode(nodeId, { runState: 'running', progress: `Rewriting with ${model}…`, error: undefined })
     try {
-      const output = await window.prism.assistant.rewrite(provider, text, 'Rewrite this creative prompt to be clearer, more visual, production-ready, and faithful to the original intent.', model)
-      updateNode(nodeId, node.data.kind === 'prompt'
+      const rewrite = await requestPromptRewrite(nodeId, provider, text, 'Rewrite this creative prompt to be clearer, more visual, production-ready, and faithful to the original intent.', model)
+      const output = rewrite.output
+      if (!rewrite.canApply(promptGraphRef.current.nodes)) throw new DOMException('The prompt context changed.','AbortError')
+      const patch:Partial<StudioNode['data']> = node.data.kind === 'prompt'
         ? { prompt: output, assistantOutput: undefined, runState: 'complete', progress: 'Prompt enhanced', assistantProvider: provider, assistantModelId: model }
-        : { assistantOutput: output, runState: 'complete', progress: 'Prompt enhanced', assistantProvider: provider, assistantModelId: model })
+        : { assistantOutput: output, runState: 'complete', progress: 'Prompt enhanced', assistantProvider: provider, assistantModelId: model }
+      updateNode(nodeId,patch,rewrite.canApply)
     } catch (error) {
+      if(error instanceof DOMException && error.name==='AbortError')return
       updateNode(nodeId, { runState: 'error', error: error instanceof Error ? error.message : String(error) })
     }
-  }, [availableModels, edges, nodes, updateNode])
+  }, [availablePromptModels, requestPromptRewrite, edges, nodes, updateNode])
 
   const nodeMediaLinkState = useCallback((nodeId: string) => {
     const node = nodes.find((candidate) => candidate.id === nodeId)
@@ -6035,6 +6018,8 @@ export function App() {
     openStyleChooser: setStyleChooserNodeId,
     rewriteStoryboardPanel,
     availableModels,
+    availablePromptModels,
+    promptProviderAccount,
     serviceAvailability,
     modelAvailabilityVerified,
     runAssistantNode,
@@ -6054,7 +6039,7 @@ export function App() {
     saveStoryboard,
     listBatchState,
     adjustListBatchQuantity,
-  }), [falSchema, higgsfieldSchema, loadHiggsfieldContract, selectFalModel, selectHiggsfieldModel, higgsfieldPresets, refreshHiggsfieldPresets, adjustListBatchQuantity, adjustVoiceoverQuantity, availableModels, availablePromptTags, buildStylePrompt, characterLibrary, chooseAssetBatch, commitSemanticAssetResult, completeCharacterSet, completeElementSet, connectPromptTags, connectedInputMedia, connectedInputRules, connectedReferenceTags, connectedStoryboardVideo, connectedStoryboardVideoFamily, copyGeneratedMedia, copyNodeLink, deleteNode, deleteReusableAsset, duplicateNode, estimateNode, exportReusableAsset, focusNode, generatedMediaFavorite, importAsset, importCanvasAssetIntoView, importDroppedAssets, importStoryboardPanel, inspectAssetBatch, inspectPort, listBatchState, modelAvailabilityVerified, nodeMediaLinkState, openGeneratedMedia, openInputQuickConnect, openProviderConnections, openQuickConnect, providerAccount, relinkAsset, renameNodeAsset, resetManualPrompt, revealGeneratedMedia, rewriteStoryboardPanel, runAssistantNode, runFromNode, runNode, runReadiness, serviceAvailability, mediaProviderAvailable, saveAssetBatchRow, saveCharacterAsset, saveSemanticAsset, saveStoryboard, saveStylePreset, selectCharacter, selectSemanticAsset, semanticAvailabilityForData, semanticLibraries, serviceConnections, setGeneratedMediaFavorite, setInputFidelity, setReusableFavorite, setVideoPromptMode, stopNode, trashGeneratedMedia, updateNode, updatePrompt, videoPromptState])
+  }), [falSchema, higgsfieldSchema, loadHiggsfieldContract, selectFalModel, selectHiggsfieldModel, higgsfieldPresets, refreshHiggsfieldPresets, adjustListBatchQuantity, adjustVoiceoverQuantity, availableModels, availablePromptModels, promptProviderAccount, availablePromptTags, buildStylePrompt, characterLibrary, chooseAssetBatch, commitSemanticAssetResult, completeCharacterSet, completeElementSet, connectPromptTags, connectedInputMedia, connectedInputRules, connectedReferenceTags, connectedStoryboardVideo, connectedStoryboardVideoFamily, copyGeneratedMedia, copyNodeLink, deleteNode, deleteReusableAsset, duplicateNode, estimateNode, exportReusableAsset, focusNode, generatedMediaFavorite, importAsset, importCanvasAssetIntoView, importDroppedAssets, importStoryboardPanel, inspectAssetBatch, inspectPort, listBatchState, modelAvailabilityVerified, nodeMediaLinkState, openGeneratedMedia, openInputQuickConnect, openProviderConnections, openQuickConnect, providerAccount, relinkAsset, renameNodeAsset, resetManualPrompt, revealGeneratedMedia, rewriteStoryboardPanel, runAssistantNode, runFromNode, runNode, runReadiness, serviceAvailability, mediaProviderAvailable, saveAssetBatchRow, saveCharacterAsset, saveSemanticAsset, saveStoryboard, saveStylePreset, selectCharacter, selectSemanticAsset, semanticAvailabilityForData, semanticLibraries, serviceConnections, setGeneratedMediaFavorite, setInputFidelity, setReusableFavorite, setVideoPromptMode, stopNode, trashGeneratedMedia, updateNode, updatePrompt, videoPromptState])
   const inspectorNode = inspectorNodeId ? nodes.find((node) => node.id === inspectorNodeId) : undefined
   const inspectorPromptTags = inspectorNode ? [...new Set(connectedInputRules(inspectorNode.id).flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))] : []
   const inspectorAvailablePromptTags = inspectorNode ? availablePromptTags(inspectorNode.id) : inspectorPromptTags
@@ -6128,7 +6113,7 @@ export function App() {
   const inspectedConnections = portInspector
     ? edges.filter((edge) => edge.source === portInspector.nodeId && edge.sourceHandle === portInspector.handleId)
     : []
-  const connectedServiceCount = Object.values(serviceConnections).filter(Boolean).length
+  const connectedServiceCount = SERVICE_CATALOG.filter(service=>serviceConnections[service.id] || promptConnections[service.id as AssistantProvider]?.mode==='subscription' && promptConnections[service.id as AssistantProvider]?.ready).length
   const contextNode = contextMenu?.kind === 'node' ? nodes.find((node) => node.id === contextMenu.nodeId) : undefined
   const contextAsset = contextMenu?.kind === 'asset' ? assets.find((asset) => asset.id === contextMenu.assetId) : contextNode ? assets.find((asset) => {
     const paths = [contextNode.data.assetPath, contextNode.data.outputPath, ...(contextNode.data.referenceAssets || []).map((item) => item.path), ...(contextNode.data.listItems || []).map((item) => item.asset?.path)]
@@ -6215,7 +6200,7 @@ export function App() {
   )
 
   return (
-    <ProviderAvailabilityContext.Provider value={{ mediaConnected: serviceConnections, promptConnected: serviceConnections }}>
+    <ProviderAvailabilityContext.Provider value={{ mediaConnected: serviceConnections, promptConnected: {...serviceConnections,...Object.fromEntries(SUBSCRIPTION_PROVIDERS.filter(provider=>promptConnections[provider]?.mode==='subscription').map(provider=>[provider,Boolean(promptConnections[provider]?.ready)]))} }}>
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
@@ -6572,16 +6557,16 @@ export function App() {
                 styleChooserDrag.current = null
                 event.currentTarget.releasePointerCapture(event.pointerId)
               }}
-            ><span><Palette size={14} /></span><div><strong>Style Asset</strong><small>Reusable style connected to every panel</small></div><button aria-label="Close Style Asset" onClick={() => setStyleChooserNodeId(null)}><X size={14} /></button></header>
+            ><span><Palette size={14} /></span><div><strong>Style Asset</strong><small>Look and feel connected to this generator</small></div><button aria-label="Close Style Asset" onClick={() => setStyleChooserNodeId(null)}><X size={14} /></button></header>
             <div className="style-source-library-head"><strong>Style Library</strong><small>Swipe to choose</small></div>
             <div ref={styleChooserRailRef} className="style-source-library nowheel" aria-label="Style Library" onWheel={(event) => { event.stopPropagation(); event.currentTarget.scrollBy({ left: Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY, behavior: 'smooth' }) }} onPointerDown={(event) => { styleChooserRailDidDrag.current = false; styleChooserRailDrag.current = { pointerId: event.pointerId, startX: event.clientX, scrollLeft: event.currentTarget.scrollLeft } }} onPointerMove={(event) => { const drag = styleChooserRailDrag.current; if (!drag || drag.pointerId !== event.pointerId) return; const distance = event.clientX - drag.startX; if (Math.abs(distance) > 3) { styleChooserRailDidDrag.current = true; styleChooserRailLastDragAt.current = Date.now(); if (!event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId) }; event.currentTarget.scrollLeft = drag.scrollLeft - distance }} onPointerUp={(event) => { styleChooserRailDrag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }} onPointerCancel={() => { styleChooserRailDrag.current = null }}>
               {availableStyleNodes.map((node) => {
                 const thumbnail = node.data.referenceAssets?.[0]?.url || node.data.assetUrl || node.data.outputUrl
                 return <button key={node.id} title={`Connect ${node.data.title}`} onClick={() => { if (Date.now() - styleChooserRailLastDragAt.current < 250) return; connectStyleNode(styleChooserNodeId, node.id) }}>{thumbnail ? <img src={thumbnail} alt="" loading="lazy" decoding="async" /> : <span><Palette size={17} /></span>}<strong>{node.data.title || 'Untitled Style'}</strong><small>{node.data.referenceTag || node.data.stylePrompt || node.data.prompt || 'Prompt Style'}</small></button>
               })}
-              {STYLE_PRESETS.map((preset) => <button key={preset.id} title={`Use ${preset.title}`} onClick={() => { if (Date.now() - styleChooserRailLastDragAt.current < 250) return; applyPresetStyleToStoryboard(styleChooserNodeId, preset) }}><span style={{ backgroundImage: `url(${preset.thumbnail})`, backgroundPosition: preset.focalPosition, backgroundSize: 'cover' }} /><strong>{preset.title}</strong><small>Built-in Style</small></button>)}
+              {STYLE_PRESETS.map((preset) => <button key={preset.id} title={`Use ${preset.title}`} onClick={() => { if (Date.now() - styleChooserRailLastDragAt.current < 250) return; applyPresetStyleToGenerator(styleChooserNodeId, preset) }}><span style={{ backgroundImage: `url(${preset.thumbnail})`, backgroundPosition: preset.focalPosition, backgroundSize: 'cover' }} /><strong>{preset.title}</strong><small>Built-in Style</small></button>)}
             </div>
-            <button className="style-source-create" onClick={() => openCustomStyleForStoryboard(styleChooserNodeId)}><Plus size={13} />Create Style</button>
+            <button className="style-source-create" onClick={() => openCustomStyleForGenerator(styleChooserNodeId)}><Plus size={13} />Create Style</button>
           </section>
         )}
 
@@ -6842,8 +6827,8 @@ export function App() {
               <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish audio format" value={inspectorNode.data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => updateNode(inspectorNode.id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label>
               <label><span>Sample rate</span><SimpleMenuSelect ariaLabel="Fish sample rate" value={inspectorNode.data.fishSampleRate === undefined ? '@default' : String(inspectorNode.data.fishSampleRate)} options={fishSampleRateOptions(inspectorNode.data.fishFormat, inspectorNode.data.fishSampleRate)} onChange={(value) => updateNode(inspectorNode.id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label>
               {(inspectorNode.data.fishFormat || 'mp3') === 'mp3' && <label><span>MP3 bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 bitrate" value={String(inspectorNode.data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', inspectorNode.data.fishMp3Bitrate ?? 128)} onChange={(value) => updateNode(inspectorNode.id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label>}
-              {inspectorNode.data.fishFormat === 'opus' && <label><span>Opus bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus bitrate" value={String(inspectorNode.data.fishOpusBitrate ?? 48)} options={fishBitrateOptions('opus', inspectorNode.data.fishOpusBitrate ?? 48)} onChange={(value) => updateNode(inspectorNode.id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label>}
-              <label><span>Chunk length</span><input type="number" min="100" max="300" value={inspectorNode.data.fishChunkLength ?? 200} onChange={(event) => updateNode(inspectorNode.id, { fishChunkLength: Number(event.target.value) })} /></label>
+              {inspectorNode.data.fishFormat === 'opus' && <label><span>Opus bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus bitrate" value={String(inspectorNode.data.fishOpusBitrate ?? -1000)} options={fishBitrateOptions('opus', inspectorNode.data.fishOpusBitrate ?? -1000)} onChange={(value) => updateNode(inspectorNode.id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label>}
+              <label><span>Chunk length</span><input type="number" min="100" max="300" value={inspectorNode.data.fishChunkLength ?? 300} onChange={(event) => updateNode(inspectorNode.id, { fishChunkLength: Number(event.target.value) })} /></label>
               <label><span>Latency</span><SimpleMenuSelect ariaLabel="Latency" value={inspectorNode.data.fishLatency || 'normal'} options={[...FISH_LATENCY_OPTIONS]} onChange={(value) => updateNode(inspectorNode.id, { fishLatency: value as StudioNodeData['fishLatency'] })} /></label>
               <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalize !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalize: event.target.checked })} /><span>Normalize text</span></label>
               {inspectorNode.data.fishModel !== 's1' && <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalizeLoudness !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalizeLoudness: event.target.checked })} /><span>Normalize loudness</span></label>}
@@ -7061,6 +7046,7 @@ export function App() {
                   <p>{service.description}</p>
                   {serviceModels[service.id]?.catalogError && <p role="status" title={serviceModels[service.id]?.catalogError}>{serviceModels[service.id]?.catalogStale ? 'Model catalog unavailable' : 'Model catalog incomplete'} · saved choices preserved</p>}
                   <div className="service-capabilities">{service.capabilities.map((capability) => <span key={capability}>{capability}</span>)}</div>
+                  {promptConnections[service.id as AssistantProvider]?.mode==='subscription' && <p role="status">{promptConnections[service.id as AssistantProvider]?.ready ? `${promptConnections[service.id as AssistantProvider]?.label} · Revamp connected` : promptConnections[service.id as AssistantProvider]?.error || 'Subscription connection unavailable'}</p>}
                   {service.id === 'omniroute' ? <footer><span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span><button className="connect-service" disabled={serviceBusy} onClick={() => void refreshOmniRoute()}><Route size={13} />{connected ? 'Refresh Models' : 'Check Local Gateway'}</button></footer> : showAccountManager ? <div className="fal-account-manager">
                     <div className="fal-account-manager-head"><button aria-label={`Collapse ${service.name} Accounts`} onClick={() => { setActiveService(null); setSignInProfileId(null) }}><X size={14} /></button></div>
                     <div className="fal-account-list">
@@ -7086,8 +7072,8 @@ export function App() {
                     </div>
                   </div> : null}
                   {service.id !== 'omniroute' && <footer>
-                    <span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span>
-                    {editingKey ? <>
+                    {SUBSCRIPTION_PROVIDERS.includes(service.id as any) ? <SimpleMenuSelect className="service-connection-method" menuClassName="service-connection-menu" defaultLabel="Subscription" ariaLabel={`${service.name} Revamp connection`} title="Prompt Revamp billing. Media generation uses its API account." value={promptConnections[service.id as AssistantProvider]?.mode || 'api'} disabled={serviceBusy || !promptConnections[service.id as AssistantProvider]} options={[{value:'api',label:'API'},{value:'subscription',label:'Subscription'}]} onChange={mode=>void configurePromptConnection(service.id as AssistantProvider,mode as PromptBillingMode)} /> : <span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span>}
+                    {promptConnections[service.id as AssistantProvider]?.mode==='subscription' ? <button className="connect-service" disabled={serviceBusy} onClick={()=>void configurePromptConnection(service.id as AssistantProvider,'subscription',!promptConnections[service.id as AssistantProvider]?.ready)}><LogIn size={13} />{promptConnections[service.id as AssistantProvider]?.ready?'Reconnect':'Sign In'}</button> : editingKey ? <>
                       <input className="service-key-input" autoFocus disabled={serviceBusy} type="password" aria-label={`${service.name} API key`} value={serviceDrafts[service.id]} onChange={(event) => setServiceDrafts((current) => ({ ...current, [service.id]: event.target.value }))} placeholder={service.placeholder} autoComplete="off" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); const footer = event.currentTarget.closest('footer'); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); requestAnimationFrame(() => footer?.querySelector<HTMLButtonElement>('button')?.focus()) } else if (event.key === 'Enter' && !serviceBusy && serviceDrafts[service.id].trim().length >= 20) { event.preventDefault(); void saveService(service.id, event.currentTarget.closest('footer')) } }} />
                       <div className="service-key-actions"><button className="service-key-cancel" disabled={serviceBusy} onClick={(event) => { const footer = event.currentTarget.closest('footer'); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); requestAnimationFrame(() => footer?.querySelector<HTMLButtonElement>('button')?.focus()) }}>Cancel</button><button className="service-key-connect" disabled={serviceBusy || serviceDrafts[service.id].trim().length < 20} onClick={(event) => void saveService(service.id, event.currentTarget.closest('footer'))}>{signInProfileId === 'new' ? 'Connect' : 'Save'}</button></div>
                   </> : expanded ? <button className="fal-add-account" onClick={() => { setSignInProfileId('new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })) }}><Plus size={13} />Add Account</button> : <button className="connect-service" onClick={() => { setActiveService(service.id); setSignInProfileId(hasAccounts ? null : 'new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); setServiceError('') }}>{hasAccounts ? <UserRound size={13} /> : <Plus size={13} />}{hasAccounts ? 'Manage Accounts' : 'Connect'}</button>}

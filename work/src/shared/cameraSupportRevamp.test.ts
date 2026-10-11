@@ -14,7 +14,7 @@ describe('Storyboard hidden camera-support Revamp policy', () => {
       const selected = cameraSupportSemantics(value)!
       expect(instruction).toContain(`SELECTED CAMERA SUPPORT POLICY (HIDDEN):\n${selected.revampInstruction}`)
       for (const other of CAMERA_SUPPORT_VALUES.filter((candidate) => candidate !== value)) expect(instruction).not.toContain(cameraSupportSemantics(other)!.revampInstruction)
-      expect(instruction).toContain('If visible action and the selected camera movement are already clear and executable, return it byte-for-byte unchanged.')
+      expect(instruction).toContain('Return it byte-for-byte unchanged only when that detail is already present and no permitted improvement remains.')
       expect(instruction).toContain('Return only the revised current panel prompt with its internal line breaks intact')
       expect(panel(value).prompt).not.toContain(selected.providerClause)
       expect(panel(value).prompt).not.toContain(selected.revampInstruction)

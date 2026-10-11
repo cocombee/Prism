@@ -13,6 +13,13 @@ const text = '  [warm] Repeat this.\r\n\r\nRepeat this.\n\nRepeat this.  '
 const request: GenerationRequest = { nodeId: 'voice', kind: 'voiceover', voiceEngine: 'fish-audio', fishModel: 's2.1-pro', fishReferenceId: 'voice-id', prompt: text, fishFormat: 'opus', fishOpusBitrate: 64, fishTemperature: 0, fishTopP: 0, fishNormalize: false, fishNormalizeLoudness: false, fishVolume: 0 }
 const catalog = (): ServiceModelAvailability => ({ provider: 'fish', verified: true, nativeInputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] }, catalogCheckedAt: new Date().toISOString(), models: [{ id: 's2.1-pro', label: 'Fish Audio S2.1 Pro' }] })
 describe('Fish faithful native audio composition', () => {
+  it('uses Fish-owned defaults without inventing a speaker or overriding saved controls', () => {
+    const minimal: GenerationRequest = { kind: 'voiceover', nodeId: 'voice', voiceEngine: 'fish-audio', fishModel: 's2.1-pro', fishReferenceId: 'chosen-fish-voice', prompt: text }
+    expect(compileFishAudioRequest(minimal).body).toMatchObject({ format: 'mp3', sample_rate: 44100, mp3_bitrate: 128, chunk_length: 300, prosody: { speed: 1, volume: 0 } })
+    expect(compileFishAudioRequest({ ...minimal, fishFormat: 'opus' }).body).toMatchObject({ sample_rate: 48000, opus_bitrate: -1000 })
+    expect(compileFishAudioRequest({ ...minimal, fishFormat: 'opus', fishOpusBitrate: 48, fishChunkLength: 200 }).body).toMatchObject({ opus_bitrate: 48000, chunk_length: 200, reference_id: 'chosen-fish-voice' })
+    expect(() => compileFishAudioRequest({ ...minimal, fishReferenceId: undefined })).toThrow(/Reference ID/)
+  })
   it('preserves repeated authored bytes through graph, preview and one exact HTTP request with correct Opus units', async () => {
     const node: StudioNode = { id: 'voice', type: 'studio', position: { x: 0, y: 0 }, data: { kind: 'voiceover', title: 'Voice', voiceEngine: 'fish-audio', fishModel: request.fishModel, fishReferenceId: request.fishReferenceId, prompt: text, fishFormat: 'opus', fishOpusBitrate: 64, fishTemperature: 0, fishTopP: 0, fishNormalize: false, fishNormalizeLoudness: false, fishVolume: 0 } }
     const graph = buildGenerationRequest(node, [node], []), compiled = compileFishAudioRequest(graph, catalog())

@@ -98,7 +98,7 @@ describe('visible provider prompt body parity', () => {
     expect(irreducible.promptBudgetDiagnostic).toMatchObject({ modelId: 'bytedance/seedance-2.5/reference-to-video', limit: 500, limitSource: 'fixture-model-capability', blocking: true })
     expect(irreducible.promptBudgetDiagnostic?.blockingReason).toContain('mandatory continuity state was preserved without truncation')
     expect(() => compileProviderPromptForSubmission(typed, { family: 'seedance', ceiling: 500, ceilingSource: 'fixture-model-capability' })).toThrow(/blocks provider dispatch/i)
-    expect(irreducible.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
+    expect(irreducible.blocks.at(-1)?.label).toBe('Reference roles')
     const semanticMaster = visibleProviderPromptBody(typed)
     expect(providerPromptPreview(typed)).toBe(semanticMaster)
     expect(providerSeedancePayloadCompilation(typed).text).toBe(semanticMaster.replaceAll('@hero', '[Image1]'))

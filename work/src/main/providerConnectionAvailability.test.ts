@@ -7,6 +7,9 @@ import ts from 'typescript'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServiceProfileStore } from './serviceProfileStore'
 import { ProviderRequestState } from './providerRequestState'
+import { PromptRewriteRouter } from './promptRewriteRouter'
+import { projectServiceProfileSelection } from '../shared/serviceProfiles'
+import { randomUUID } from 'node:crypto'
 import { ProjectCommandBusyError, ProjectCommandQueue } from './projectCommandQueue'
 import { generationServiceProvider } from '../shared/generationServiceProvider'
 import { filterProviderModelGroups, SERVICE_PROVIDER_IDS } from '../shared/providerAvailability'
@@ -32,7 +35,7 @@ function inspect(node: ts.Node) {
   ts.forEachChild(node, inspect)
 }
 inspect(mainAst)
-const functions = ['activateProviderRequestProject', 'withProviderRequest', 'serviceConnected', 'loadServiceCredential'].map(name => {
+const functions = ['activateProviderRequestProject', 'withProviderRequest', 'serviceConnected', 'loadServiceCredential', 'promptRequestOwner'].map(name => {
   const declaration = mainAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)
   if (!declaration) throw new Error(`Missing production owner ${name}`)
   return declaration.getText(mainAst)
@@ -43,6 +46,8 @@ function productionBoundary(store: ServiceProfileStore) {
   const calls = { provider: vi.fn(), obsolete: vi.fn(() => { throw new Error('Retired preferences must not be consulted') }), completed: vi.fn() }
   const context: Record<string, unknown> = {
     DOMException, Promise,
+    randomUUID, projectServiceProfileSelection,
+    promptRewriteRouter: () => router,
     SERVICE_PROVIDERS: SERVICE_PROVIDER_IDS,
     currentProject: { id: 'fixture-project', rootPath: '/fictional/project', serviceProfileOverrides: undefined },
     currentProjectOwner: () => 'fictional-project-owner',
@@ -58,6 +63,7 @@ function productionBoundary(store: ServiceProfileStore) {
     generationContext: { run: (_identity: unknown, work: () => unknown) => work() },
     readJson: async () => [], historyPath: () => '/fictional/history', atomicJson: vi.fn(),
   }
+  const router=new PromptRewriteRouter({store:{read:async()=>({choice:{mode:'api'},fingerprint:'fictional-api-choice'}),set:vi.fn()},subscriptions:{}})
   const compile = (code: string) => ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   runInNewContext(compile(functions), context)
   const loadCredential = context.loadServiceCredential as (provider: ServiceProvider) => Promise<string>
@@ -125,7 +131,7 @@ describe('connection-only availability after retiring preferences', () => {
     await store.transitionProfile('fixture-2', 'disconnect')
     const boundary = productionBoundary(store)
     boundary.context.currentProject = { serviceProfileOverrides: { anthropic: 'fixture-2' } }
-    await expect(boundary.rewrite(null, 'anthropic', 'Text', 'Instruction', 'model')).rejects.toThrow('disconnected')
+    await expect(boundary.rewrite(null, 'anthropic', 'Text', 'Instruction', 'model')).rejects.toThrow('selected API account is unavailable')
     expect(boundary.calls.provider).not.toHaveBeenCalled()
     expect(await store.isConnectedForProject('anthropic')).toBe(true)
     expect(await store.isConnectedForProject('anthropic', { anthropic: 'fixture-2' })).toBe(false)
@@ -161,7 +167,7 @@ describe('connection-only availability after retiring preferences', () => {
     expect(await store.isConnectedForProject('anthropic')).toBe(false)
     const connections = await productionBoundary(store).services()
     expect(connections.find(connection => connection.id === 'anthropic')?.connected).toBe(false)
-    await expect(productionBoundary(store).rewrite(null, 'anthropic', 'Text', 'Instruction', 'model')).rejects.toThrow('Sign in')
+    await expect(productionBoundary(store).rewrite(null, 'anthropic', 'Text', 'Instruction', 'model')).rejects.toThrow('selected API account is unavailable')
     expect(decrypt).not.toHaveBeenCalled()
   })
   it('removes retired mutation/read capabilities while keeping normal account operations', () => {

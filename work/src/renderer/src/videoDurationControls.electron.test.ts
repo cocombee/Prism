@@ -19,6 +19,7 @@ describe('actual model duration controls', () => {
         import {createRoot} from 'react-dom/client'
         import {ReactFlow,ReactFlowProvider} from '@xyflow/react'
         import {NodeCard,NodeRuntimeContext} from ${JSON.stringify(resolve(source,'src/renderer/src/NodeCardNext.tsx'))}
+    import { ProviderAvailabilityContext } from ${JSON.stringify(resolve(process.cwd(), 'src/renderer/src/ProviderAvailabilityContext.tsx'))}
         import {StoryboardNode} from ${JSON.stringify(resolve(source,'src/renderer/src/UtilityNodes.tsx'))}
         import {connectedStoryboardVideo} from ${JSON.stringify(resolve(source,'src/shared/storyboardVideoSync.ts'))}
         import {describeFalRuntimeInputs} from ${JSON.stringify(resolve(source,'src/shared/falRuntimeInputs.ts'))}
@@ -43,7 +44,7 @@ describe('actual model duration controls', () => {
             nativeDuration:duration=>updateNode('native',{falNative:{...nodes.find(node=>node.id==='native').data.falNative,values:{duration}}}),
             reopen:()=>setNodes(JSON.parse(JSON.stringify(nodes))),
           }
-          return <NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard,storyboard:StoryboardNode}} defaultViewport={{x:10,y:10,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider>
+          return <ProviderAvailabilityContext.Provider value={{mediaConnected:{fal:true,byteplus:true,openai:true,google:true,higgsfield:true,elevenlabs:true,fish:true},promptConnected:{openai:true,anthropic:true,google:true,omniroute:true,deepseek:true,moonshot:true}}}><NodeRuntimeContext.Provider value={runtime}><ReactFlowProvider><ReactFlow nodes={nodes} edges={[]} nodeTypes={{studio:NodeCard,storyboard:StoryboardNode}} defaultViewport={{x:10,y:10,zoom:1}} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}/></ReactFlowProvider></NodeRuntimeContext.Provider></ProviderAvailabilityContext.Provider>
         }
         createRoot(document.getElementById('root')).render(<App/>);
       `)

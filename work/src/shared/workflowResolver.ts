@@ -1,3 +1,4 @@
+import { directStoryboardStyles } from './storyboardStyleRouting'
 import { normalizedNativeVideoMotionCadence } from './nativeVideoFooterControls'
 import { requiresGeneratedDialogueAudio } from './videoDialogueAudio'
 import { higgsfieldModel, planHiggsfieldInput, planHiggsfieldNativeInput, type HiggsfieldMediaSource } from './higgsfieldNative'
@@ -222,6 +223,7 @@ function compiledStoryboardPrompt(preamble: string | undefined, shots: ResolvedS
 }
 
 export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges: Edge[], ignoredRootTargetHandles = new Set<string>()): ResolvedWorkflowInput {
+  edges = directStoryboardStyles(nodes, edges)
   const combinePrompt = preservesSpeech(nodes.find(node => node.id === nodeId)?.data || { kind: 'prompt', title: '' }) ? joinSpeech : joinPrompt
   const byId = new Map(nodes.map((node) => [node.id, node]))
 
@@ -393,10 +395,8 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         const panels = source.data.storyboardPanels || []
         const storyboard = formattedStoryboard(panels, duration)
         const nested = walk(source.id, path)
-        const hasConnectedStyle = edges.some((candidate) => candidate.target === source.id && candidate.targetHandle === 'style-in')
-        const legacyStyleFallback = !hasConnectedStyle && source.data.stylePrompt ? `Style Direction:\n${source.data.stylePrompt}` : undefined
-        result.prompt = combinePrompt(result.prompt, storyboard.rawPrompt, legacyStyleFallback, nested.prompt)
-        result.stylePrompt = combinePrompt(result.stylePrompt, legacyStyleFallback ? source.data.stylePrompt : undefined, nested.stylePrompt)
+        result.prompt = combinePrompt(result.prompt, storyboard.rawPrompt, nested.prompt)
+        result.stylePrompt = combinePrompt(result.stylePrompt, nested.stylePrompt)
         result.builtInStylePrompts = [...(result.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])]
         result.storyboardShots = storyboard.shots
         result.storyboardIncompletePanels = storyboard.incompletePanels
@@ -404,7 +404,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         result.storyboardRawPrompt = storyboard.rawPrompt
         result.storyboardDuration = duration
 
-        result.storyboardContext = combinePrompt(result.storyboardContext, legacyStyleFallback, nested.prompt)
+        result.storyboardContext = combinePrompt(result.storyboardContext, nested.prompt)
         result.references.push(...nested.references)
         result.offlineSemanticSources.push(...nested.offlineSemanticSources)
         result.connectionRules.push(...nested.connectionRules)
@@ -558,6 +558,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
 }
 
 function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  edges = directStoryboardStyles(nodes, edges)
   const state = node.data.falNative!
   if (falNativeFlowForKind(node.data.kind) !== state.flow || !state.fingerprint) throw new Error('Load the selected model contract before generating.')
   if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON field edits before generating.')
@@ -630,6 +631,7 @@ function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges
 }
 
 function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  edges = directStoryboardStyles(nodes, edges)
   const state = node.data.higgsfieldNative!
   if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON input edits before generating.')
   if (state.repairs?.length) throw new Error(state.repairs.join(' '))
@@ -723,6 +725,7 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
 }
 
 function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  edges = directStoryboardStyles(nodes, edges)
   const state = node.data.higgsfieldNative!
   if (node.data.kind !== 'video-generator' || node.data.falNative) throw new Error('Choose one Higgsfield video binding.')
   const model = higgsfieldModel(state.endpointId)
@@ -768,6 +771,7 @@ function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edge
 }
 
 export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  edges = directStoryboardStyles(nodes, edges)
   if (!node.data.falNative && !node.data.higgsfieldNative && node.data.kind === 'video-generator' && !findVideoModel(node.data.videoEngine)) {
     throw new Error(`Choose a supported video model; the saved selection “${node.data.videoEngine}” is unavailable.`)
   }

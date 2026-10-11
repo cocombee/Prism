@@ -132,7 +132,7 @@ export function fitClosedSelector(trackWidth: number, selectedPaintedTextWidth: 
   }
 }
 
-export type FluidControlKind = 'selector' | 'bounded-elastic' | 'intrinsic' | 'fixed-action'
+export type FluidControlKind = 'selector' | 'editable-field' | 'bounded-elastic' | 'intrinsic' | 'fixed-action'
 export type FluidControlPreferredZone = 'start' | 'middle' | 'end'
 export type FluidControlFixedAnchor = 'first' | 'terminal'
 
@@ -238,6 +238,12 @@ function minimumControlWidth(control: MixedControlInput): number {
   return finiteWidth(control.minimumWidth ?? control.intrinsicWidth)
 }
 
+// Editable inputs use the same row space as selectors, with their own measured
+// input width. They are not fixed actions and may occupy a whole narrow row.
+function flexibleTrack(control: MixedControlInput): boolean {
+  return control.kind === 'selector' || control.kind === 'editable-field'
+}
+
 function maximumControlWidth(control: MixedControlInput): number {
   const minimum = minimumControlWidth(control)
   if (control.kind === 'intrinsic' || control.kind === 'fixed-action') return minimum
@@ -327,7 +333,7 @@ function allocateMixedRow<Id extends string>(
   if (remaining < -0.001) return null
   const extras = controls.map(() => 0)
 
-  const referenceSelectors = controls.flatMap((control, index) => control.kind === 'selector' ? [index] : [])
+  const referenceSelectors = controls.flatMap((control, index) => flexibleTrack(control) ? [index] : [])
   if (referenceSelectors.length && referenceSelectors.every(index => controls[index].referenceSized)) {
     // Predictable numeric/quantity fields retain their established symmetric
     // breathing-room cap; remaining row space belongs equally to selectors.
@@ -353,7 +359,7 @@ function allocateMixedRow<Id extends string>(
   // A selector-only row standardizes its default painted text-to-chevron
   // clearance. Each track starts at its readable default and receives the
   // same share of the remaining row width; later longer values may ellipsize.
-  if (controls.every((control) => control.kind === 'selector' && control.shrinkPriority !== 'model')) {
+  if (controls.every((control) => flexibleTrack(control) && control.shrinkPriority !== 'model')) {
     const equalSlack = remaining / controls.length
     const allocated = controls.map((control): AllocatedMixedControl<Id> => ({
       ...control,
@@ -410,7 +416,7 @@ function allocateMixedRow<Id extends string>(
   // Mixed rows keep intrinsic actions fixed. Once readable/model/bounded
   // ranges are satisfied, selector tracks share unavoidable residual width
   // instead of converting it into a random larger inter-control gap.
-  const fluidSelectorIndexes = controls.flatMap((control, index) => control.kind === 'selector' ? [index] : [])
+  const fluidSelectorIndexes = controls.flatMap((control, index) => flexibleTrack(control) ? [index] : [])
   if (remaining > 0.001 && fluidSelectorIndexes.length) {
     const sharedExtra = remaining / fluidSelectorIndexes.length
     for (const index of fluidSelectorIndexes) extras[index] += sharedExtra
@@ -423,7 +429,7 @@ function allocateMixedRow<Id extends string>(
     const sidePadding = control.kind === 'bounded-elastic' ? extras[index] / 2 : 0
     return {
       ...control,
-      width: control.kind === 'selector' ? minimumControlWidth(control) + extras[index] : Math.min(maximumControlWidth(control), minimumControlWidth(control) + extras[index]),
+      width: flexibleTrack(control) ? minimumControlWidth(control) + extras[index] : Math.min(maximumControlWidth(control), minimumControlWidth(control) + extras[index]),
       sidePadding,
       leftPadding: sidePadding,
       rightPadding: sidePadding,
@@ -481,10 +487,10 @@ export function allocateMixedControlRows<Id extends string>(
         const terminal = groups.at(-1)?.slice(-terminalIds.length).map((control) => control.id)
         if (!terminal || terminal.some((id, index) => id !== terminalIds[index])) continue
       }
-      if (rowCount > 1 && groups.some((row) => row.reduce((sum, control) => sum + maximumControlWidth(control), 0) + safeGap * Math.max(0, row.length - 1) < safeWidth - 0.001 && !row.some((control) => control.kind === 'selector'))) continue
+      if (rowCount > 1 && groups.some((row) => row.reduce((sum, control) => sum + maximumControlWidth(control), 0) + safeGap * Math.max(0, row.length - 1) < safeWidth - 0.001 && !row.some(flexibleTrack))) continue
       const interval = sharedGapIntervalForRows(groups.map((row) => ({
         minimumWidths: row.map(minimumControlWidth),
-        maximumWidths: row.map((control) => control.kind === 'selector' ? safeWidth : maximumControlWidth(control)),
+        maximumWidths: row.map((control) => flexibleTrack(control) ? safeWidth : maximumControlWidth(control)),
       })), safeWidth)
       if (!interval) continue
       // The caller's established group gap is a layout invariant, not spare
@@ -611,7 +617,7 @@ export function validateControlLayout<Id extends string>(
       }
       if (descriptor.kind !== control.kind) reasons.push(`${prefix}/control:${control.id}/category-mismatch:${control.kind}!=${descriptor.kind}`)
       if (finiteWidth(control.width) + 0.001 < minimumControlWidth(descriptor)) reasons.push(`${prefix}/control:${control.id}/default-not-readable:${finiteWidth(control.width).toFixed(3)}<${minimumControlWidth(descriptor).toFixed(3)}`)
-      if (descriptor.kind !== 'selector' && finiteWidth(control.width) > maximumControlWidth(descriptor) + 0.001) reasons.push(`${prefix}/control:${control.id}/maximum-exceeded:${finiteWidth(control.width).toFixed(3)}>${maximumControlWidth(descriptor).toFixed(3)}`)
+      if (!flexibleTrack(descriptor) && finiteWidth(control.width) > maximumControlWidth(descriptor) + 0.001) reasons.push(`${prefix}/control:${control.id}/maximum-exceeded:${finiteWidth(control.width).toFixed(3)}>${maximumControlWidth(descriptor).toFixed(3)}`)
     })
   })
 

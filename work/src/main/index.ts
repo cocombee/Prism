@@ -1,3 +1,10 @@
+import { assistantThinkingSelection, OPENAI_API_REASONING_EFFORTS, openAiThinkingRequest } from '../shared/assistantThinking'
+import { PromptBillingStore } from './promptBillingStore'
+import { PromptRewriteRouter, type PromptRequestOwner } from './promptRewriteRouter'
+import { ClaudeSubscriptionRuntime } from './claudeSubscription'
+import { CodexSubscriptionRuntime } from './codexSubscription'
+import { GeminiSubscriptionRuntime } from './geminiSubscription'
+import type { PromptRewriteOptions, PromptBillingMode } from '../shared/promptConnection'
 import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
 import { effectiveProviderPromptOwnership } from '../shared/providerPromptOwnership'
 import { SeedancePromptIntegrityError } from '../shared/seedancePromptIntegrity'
@@ -320,7 +327,23 @@ async function loadServiceCredential(provider: ServiceProvider): Promise<string>
   return key
 }
 
-async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, instruction: unknown, requestedModel?: unknown): Promise<string> {
+let promptRewriteRouterInstance: PromptRewriteRouter | undefined
+function promptRewriteRouter(): PromptRewriteRouter {
+  return promptRewriteRouterInstance ||= new PromptRewriteRouter({store:new PromptBillingStore(app.getPath('userData')),subscriptions:{
+    openai:new CodexSubscriptionRuntime(join(app.getPath('userData'),'subscription-clients','codex'),url=>shell.openExternal(url)),
+    anthropic:new ClaudeSubscriptionRuntime({configurationDirectory:join(app.getPath('userData'),'subscription-clients','claude')}),google:new GeminiSubscriptionRuntime(join(app.getPath('userData'),'subscription-clients','google')),
+  }})
+}
+async function promptRequestOwner(provider:AssistantProvider):Promise<PromptRequestOwner>{
+  const assertCurrent=()=>runtimeServiceFailures.assertCurrent(provider)
+  const registry=await serviceProfileStore().listProfiles(provider,false);assertCurrent()
+  const overrides=runtimeServiceFailures.overrides(provider,currentProject?.serviceProfileOverrides)
+  const selection=projectServiceProfileSelection(registry,{serviceProfileOverrides:overrides},provider)
+  const apiReady=await serviceProfileStore().isConnectedForProject(provider,overrides);assertCurrent()
+  return{provider,projectScope:currentProjectOwner(),apiProfileId:selection.profile?.id,apiReady,assertCurrent}
+}
+
+async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, instruction: unknown, requestedModel?: unknown, signal?: AbortSignal, assertCurrent: () => void = () => undefined): Promise<string> {
   const source = typeof text === 'string' ? text.trim() : ''
   if (!source) throw new Error('Write a panel prompt first.')
   const direction = typeof instruction === 'string' && instruction.trim() ? instruction.trim() : 'Clarify only visible action and the selected camera movement. Preserve every other prompt detail.'
@@ -328,7 +351,8 @@ async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, 
   const model = typeof requestedModel === 'string' && requestedModel.trim() ? requestedModel.trim() : provider === 'omniroute' ? 'auto/best-chat' : provider === 'openai' ? 'gpt-5-mini' : provider === 'anthropic' ? 'claude-sonnet-4-20250514' : provider === 'deepseek' ? 'deepseek-v4-flash' : provider === 'moonshot' ? 'kimi-k3' : 'gemini-3.5-flash'
   if (provider === 'omniroute') {
     try {
-      const response = await fetch(`${OMNIROUTE_BASE_URL}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(omniRouteChatRequest(model, prompt)), signal: AbortSignal.timeout(120_000) })
+      assertCurrent()
+      const response = await fetch(`${OMNIROUTE_BASE_URL}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(omniRouteChatRequest(model, prompt)), signal: signal || AbortSignal.timeout(120_000) })
       const body = await response.json() as Record<string, unknown>
       if (!response.ok) {
         const error = new Error((body.error as { message?: string } | undefined)?.message || 'The local OmniRoute rewrite request failed.')
@@ -337,6 +361,7 @@ async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, 
       }
       const rewritten = omniRouteRewriteOutput(body)
       if (!rewritten) throw new Error('OmniRoute returned no rewritten prompt.')
+      assertCurrent()
       runtimeServiceFailures.delete(provider)
       return rewritten
     } catch (error) {
@@ -344,17 +369,19 @@ async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, 
       throw error
     }
   }
+  assertCurrent()
   const key = await loadServiceCredential(provider)
+  assertCurrent()
   let response: Response
   if (provider === 'openai') {
-    response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, input: prompt }) })
+    response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal, body: JSON.stringify(openAiThinkingRequest(model, prompt)) })
   } else if (provider === 'anthropic') {
-    response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, body: JSON.stringify({ model, max_tokens: 1200, messages: [{ role: 'user', content: prompt }] }) })
+    response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, signal, body: JSON.stringify({ model, max_tokens: 1200, messages: [{ role: 'user', content: prompt }] }) })
   } else if (provider === 'google') {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) })
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, signal, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) })
   } else {
     const endpoint = provider === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://api.moonshot.ai/v1/chat/completions'
-    response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }) })
+    response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal, body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }) })
   }
   const body = await response.json() as Record<string, unknown>
   if (!response.ok) {
@@ -364,6 +391,7 @@ async function rewriteWithAssistant(provider: AssistantProvider, text: unknown, 
     rememberServiceFailure(provider, error)
     throw error
   }
+  assertCurrent()
   runtimeServiceFailures.delete(provider)
   const rewritten = provider === 'openai'
     ? (body.output_text as string | undefined) || ((body.output as Array<{ content?: Array<{ text?: string }> }> | undefined)?.flatMap((item) => item.content || []).map((item) => item.text).find(Boolean))
@@ -482,13 +510,23 @@ async function listServiceModels(provider: ServiceProvider): Promise<ServiceMode
     body = await response.json() as Record<string, unknown>
     if (!response.ok) throw new Error((body.error as { message?: string } | undefined)?.message || `Could not load ${provider} models.`)
   }
-  const models = provider === 'openai'
+  let models = provider === 'openai'
     ? (body.data as Array<{ id: string }> | undefined || []).filter((item) => /^(gpt|o\d)/i.test(item.id)).map((item) => ({ id: item.id, label: modelDisplayName(item.id) }))
     : provider === 'anthropic'
       ? (body.data as Array<{ id: string; display_name?: string }> | undefined || []).map((item) => ({ id: item.id, label: modelDisplayName(item.id, item.display_name) }))
       : provider === 'google'
         ? (body.models as Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }> | undefined || []).filter((item) => item.supportedGenerationMethods?.includes('generateContent')).map((item) => ({ id: item.name.replace(/^models\//, ''), label: modelDisplayName(item.name.replace(/^models\//, ''), item.displayName) }))
         : (body.data as Array<{ id: string; display_name?: string }> | undefined || []).map((item) => ({ id: item.id, label: modelDisplayName(item.id, item.display_name) }))
+  if (provider === 'openai') {
+    // Discover capabilities from the official installed client; API admission still requires an exact live API model ID.
+    try {
+      const capabilities = await new CodexSubscriptionRuntime(join(app.getPath('userData'), 'subscription-clients', 'codex'), async () => { throw new Error('Catalog discovery never signs in.') }).models()
+      models = models.flatMap(model => [model, ...capabilities.models.filter(option => {
+        const choice = assistantThinkingSelection(option.id)
+        return choice.model === model.id && choice.effort && OPENAI_API_REASONING_EFFORTS.has(choice.effort)
+      }).map(option => ({ id: option.id, label: `${model.label} · ${assistantThinkingSelection(option.id).effort}` }))])
+    } catch { /* No verified effort metadata: retain discovered base API options only. */ }
+  }
   return { provider, verified: true, models }
 }
 
@@ -2486,9 +2524,25 @@ function registerIpc(): void {
     if (profileId !== undefined && typeof profileId !== 'string') throw new Error('Invalid project account selection.')
     return selectCurrentProjectServiceProfile(provider as ServiceProvider, profileId as string | undefined)
   })
-  ipcMain.handle('assistant:rewrite', async (_event, provider: unknown, text: unknown, instruction?: unknown, model?: unknown) => {
-    if (!isAssistantProvider(provider)) throw new Error('Choose a supported assistant service.')
-    return withProviderRequest(provider, () => rewriteWithAssistant(provider, text, instruction, model))
+  ipcMain.handle('assistant:connection',async(_event,provider:unknown)=>{
+    if(!isAssistantProvider(provider))throw new Error('Choose a supported assistant service.')
+    return withProviderRequest(provider,async()=>promptRewriteRouter().view(await promptRequestOwner(provider)))
+  })
+  ipcMain.handle('assistant:configure',async(_event,provider:unknown,mode:unknown,signIn:unknown)=>{
+    if(!isAssistantProvider(provider)||!['api','subscription'].includes(String(mode))||typeof signIn!=='boolean')throw new Error('Invalid Revamp connection choice.')
+    return withProviderRequest(provider,async()=>promptRewriteRouter().configure(await promptRequestOwner(provider),mode as PromptBillingMode,signIn))
+  })
+  ipcMain.handle('assistant:cancel',async(_event,requestId:unknown)=>{
+    if(typeof requestId!=='string'||!/^[a-zA-Z0-9-]{16,80}$/.test(requestId))throw new Error('Invalid Revamp request identifier.')
+    return promptRewriteRouter().cancel(requestId)
+  })
+  ipcMain.handle('assistant:rewrite',async(_event,provider:unknown,text:unknown,instruction?:unknown,model?:unknown,options?:PromptRewriteOptions)=>{
+    if(!isAssistantProvider(provider))throw new Error('Choose a supported assistant service.')
+    return withProviderRequest(provider,async()=>{
+      const owner=await promptRequestOwner(provider)
+      if(!options){const view=await promptRewriteRouter().view(owner);if(view.mode!=='api')throw new Error('Refresh the subscription connection before revamping.');options={requestId:randomUUID(),connectionLease:view.lease}}
+      return promptRewriteRouter().rewrite(owner,text,instruction,model,options,(_prompt,selected,signal,assertCurrent)=>rewriteWithAssistant(provider,text,instruction,selected,signal,assertCurrent))
+    })
   })
   ipcMain.handle('credentials:status', async () => {
     try {

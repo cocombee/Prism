@@ -35,7 +35,8 @@ describe('local deterministic Seedance Director completion', () => {
     expect(body).toContain('REFERENCES · @maya; @station; @case; Use @maya as maya.; Use @maya-coat for @maya\'s wardrobe.')
     expect(body).toContain(`SHOT 2 · 3.0–5.0s\nPURPOSE / ACTION · ${second}`)
     expect(body.match(/^HARD CUT\.$/gm)).toHaveLength(1)
-    expect(body.trim().endsWith('excessive motion smear')).toBe(true)
+    expect(body.split('REFERENCE ROLES\n')[0].trim().endsWith('excessive motion smear')).toBe(true)
+    expect(body.split('REFERENCE ROLES\n')[1]).toContain('@maya')
     expect(validateSeedanceDirectorPrompt(body, request)).toEqual({ ok: true, knowledgeIds: expect.any(Array) })
   })
 

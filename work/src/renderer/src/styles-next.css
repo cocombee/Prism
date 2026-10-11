@@ -188,7 +188,7 @@ html.is-canvas-middle-panning body #root * { cursor: grabbing !important; }
   background: #1a1722;
 }
 .tool-rail button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: #8e8999; display: grid; place-items: center; cursor: pointer; }
-.tool-rail button.is-active { background: #f0ebf8; color: #17121e; }
+.tool-rail button.is-active { background: #222027; color: #8e8999; }
 .tool-rail button:disabled { opacity: .28; cursor: default; background: transparent; color: #777180; }
 .tool-rail button[data-tooltip], .node-hover-toolbar [data-tooltip], .edge-actions [data-tooltip] { position: relative; }
 .sticker-picker { position: absolute; left: 51px; top: 218px; display: flex; gap: 4px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: #1d1a25; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
@@ -420,7 +420,7 @@ html.is-canvas-middle-panning body #root * { cursor: grabbing !important; }
   [aria-label="Sound effect output format"]
 )) { display: none; }
 .inspector-grid.direct-eleven-settings label:has(> :is([aria-label="Voice language"], [aria-label="Output format"], [aria-label="Eleven primary speed"])) { display: flex; }
-.voice-primary-controls { padding: 8px; display: grid; gap: 7px; border-top: 1px solid var(--node-divider); background: var(--node-body-bg); }
+.voice-primary-controls { padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; border-top: 1px solid var(--node-divider); background: var(--node-body-bg); }
 .equalized-control-group { min-width: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--control-group-gap, 7px); }
 .equalized-control-row, .voice-primary-row { min-width: 0; width: 100%; display: grid; gap: var(--control-group-gap, 7px); }
 .fluid-control-group-row { min-width: 0; width: 100%; display: grid; align-items: center; }
@@ -463,6 +463,8 @@ html.is-canvas-middle-panning body #root * { cursor: grabbing !important; }
 .studio-node.kind-voiceover .compact-generic-footer .quantity-stepper { width: max-content; }
 .studio-node.kind-voiceover .compact-generic-footer .compact-options { grid-column: 3; justify-self: end; }
 .studio-node.kind-voiceover .compact-generic-footer .play-tooltip-anchor { grid-column: 4; }
+.studio-node.kind-voiceover .voice-primary-controls:has(+ .compact-generic-footer) { padding-bottom: 0; }
+.studio-node.kind-voiceover .voice-primary-controls + .compact-generic-footer { border-top: 0; padding-top: var(--control-group-gap, 7px); min-height: 0; }
 .studio-node.kind-sound-effects .compact-generic-footer { min-height: 76px; display: grid; grid-template-columns: max-content 52px 55px minmax(var(--node-terminal-action-size), 1fr) var(--node-terminal-action-size); grid-template-rows: repeat(2, var(--node-control-height)); }
 .studio-node.kind-sound-effects .compact-generic-footer .quantity-stepper { width: max-content; grid-column: 1; grid-row: 2; }
 .studio-node.kind-sound-effects .compact-generic-footer .sound-effects-model { width: 100%; max-width: none; grid-column: 1 / 4; grid-row: 1; }
@@ -1068,11 +1070,12 @@ html.is-canvas-middle-panning body #root * { cursor: grabbing !important; }
 .home-sidebar > strong { padding: 0 12px 22px; overflow: hidden; color: #ddd8e2; font-size: var(--font-text); text-overflow: ellipsis; white-space: nowrap; }
 .home-sidebar nav { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 :is(.launcher-sidebar, .home-sidebar) nav button, .switch-project-sidebar, .space-breadcrumb { height: 40px; padding: 0 12px; display: flex; align-items: center; gap: 11px; border: 0; border-radius: 8px; background: transparent; color: #89838e; text-align: left; cursor: pointer; }
-/* Existing navigation highlight owner, shared by menu rows and toolbar hover. */
+/* Tools retain the muted icon token shown by the existing alignment controls. */
+.tool-rail button:hover:not(.is-active) { background: #222027; color: #8e8999; }
+/* Existing navigation highlight owner, shared by menu rows and top toolbar hover. */
 .top-actions > button.top-align-action:hover:not(.is-active),
 .top-actions .compact-alignment-launcher:hover:not(.is-active),
 .top-actions .compact-alignment-palette button:hover,
-.tool-rail button:hover:not(.is-active),
 .space-breadcrumb:hover,
 :is(.launcher-sidebar, .home-sidebar) nav button:hover,
 :is(.launcher-sidebar, .home-sidebar) nav button.is-active { background: #222027; color: #e2dde6; }
@@ -1646,6 +1649,9 @@ kbd { border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.04)
 .service-card > footer button, .service-card > footer .service-connection-method, .service-card > footer .service-key-input, .service-connect-form button { height: 29px; padding: 0 10px; border: 1px solid #37333e; border-radius: 7px; background: #1e1c23; color: #aaa3af; font-size: var(--font-smaller-text); font-weight: var(--font-weight-medium); cursor: pointer; }
 .service-connection-method { display: inline-flex; align-items: center; gap: var(--selector-icon-label-gap); white-space: nowrap; }
 .service-connection-method > svg { flex: 0 0 auto; }
+/* Billing choices are ordinary popup options, independent of capped footer fields. */
+.grouped-menu-select-menu.service-connection-menu { width: max-content !important; max-width: calc(100vw - 16px); }
+.service-connection-menu section > button > .selector-option-label { overflow: visible; text-overflow: clip; }
 .service-card > footer .service-key-input { min-width: 0; flex: 1; outline: 0; cursor: text; font-weight: var(--font-weight-normal); animation: service-key-expand .18s ease-out; }
 .service-key-actions { display: flex; flex: 0 0 auto; align-items: center; gap: var(--selector-icon-label-gap); animation: service-card-expand .18s ease-out; }
 @keyframes service-key-expand { from { clip-path: inset(0 0 0 100%); opacity: .82; } to { clip-path: inset(0); opacity: 1; } }

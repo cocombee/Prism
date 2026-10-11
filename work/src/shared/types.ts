@@ -911,7 +911,10 @@ export interface PrismAPI {
     relinkMissing: () => Promise<AssetRelinkResult | null>
   }
   assistant: {
-    rewrite: (provider: 'omniroute' | 'openai' | 'anthropic' | 'google' | 'deepseek' | 'moonshot', text: string, instruction?: string, model?: string) => Promise<string>
+    connection: (provider: import('./assistantModels').AssistantProvider) => Promise<import('./promptConnection').PromptConnectionView>
+    configure: (provider: import('./assistantModels').AssistantProvider, mode: import('./promptConnection').PromptBillingMode, signIn: boolean) => Promise<import('./promptConnection').PromptConnectionView>
+    cancel: (requestId: string) => Promise<boolean>
+    rewrite: (provider: 'omniroute' | 'openai' | 'anthropic' | 'google' | 'deepseek' | 'moonshot', text: string, instruction?: string, model?: string, options?: import('./promptConnection').PromptRewriteOptions) => Promise<string>
   }
   generation: {
     higgsfieldJobs: () => Promise<HiggsfieldJobView[]>

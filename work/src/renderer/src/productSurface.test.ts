@@ -651,15 +651,14 @@ describe('global product-surface regressions', () => {
     expect(appSource).toContain('referenceAssets: collection.assets')
     expect(appSource).toContain("nodeId = createNode('upload', position)")
     expect(appSource).toContain("nodeId = createNode('style-reference', position)")
-    expect(appSource).toContain("const upstreamKinds = new Set<NodeKind>(['character', 'wardrobe', 'element', 'location', 'style-reference'])")
+    expect(appSource).toContain("const upstreamKinds = new Set<NodeKind>(['character', 'wardrobe', 'element', 'location'])")
     expect(appSource).toContain("const incoming = (sourcePage?.edges || []).filter((edge) => edge.target === source.id)")
-    expect(appSource).toContain('linkedStoryboardId: dependency.data.kind === \'style-reference\' ? nodeId : undefined')
+    expect(appSource).toContain('linkedStoryboardId: undefined')
     expect(appSource).toContain('const clonedEdges = incoming.flatMap')
     expect(appSource).toContain('source: sourceId, target: nodeId!')
-    expect(appSource).toContain("if (kind === 'storyboard')")
-    expect(appSource).toContain("const styleId = createNode('style-reference', pair.style)")
-    expect(appSource).toContain("const storyboardId = createNode('storyboard', pair.storyboard)")
-    expect(appSource).toContain("target: storyboardId, targetHandle: 'style-in'")
+    expect(appSource).toContain('createNode(kind, position)')
+    expect(appSource).not.toContain("createNode('style-reference', pair.style)")
+    expect(appSource).not.toContain('linkedStoryboard && styleReady')
   })
 
   it('uses the balanced asset preview rule inside reusable selection nodes', () => {
@@ -890,7 +889,8 @@ describe('global product-surface regressions', () => {
     expect(appSource).toContain("progress: 'Storyboard already complete.'")
     const revampBody = appSource.slice(appSource.indexOf('const rewriteStoryboardPanel'), appSource.indexOf('const connectStyleNode'))
     expect(revampBody).not.toContain('for (const panel of targets)')
-    expect(revampBody.match(/window\.prism\.assistant\.rewrite\(/g)).toHaveLength(2)
+    expect(revampBody.match(/await requestPromptRewrite\(/g)).toHaveLength(2)
+    expect(appSource.match(/await window\.prism\.assistant\.rewrite\(/g)).toHaveLength(1)
     expect(revampBody).not.toContain('storyboardRewriteProgress')
   })
 
@@ -913,7 +913,7 @@ describe('global product-surface regressions', () => {
     expect(appSource).not.toContain('if (!settingsOpen) return\n    const connected = (Object.keys(serviceConnections)')
     expect(appSource).toContain('assistantCatalogsWithSavedSelection(rawAssistantCatalogs, source.data.assistantProvider, source.data.assistantModelId, Boolean(source.data.assistantProvider && serviceModels[source.data.assistantProvider]?.verified))')
     expect(utilitySource).toContain('assistantCatalogsWithSavedSelection(rawAssistantCatalogs, data.assistantProvider, data.assistantModelId, Boolean(data.assistantProvider && runtime?.modelAvailabilityVerified?.(data.assistantProvider)))')
-    expect(utilitySource).toContain('assistantModelGroups(assistantCatalogs, data.assistantProvider, data.assistantModelId)')
+    expect(utilitySource).toContain('latestAssistantModelGroups(assistantCatalogs)')
     expect(utilitySource).toContain('resolveAssistantSelection(data.assistantProvider, data.assistantModelId, assistantCatalogs)')
   })
 
@@ -1012,7 +1012,7 @@ describe('global product-surface regressions', () => {
     expect(utilitySource).toContain("runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined })")
     expect(utilitySource).toContain('onClick={() => runtime?.rewriteStoryboardPanel(id, panel.id)}')
     expect(utilitySource).toContain('onClick={() => runtime?.rewriteStoryboardPanel(id)}')
-    expect(utilitySource).toContain('assistantModelGroups(assistantCatalogs, data.assistantProvider, data.assistantModelId)')
+    expect(utilitySource).toContain('latestAssistantModelGroups(assistantCatalogs)')
     expect(utilitySource).toContain('ASSISTANT_PROVIDER_GROUPS')
     expect(utilitySource).not.toContain('fal.ai Text AI')
     expect(utilitySource).not.toContain('FAL_TEXT_MODEL_FALLBACK')
@@ -1699,7 +1699,7 @@ describe('global product-surface regressions', () => {
 
   it('loads current DeepSeek and Kimi models through the shared live provider groups', () => {
     expect(utilitySource).toContain('ASSISTANT_PROVIDER_GROUPS')
-    expect(utilitySource).toContain('assistantModelGroups(assistantCatalogs, data.assistantProvider, data.assistantModelId)')
+    expect(utilitySource).toContain('latestAssistantModelGroups(assistantCatalogs)')
     expect(mainSource).toContain('https://api.deepseek.com/models')
     expect(mainSource).toContain('https://api.moonshot.ai/v1/models')
     expect(mainSource).not.toContain('moonshot/kimi')
