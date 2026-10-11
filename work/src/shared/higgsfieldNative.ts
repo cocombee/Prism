@@ -1,6 +1,8 @@
 import {assertHiggsfieldPublicUrl} from './higgsfieldPublicUrl'
 export {assertHiggsfieldPublicUrl} from './higgsfieldPublicUrl'
 import {HIGGSFIELD_SEEDANCE_INPUT_REVISION,higgsfieldSeedanceSchema,higgsfieldSeedanceFields,planHiggsfieldSeedanceInput,materializeHiggsfieldSeedanceInput,type HiggsfieldSeedanceInputPlan,type HiggsfieldSeedanceInputRequest,type HiggsfieldSeedanceSource} from './higgsfieldSeedanceInput'
+import { HIGGSFIELD_TEXT_VIDEO_MODELS, HIGGSFIELD_TEXT_VIDEO_REVISION, higgsfieldTextVideoSchema, higgsfieldTextVideoFields, planHiggsfieldTextVideoInput, materializeHiggsfieldTextVideoInput, type HiggsfieldTextVideoInputPlan } from './higgsfieldTextVideo'
+import { HIGGSFIELD_REFERENCE_VIDEO_MODELS, HIGGSFIELD_REFERENCE_VIDEO_REVISION, higgsfieldReferenceVideoSchema, higgsfieldReferenceVideoFields, planHiggsfieldReferenceVideoInput, materializeHiggsfieldReferenceVideoInput, type HiggsfieldReferenceVideoInputPlan } from './higgsfieldReferenceVideo'
 import type { FalJson, FalSchemaNode } from './falSchemaBinding'
 import { validateFalSchema } from './falSchemaBinding'
 
@@ -24,12 +26,12 @@ export const HIGGSFIELD_SEEDANCE_MODELS = Object.freeze(HIGGSFIELD_SEEDANCE_RUNN
   kind:'seedance' as const,id,label:`Seedance 2.5 · ${{'text-to-video':'Text to Video','image-to-video':'Image to Video','reference-to-video':'Reference to Video','video-extend':'Video Extend','video-edit':'Video Edit'}[id.split('/').at(-1)!]}`,
 })))
 /** Only routes with verified independent native adapters belong in selectable menus. */
-export const HIGGSFIELD_RUNNABLE_MODELS = Object.freeze([...HIGGSFIELD_GENJUTSU_MODELS, ...HIGGSFIELD_SEEDANCE_MODELS])
-export const HIGGSFIELD_BUNDLED_CATALOG_REVISION = `${HIGGSFIELD_CONTRACT_REVISION}|${HIGGSFIELD_SEEDANCE_INPUT_REVISION}`
+export const HIGGSFIELD_RUNNABLE_MODELS = Object.freeze([...HIGGSFIELD_GENJUTSU_MODELS, ...HIGGSFIELD_SEEDANCE_MODELS, ...HIGGSFIELD_TEXT_VIDEO_MODELS, ...HIGGSFIELD_REFERENCE_VIDEO_MODELS])
+export const HIGGSFIELD_BUNDLED_CATALOG_REVISION = `${HIGGSFIELD_CONTRACT_REVISION}|${HIGGSFIELD_SEEDANCE_INPUT_REVISION}|${HIGGSFIELD_TEXT_VIDEO_REVISION}|${HIGGSFIELD_REFERENCE_VIDEO_REVISION}`
 export function higgsfieldBundledCatalogModels() {
   return HIGGSFIELD_RUNNABLE_MODELS.map(model => ({
-    id: model.id, label: model.label, category: model.kind === 'seedance' ? 'video' : 'video-to-video',
-    catalog: { service: 'Higgsfield', company: model.kind === 'seedance' ? 'ByteDance' : 'Higgsfield', release: model.kind === 'seedance' ? 'Seedance 2.5' : 'Genjutsu 1.0', mode: model.label.split(' · ')[1] },
+    id: model.id, label: model.label, category: model.kind !== 'genjutsu' ? 'video' : 'video-to-video',
+    catalog: { service: 'Higgsfield', company: 'company' in model ? model.company : model.kind === 'seedance' ? 'ByteDance' : 'Higgsfield', release: 'release' in model ? model.release : model.kind === 'seedance' ? 'Seedance 2.5' : 'Genjutsu 1.0', mode: model.label.split(' · ')[1] },
     description: 'Retained bundled native contract; current inputs and account access require verification.',
   }))
 }
@@ -46,13 +48,15 @@ export interface HiggsfieldNativeRequest {
 }
 export interface HiggsfieldPreset { id: string; name: string; previewUrl?: string }
 export function higgsfieldModel(endpointId: string) {
-  const model = HIGGSFIELD_GENJUTSU_MODELS.find(item => item.id === endpointId) || HIGGSFIELD_SEEDANCE_MODELS.find(item=>item.id===endpointId)
+  const model = HIGGSFIELD_GENJUTSU_MODELS.find(item => item.id === endpointId) || HIGGSFIELD_SEEDANCE_MODELS.find(item=>item.id===endpointId) || HIGGSFIELD_TEXT_VIDEO_MODELS.find(item=>item.id===endpointId) || HIGGSFIELD_REFERENCE_VIDEO_MODELS.find(item=>item.id===endpointId)
   if (!model) throw new Error('The saved Higgsfield route has no verified input contract. Preserve it and refresh before generating.')
   return model
 }
 export function higgsfieldInputSchema(endpointId: string): FalSchemaNode {
   const model = higgsfieldModel(endpointId)
   if(model.kind==='seedance')return higgsfieldSeedanceSchema(endpointId)
+  if(model.kind==='text-video')return higgsfieldTextVideoSchema(endpointId)
+  if(model.kind==='reference-video')return higgsfieldReferenceVideoSchema(endpointId)
   const restyle = model.minImages === 0
   return { type: 'object', additionalProperties: false, properties: {
     prompt: { type: 'string', title: 'Prompt', maxLength: 10000, default: '' },
@@ -103,7 +107,7 @@ export function materializeHiggsfieldInput(plan: HiggsfieldInputPlan, videoUrl: 
 export function isHiggsfieldRemoteUncertainty(message: string): boolean { return /remote work may continue|Higgsfield submission status is unknown|Higgsfield accepted an unresolved request/i.test(message) }
 
 /** Full route recognition does not advertise a renderer selection as runnable. */
-export type HiggsfieldNativeInputPlan = (HiggsfieldInputPlan & {kind:'genjutsu';preview:Record<string,FalJson>}) | (HiggsfieldSeedanceInputPlan & {kind:'seedance';schema:FalSchemaNode})
+export type HiggsfieldNativeInputPlan = (HiggsfieldInputPlan & {kind:'genjutsu';preview:Record<string,FalJson>}) | (HiggsfieldSeedanceInputPlan & {kind:'seedance';schema:FalSchemaNode}) | (HiggsfieldTextVideoInputPlan & {kind:'text-video';schema:FalSchemaNode}) | (HiggsfieldReferenceVideoInputPlan & {kind:'reference-video';schema:FalSchemaNode})
 export function higgsfieldSeedanceRequest(request:HiggsfieldNativeRequest):HiggsfieldSeedanceInputRequest {
   if(request.allowSourceTrimming!==undefined||Object.keys(request).some(key=>!['endpointId','contractRevision','values','media','allowSourceTrimming','fingerprint'].includes(key)))throw new Error('Native Seedance does not accept Genjutsu trimming consent or another unsupported request field. Its inputs were preserved.')
   return {endpointId:request.endpointId,inputRevision:request.contractRevision,values:request.values,media:request.media,...(request.fingerprint!==undefined?{fingerprint:request.fingerprint}:{})}
@@ -112,23 +116,45 @@ export function planHiggsfieldNativeInput(request:HiggsfieldNativeRequest, input
   if(!request||typeof request!=='object'||Array.isArray(request)||Object.keys(request).some(key=>!['endpointId','contractRevision','values','media','allowSourceTrimming','fingerprint'].includes(key)))throw new Error('Higgsfield has an unsupported request field; review the preserved request.')
   const model=higgsfieldModel(request.endpointId)
   if(model.kind==='seedance')return {...planHiggsfieldSeedanceInput(higgsfieldSeedanceRequest(request),inputSchema),kind:'seedance',schema:inputSchema || higgsfieldSeedanceSchema(request.endpointId)}
+  if(model.kind==='text-video')return {...planHiggsfieldTextVideoInput(request,inputSchema),kind:'text-video',schema:inputSchema || higgsfieldTextVideoSchema(request.endpointId)}
+  if(model.kind==='reference-video')return {...planHiggsfieldReferenceVideoInput(request,inputSchema),kind:'reference-video',schema:inputSchema || higgsfieldReferenceVideoSchema(request.endpointId)}
   if(request.fingerprint!==undefined)throw new Error('Genjutsu does not yet use a current-schema digest; review the preserved native selection.')
   const plan=planHiggsfieldInput(request)
   return {...plan,kind:'genjutsu',preview:materializeHiggsfieldInput(plan,plan.video.url||'https://media.prism.example/source.mp4',plan.images.map(source=>source.url||'https://media.prism.example/reference.png'))}
 }
 export function materializeHiggsfieldNativeInput(plan:HiggsfieldNativeInputPlan,urls:string[]):Record<string,FalJson> {
   if(plan.kind==='seedance')return materializeHiggsfieldSeedanceInput(plan,urls)
+  if(plan.kind==='text-video')return materializeHiggsfieldTextVideoInput(plan,urls)
+  if(plan.kind==='reference-video')return materializeHiggsfieldReferenceVideoInput(plan,urls)
   if(urls.length!==1+plan.images.length)throw new Error('Higgsfield reference order/count changed during preparation.')
   return materializeHiggsfieldInput(plan,urls[0],urls.slice(1))
 }
 export function higgsfieldWireMediaUrls(endpointId:string,input:Record<string,unknown>, inputSchema?:FalSchemaNode):string[] {
-  const fields=higgsfieldModel(endpointId).kind==='seedance'?higgsfieldSeedanceFields(endpointId,inputSchema).filter(field=>field.media).map(field=>({key:field.key,array:field.media!.array})):[{key:'video_url',array:false},{key:'image_urls',array:true}]
+  const fields=higgsfieldNativeFields(endpointId,inputSchema).filter(field=>field.media).map(field=>({key:field.key,array:field.media!.array}))
   return fields.flatMap(({key,array})=>input[key]===undefined?[]:array?input[key] as string[]:[input[key] as string])
 }
 export function higgsfieldContractRevision(endpointId:string):string {
-  return higgsfieldModel(endpointId).kind==='seedance'?HIGGSFIELD_SEEDANCE_INPUT_REVISION:HIGGSFIELD_CONTRACT_REVISION
+  const kind=higgsfieldModel(endpointId).kind
+  return kind==='seedance'?HIGGSFIELD_SEEDANCE_INPUT_REVISION:kind==='text-video'?HIGGSFIELD_TEXT_VIDEO_REVISION:kind==='reference-video'?HIGGSFIELD_REFERENCE_VIDEO_REVISION:HIGGSFIELD_CONTRACT_REVISION
 }
 
 export function higgsfieldSourceOwnsTimeline(endpointId:string):boolean {
   try {return higgsfieldModel(endpointId).kind==='genjutsu'||endpointId==='bytedance/seedance-2.5/video-edit'}catch{return true /* Unavailable saved routes cannot consume a newly authored timeline. */}
+}
+
+/** Shared UI/transport projection; each native family still owns its admitted planner. */
+export function higgsfieldNativeFields(endpointId:string,inputSchema?:FalSchemaNode) {
+  const kind=higgsfieldModel(endpointId).kind
+  if(kind==='seedance')return higgsfieldSeedanceFields(endpointId,inputSchema)
+  if(kind==='text-video')return higgsfieldTextVideoFields(endpointId,inputSchema)
+  if(kind==='reference-video')return higgsfieldReferenceVideoFields(endpointId,inputSchema)
+  const schema=inputSchema || higgsfieldInputSchema(endpointId)
+  return Object.entries(schema.properties||{}).map(([key,field])=>({key,schema:field,required:schema.required?.includes(key)||false,media:key==='video_url'?{type:'video' as const,array:false,role:'source-video'}:key==='image_urls'?{type:'image' as const,array:true,role:'reference-image'}:undefined}))
+}
+
+/** Native routes reuse prompt compilation only through their actual maker family. */
+export function higgsfieldPromptFamily(endpointId:string):'seedance'|'kling'|'wan'|'generic' {
+  const model=higgsfieldModel(endpointId)
+  if(model.kind==='seedance'||model.kind==='genjutsu')return 'seedance'
+  return model.company==='Kling'?'kling':model.company==='Alibaba'?'wan':'generic'
 }

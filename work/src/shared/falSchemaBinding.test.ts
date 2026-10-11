@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { describeFalRuntimeInputs } from './falRuntimeInputs'
 import { compileFalSchemaContract, validateFalSchema } from './falSchemaBinding'
 
 const fixtures = JSON.parse(readFileSync(new URL('falSchemaBinding.fixtures.json', import.meta.url), 'utf8')) as { models: Array<{ endpoint_id: string; openapi: unknown }> }
@@ -10,6 +11,31 @@ const media = JSON.parse(readFileSync(new URL('falSchemaMedia.fixtures.json', im
 const inputOf = (schema: unknown) => ({ paths: { '/fal-ai/test': { post: { requestBody: { content: { 'application/json': { schema } } } } }, '/fal-ai/test/requests/{request_id}': { get: { responses: { '200': { content: { 'application/json': { schema: { type: 'object', properties: { image: { type: 'object', required: ['url'], properties: { url: { type: 'string' } } } }, required: ['image'] } } } } } } } } })
 
 describe('actual fal OpenAPI model bindings', () => {
+  it('preserves captured native file-byte limits without treating URL length as file size', () => {
+    const raw = JSON.parse(readFileSync(new URL('falAudioFileLimit.fixture.json', import.meta.url), 'utf8'))
+    const contract = compileFalSchemaContract(raw.endpoint_id, raw.openapi)
+    const field = describeFalRuntimeInputs(contract).fields.find(field => field.key === 'audio_url')!
+    expect(field.control).toBe('media')
+    expect(field.media?.maximumBytes).toBe(60_000_000)
+    expect(() => compileFalSchemaContract('fal-ai/test', inputOf({type:'string',max_file_size:-1}))).toThrow('file-size')
+    expect(() => validateFalSchema({type:'string',maxFileSize:60_000_000},'https://fal.media/audio.wav')).not.toThrow()
+  })
+  it('loads the captured Wan 2.7 references schema including real video/image inputs', () => {
+    const raw = JSON.parse(readFileSync(new URL('falWan27Schema.fixture.json', import.meta.url), 'utf8'))
+    const contract = compileFalSchemaContract(raw.endpoint_id, raw.openapi)
+    const fields = describeFalRuntimeInputs(contract).fields
+    expect(fields.find(field => field.key === 'reference_video_urls')?.media?.type).toBe('video')
+    expect(fields.find(field => field.key === 'reference_image_urls')?.media?.type).toBe('image')
+    expect(fields.some(field => field.key === 'duration')).toBe(true)
+    expect(() => validateFalSchema(contract.input, {prompt:'Owned prompt',duration:1000})).toThrow()
+  })
+  it('ignores provider UI annotations without dropping validation or acquiring media authority', () => {
+    const contract = compileFalSchemaContract('fal-ai/test', inputOf({type:'object',required:['duration'],properties:{duration:{type:'integer',minimum:2,maximum:10,ui:{component:'slider'}},image:{type:'string',ui:{component:'upload'}}}}))
+    expect(contract.input.properties?.image.uiField).toBeUndefined()
+    expect(() => validateFalSchema(contract.input,{duration:1})).toThrow('minimum')
+    expect(() => validateFalSchema(contract.input,{duration:5})).not.toThrow()
+    expect(() => compileFalSchemaContract('fal-ai/test',inputOf({type:'string',unknownValidation:true,ui:{}}))).toThrow('unknownValidation')
+  })
   it('binds current image/reference contracts including declared video and audio presentation annotations', () => {
     const image = compileFalSchemaContract(media.models[0].endpoint_id, media.models[0].openapi)
     expect(image.input.required).toContain('image_url')

@@ -5,6 +5,7 @@ import { measuredFloatingMenuWidth, selectorTriggerFontSize, useContinuousAnchor
 import { normalizedStoryboardDurationOptions } from '../../shared/storyboardDurationBudget'
 import { storyboardTriggerMenuKeyAction } from '../../shared/storyboardMenuInteraction'
 import { filterAndRankSelectorOptions, selectorSearchKeyAction, setSelectorPortalOpen } from '../../shared/selectorSearch'
+import { consolidateCameraChoices } from '../../shared/storyboardCameraChoices'
 
 /** Production owner for the compact Cut/Continue capsule used by Storyboard and Camera. */
 export function ShotBoundaryChoice({ shotId, name, value, disabled = false, onChange }: { shotId: string; name: string; value: 'cut' | 'continue'; disabled?: boolean; onChange(value: 'cut' | 'continue'): void }) {
@@ -15,9 +16,27 @@ export function durationChoices(maximum: number): number[] {
   return normalizedStoryboardDurationOptions([maximum])
 }
 
-export const STORYBOARD_SHOT_SIZE_OPTIONS = [{ value: 'wide', label: 'Wide' }, { value: 'medium', label: 'Medium' }, { value: 'close-up', label: 'Close-up' }, { value: 'detail', label: 'Detail' }] as const
+export const STORYBOARD_SHOT_SIZE_OPTIONS = [
+  { value: 'extreme-wide', label: 'Extreme Wide Shot', aliases: ['super wide'] },
+  { value: 'wide', label: 'Wide Shot' },
+  { value: 'medium', label: 'Medium Shot' },
+  { value: 'close-up', label: 'Close-up' },
+  { value: 'extreme-close-up', label: 'Extreme Close-up', aliases: ['super close-up'] },
+  { value: 'detail', label: 'Detail / Insert' },
+] as const
 
-export const CAMERA_MOVEMENT_GROUPS = [
+export const STORYBOARD_LENS_OPTIONS = [
+  { value: 'unspecified', label: 'Unspecified' },
+  ...[8, 16, 24, 35, 50, 85, 100].map(mm => ({ value: String(mm), label: `${mm}mm`, title: `${mm}mm focal length; field of view depends on capture format` })),
+]
+
+export function storyboardLensOptions(lensMm?: number): StoryboardMenuOption[] {
+  const options: StoryboardMenuOption[] = [...STORYBOARD_LENS_OPTIONS]
+  if (lensMm !== undefined && !options.some(option => option.value === String(lensMm))) options.push({ value: String(lensMm), label: `${lensMm}mm`, disabled: !Number.isFinite(lensMm) || lensMm <= 0, disabledReason: 'Review the saved focal length.' })
+  return options
+}
+
+const RAW_CAMERA_MOVEMENT_GROUPS = [
   { label: 'Static & framing', options: [
     ['static', 'Static / Locked'], ['reframe-left', 'Reframe Left'], ['reframe-right', 'Reframe Right'], ['reframe-up', 'Reframe Up'], ['reframe-down', 'Reframe Down'],
   ] },
@@ -70,6 +89,8 @@ export const CAMERA_MOVEMENT_GROUPS = [
   ] },
 ] as const
 
+export const CAMERA_MOVEMENT_GROUPS = consolidateCameraChoices(RAW_CAMERA_MOVEMENT_GROUPS)
+
 
 export function cameraMovementName(value: string): string {
   const special: Record<string, string> = {
@@ -78,6 +99,8 @@ export function cameraMovementName(value: string): string {
     'handheld-subtle': 'Gentle Handheld',
     'handheld-intense': 'Intense Handheld',
     'shoulder-rig': 'Shoulder-Mounted Camera',
+    'truck-left': 'Track Left',
+    'truck-right': 'Track Right',
     'point-of-view': 'Point Of View (POV)',
     'over-shoulder-follow': 'Over-The-Shoulder Follow',
     'walk-and-talk': 'Walk & talk',
@@ -89,7 +112,7 @@ export function cameraMovementName(value: string): string {
 }
 
 export function cameraMovementHelp(value: string): string {
-  for (const group of CAMERA_MOVEMENT_GROUPS) {
+  for (const group of RAW_CAMERA_MOVEMENT_GROUPS) {
     const match = group.options.find(([candidate]) => candidate === value)
     if (match) return match[1]
   }
@@ -107,7 +130,27 @@ export type StoryboardMenuOption = {
   aliases?: readonly string[]
 }
 
-export function StoryboardCompactSelect({ label, value, options, disabled, help, description, exhausted = false, triggerAriaLabel, onChange }: { label: string; value: string; options: StoryboardMenuOption[]; disabled?: boolean; help?: string; description?: string; exhausted?: boolean; triggerAriaLabel?: string; onChange: (value: string) => void }) {
+export function storyboardCameraMovementOptions(value: string): StoryboardMenuOption[] {
+  const options = CAMERA_MOVEMENT_GROUPS.flatMap((group) => group.options.map(([optionValue]) => ({
+    value: optionValue,
+    label: cameraMovementName(optionValue),
+    group: group.label,
+    title: cameraMovementHelp(optionValue),
+  })))
+
+  if (value && !options.some((option) => option.value === value)) {
+    options.push({
+      value,
+      label: cameraMovementName(value),
+      group: 'Saved selection',
+      title: cameraMovementHelp(value),
+    })
+  }
+
+  return options
+}
+
+export function StoryboardCompactSelect({ label, value, options, disabled, help, defaultLabel, description, exhausted = false, triggerAriaLabel, onChange }: { label: string; value: string; options: StoryboardMenuOption[]; disabled?: boolean; help?: string; defaultLabel?: string; description?: string; exhausted?: boolean; triggerAriaLabel?: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeValue, setActiveValue] = useState(value)
@@ -284,9 +327,8 @@ export function StoryboardCompactSelect({ label, value, options, disabled, help,
     </div>
   </div> : null
   return <div ref={root} className={`storyboard-compact-select ${label === 'Camera Movement' ? 'is-movement' : ''} ${label === 'Duration' ? 'is-duration' : ''} ${exhausted ? 'is-exhausted' : ''} ${open ? 'is-open' : ''}`}>
-    <button ref={trigger} type="button" data-equalized-options={JSON.stringify(options.map((option) => option.label))} data-equalized-default={selected?.label || options[0]?.label || value} aria-label={triggerAriaLabel || label} aria-describedby={description ? descriptionId : undefined} aria-haspopup="listbox" aria-expanded={open} title={selected?.disabledReason || selected?.title || help || label} disabled={disabled} onClick={toggleMenu} onKeyDown={handleTriggerKeyDown}><span>{selected?.label || value}</span><ChevronDown size={9} /></button>
+    <button ref={trigger} type="button" data-equalized-options={JSON.stringify(options.map((option) => option.label))} data-equalized-default={defaultLabel || selected?.label || options[0]?.label || value} aria-label={triggerAriaLabel || label} aria-describedby={description ? descriptionId : undefined} aria-haspopup="listbox" aria-expanded={open} title={selected?.disabledReason || selected?.title || help || `${label}: ${selected?.label || value}`} disabled={disabled} onClick={toggleMenu} onKeyDown={handleTriggerKeyDown}><span>{selected?.label || value}</span><ChevronDown size={9} /></button>
     {description && <span id={descriptionId} className="storyboard-visually-hidden">{description}</span>}
     {menuContent && createPortal(menuContent, document.body)}
   </div>
 }
-

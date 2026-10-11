@@ -1,8 +1,9 @@
+import { createStoryboardPanel } from '../../shared/storyboardPanels'
 import { ProviderAvailabilityContext } from './ProviderAvailabilityContext'
 import { higgsfieldJobReadinessFailures, type HiggsfieldJobsView, type HiggsfieldJobCommand } from '../../shared/higgsfieldJobs'
 import { selectHiggsfieldBinding, preserveHiggsfieldSelection, higgsfieldPresetReadinessFailures, higgsfieldInputReadinessFailures, reconcileHiggsfieldNodeBinding, resetHiggsfieldBinding } from '../../shared/higgsfieldNodeBinding'
 import type { HiggsfieldPreset } from '../../shared/higgsfieldNative'
-import { isHiggsfieldRemoteUncertainty, higgsfieldModel } from '../../shared/higgsfieldNative'
+import { isHiggsfieldRemoteUncertainty, higgsfieldModel, higgsfieldPromptFamily, higgsfieldSourceOwnsTimeline } from '../../shared/higgsfieldNative'
 import type { HiggsfieldContractView } from '../../shared/higgsfieldInputContract'
 import { HiggsfieldContractStore } from './higgsfieldContractStore'
 import { workflowSaveOwner } from '../../shared/workflowSaveOwnership'
@@ -10,7 +11,7 @@ import { createWorkflowSaveCoordinator, type WorkflowSaveSnapshot } from './work
 import { loadProjectActivationState } from './projectActivationState'
 import { fishAvailabilityError, fishSampleRateOptions, fishBitrateOptions } from '../../shared/fishAudio'
 import { isElevenDialogue } from '../../shared/elevenDialogue'
-import { generationCallCount, generationResultMedia } from '../../shared/generationResultMedia'
+import { generationCallCount, generationResultMedia, nativeVideoQuantityAvailable, runNativeVideoBatch } from '../../shared/generationResultMedia'
 import { FalContractStore } from './falContractStore'
 import { reconcileFalNodeBinding, preserveFalNativeSelection, type FalNativeNodeState } from '../../shared/falNodeBinding'
 import { falNativeFlowForKind } from '../../shared/falNativeExecution'
@@ -513,9 +514,7 @@ const emptyServiceDrafts: Record<ServiceProvider, string> = { higgsfield: '', fa
 
 const AUDIO_OUTPUT_FORMATS = ELEVEN_AUDIO_OUTPUT_FORMATS
 
-const makeStoryboardPanels = (count: number, duration: number = 1): StoryboardPanel[] => Array.from({ length: count }, () => ({
-  id: crypto.randomUUID(), prompt: '', duration, shotSize: 'wide', camera: 'static', audioCue: '', locked: false,
-}))
+const makeStoryboardPanels = (count: number): StoryboardPanel[] => Array.from({ length: count }, () => createStoryboardPanel(crypto.randomUUID()))
 
 function initialData(kind: NodeKind): StudioNodeData {
   const item = palette.find((entry) => entry.kind === kind)
@@ -1134,6 +1133,7 @@ export function App() {
   const edgeCloseTimer = useRef<number | null>(null)
   const pendingEdgeHover = useRef<EdgeMenuState | null>(null)
   const nodeLayoutRef = useRef<StudioNode[]>([])
+  const nativeVideoBatchTokens = useRef(new Map<string, { cancelled: boolean }>())
   const nodeProgressExpiryTimers = useRef<NodeProgressExpiryTimers>(new Map())
   const notificationNodesRef = useRef<StudioNode[]>([])
   const graphStateRef = useRef<{ canvases: WorkspaceCanvas[]; pages: CanvasPage[]; edges: Edge[]; activeCanvasId: string; activePageId: string }>({ canvases: [], pages: [], edges: [], activeCanvasId: '', activePageId: '' })
@@ -1611,6 +1611,7 @@ export function App() {
     const stop = startServiceAvailabilityRefresh({
       connected,
       publicCatalogs: ['fish', 'higgsfield'],
+      snapshot: (provider) => window.prism.services.modelSnapshot(provider),
       models: (provider) => window.prism.services.models(provider),
       account: (provider) => window.prism.services.account(provider),
       requestGuard: (provider, channel) => serviceResponseScope.current!.begin(provider, channel),
@@ -2025,7 +2026,7 @@ export function App() {
 
   const loadHiggsfieldContract = useCallback(async (endpointId: string, refresh = false) => {
     if (!mediaProviderAvailable('higgsfield')) return
-    try { if (higgsfieldModel(endpointId).kind !== 'seedance') return } catch { return }
+    try { if (higgsfieldModel(endpointId).kind === 'genjutsu') return } catch { return }
     const owned = serviceResponseScope.current!.capture('higgsfield'), scope = serviceResponseScope.current!.identity('higgsfield')
     const key = endpointId, revision = (higgsfieldContractRevisions.current.get(key) || 0) + 1
     higgsfieldContractRevisions.current.set(key, revision)
@@ -2127,7 +2128,11 @@ export function App() {
       window.requestAnimationFrame(() => updateNodeInternals(nodeId))
     } catch (error) { updateNode(nodeId, { error: error instanceof Error ? error.message : String(error) }) }
   }, [edges, loadHiggsfieldContract, updateNode, updateNodeInternals])
-  const selectedHiggsfieldEndpoints = [...new Set(nodes.flatMap(node => node.data.higgsfieldNative && node.data.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/') ? [node.data.higgsfieldNative.endpointId] : []))].sort().join('\n')
+  const selectedHiggsfieldEndpoints = [...new Set(nodes.flatMap(node => {
+    const state = node.data.higgsfieldNative
+    if (!state) return []
+    try { return higgsfieldModel(state.endpointId).kind !== 'genjutsu' ? [state.endpointId] : [] } catch { return [] /* preserve unavailable saved routes */ }
+  }))].sort().join('\n')
   useEffect(() => {
     if (!mediaProviderAvailable('higgsfield') || !selectedHiggsfieldEndpoints) return
     const refresh = () => { for (const endpointId of selectedHiggsfieldEndpoints.split('\n')) void loadHiggsfieldContract(endpointId) }
@@ -2152,13 +2157,15 @@ export function App() {
   useEffect(() => {
     if (!serviceConnections.fal) return
     for (const endpointId of selectedFalEndpoints.split('\n').filter(Boolean)) void loadFalContract(endpointId)
-  }, [loadFalContract, selectedFalEndpoints, serviceConnections.fal, serviceModels.fal, project?.id, project?.rootPath])
+  }, [loadFalContract, selectedFalEndpoints, serviceConnections.fal, serviceModels.fal, serviceProfiles, project?.id, project?.rootPath])
 
   const resetNodeSettings = useCallback((id: string) => {
     setNodes((current) => current.map((node) => {
       if (node.id !== id) return node
       const state = node.data.higgsfieldNative, view = state ? higgsfieldSchema(state.endpointId) : undefined
-      if (state?.endpointId.startsWith('bytedance/seedance-2.5/') && (!view?.contract || view.loading || view.error)) return { ...node, data: { ...node.data, error: 'Load current Higgsfield model inputs before resetting; saved values are preserved.' } }
+      let schemaNative = false
+      try { schemaNative = Boolean(state && higgsfieldModel(state.endpointId).kind !== 'genjutsu') } catch { schemaNative = Boolean(state) }
+      if (schemaNative && (!view?.contract || view.loading || view.error)) return { ...node, data: { ...node.data, error: 'Load current Higgsfield model inputs before resetting; saved values are preserved.' } }
       return { ...node, data: { ...node.data, ...resetNodeSettingsPatch(node.data), ...(state && view?.contract ? { higgsfieldNative: resetHiggsfieldBinding(state, view.contract) } : {}) } }
     }))
   }, [setNodes, higgsfieldSchema])
@@ -4281,13 +4288,25 @@ export function App() {
       updateNode(id, { runState: 'error', progress: undefined, error: `Cannot run: ${formatRequirementList(requirementFailures)}.` })
       return
     }
+    const nativeVideoFields = request.falNative ? falSchema(request.falNative.endpointId).contract?.runtime?.fields
+      : request.higgsfieldNative ? higgsfieldSchema(request.higgsfieldNative.endpointId).contract?.fields : undefined
+    const repeatNativeVideo = request.kind === 'video-generator' && Boolean(request.falNative || request.higgsfieldNative)
+      && (!request.higgsfieldNative || !higgsfieldSourceOwnsTimeline(request.higgsfieldNative.endpointId))
+      && nativeVideoQuantityAvailable(nativeVideoFields)
+    const batchToken = repeatNativeVideo ? { cancelled: false } : undefined
+    const batchOrigin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
+    const patchGenerationNode = (patch: Partial<StudioNodeData>) => {
+      if (repeatNativeVideo) { if (ownsServiceOperation() && graphAtOrigin(batchOrigin).nodes.some(candidate => candidate.id === id)) patchOriginNode(batchOrigin, id, patch) }
+      else updateNode(id, patch)
+    }
+    if (batchToken) nativeVideoBatchTokens.current.set(id, batchToken)
     const timingKey = generationTimingKey(request)
     const coldStartSeconds = estimatedGenerationSeconds({ ...node.data, learnedGenerationSeconds: undefined })
     const learnedSeconds = learnedGenerationSeconds(history, timingKey, coldStartSeconds)
     const runStartedAt = new Date().toISOString()
     updateNode(id, { runState: 'queued', progress: 'Preparing request…', error: undefined, runStartedAt, learnedGenerationSeconds: learnedSeconds, ...(semanticAssetKind ? semanticAssetGenerationStartedPatch(node.data) : {}) })
     try {
-      const batchSize = generationCallCount(Boolean(request.falNative || request.higgsfieldNative), node.data.quantity, isElementAsset ? 2 : 1)
+      const batchSize = generationCallCount(Boolean(request.falNative || request.higgsfieldNative), node.data.quantity, isElementAsset ? 2 : 1, repeatNativeVideo)
       const keepsGenerationHistory = ['image-generator', 'image-editor', 'upscaler', 'video-generator', 'voiceover', 'sound-effects', 'music-generator', 'output'].includes(node.data.kind)
       const batchGeneratedResults: NonNullable<StudioNodeData['generatedResults']> = []
       const sourceLabels = [...new Set([
@@ -4297,8 +4316,8 @@ export function App() {
       ].filter((label): label is string => Boolean(label?.trim())).map((label) => label.trim()))]
       let lastResult: Awaited<ReturnType<typeof window.prism.generation.run>> | undefined
 
-      for (let index = 0; index < batchSize; index += 1) {
-        updateNode(id, {
+      const runBatchIteration = async (index: number) => {
+        patchGenerationNode({
           runState: 'running',
           progress: batchSize > 1 ? `Generating ${index + 1} of ${batchSize}…` : 'Generating…',
         })
@@ -4314,16 +4333,25 @@ export function App() {
         })
         lastResult = result
         for (const media of generationResultMedia(result)) batchGeneratedResults.push({ id: crypto.randomUUID(), ...media, modelId: result.modelId, name: generatedResultName({ ...media, modelId: result.modelId }, node.data.title), createdAt: new Date().toISOString(), sourceLabels })
+        if (repeatNativeVideo && ownsServiceOperation()) {
+          const liveData = graphAtOrigin(batchOrigin).nodes.find(candidate => candidate.id === id)?.data || node.data
+          const generatedResults = mergeLiveGeneratedResults(liveData.generatedResults || [], batchGeneratedResults)
+          patchGenerationNode({ outputPath: result.outputPath, outputUrl: result.outputUrl, outputType: result.outputType,
+            modelId: result.modelId, generatedResults, activeResultIndex: Math.max(0, generatedResults.findIndex(item => item.path === result.outputPath)) })
+          userMutationArmed.current = true; mutationVersion.current += 1; saveLifecycle.current?.markDirty()
+        }
       }
+      if (repeatNativeVideo) await runNativeVideoBatch(batchSize, runBatchIteration, () => Boolean(batchToken?.cancelled) || !ownsServiceOperation() || !graphAtOrigin(batchOrigin).nodes.some(candidate => candidate.id === id))
+      else for (let index = 0; index < batchSize; index += 1) await runBatchIteration(index)
 
       if (!lastResult) throw new Error('The generation completed without returning media.')
-      const liveNodeData = nodeLayoutRef.current.find((candidate) => candidate.id === id)?.data || node.data
+      const liveNodeData = (repeatNativeVideo ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data
       const liveGeneratedResults = keepsGenerationHistory
         ? [...(liveNodeData.generatedResults || [])]
         : []
       const semanticGenerationPatch = semanticAssetKind ? semanticAssetGenerationPatch(liveNodeData, batchGeneratedResults) : undefined
       const generatedResults = semanticGenerationPatch?.generatedResults || mergeLiveGeneratedResults(liveGeneratedResults, batchGeneratedResults)
-      updateNode(id, {
+      patchGenerationNode({
         runState: 'complete',
         progress: `${batchGeneratedResults.length > 1 ? `${batchGeneratedResults.length} results complete` : 'Complete'} · ${providerModelDisplayName(lastResult.modelId)}`,
         outputPath: lastResult.outputPath,
@@ -4342,9 +4370,9 @@ export function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const stopped = !isHiggsfieldRemoteUncertainty(message) && (error instanceof DOMException && error.name === 'AbortError' || /abort|cancel|stopped/i.test(message))
-      const liveData = nodeLayoutRef.current.find((candidate) => candidate.id === id)?.data || node.data
+      const liveData = (repeatNativeVideo ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data
       const semanticStopped = semanticAssetKind ? semanticAssetGenerationStoppedPatch(liveData) : {}
-      updateNode(id, stopped ? { runState: 'idle', progress: 'Stopped', error: undefined, runStartedAt: undefined, ...semanticStopped } : { runState: 'error', progress: undefined, error: message, runStartedAt: undefined, ...semanticStopped })
+      patchGenerationNode(stopped ? { runState: 'idle', progress: 'Stopped', error: undefined, runStartedAt: undefined, ...semanticStopped } : { runState: 'error', progress: undefined, error: message, runStartedAt: undefined, ...semanticStopped })
       userMutationArmed.current = true
       mutationVersion.current += 1
       saveLifecycle.current?.markDirty()
@@ -4357,9 +4385,10 @@ export function App() {
         }
       }
     } finally {
+      if (batchToken && nativeVideoBatchTokens.current.get(id) === batchToken) nativeVideoBatchTokens.current.delete(id)
       if (request.higgsfieldNative && ownsServiceOperation()) void refreshHiggsfieldJobs()
     }
-  }, [higgsfieldJobs, refreshHiggsfieldJobs, falSchema, higgsfieldSchema, loadFalContract, history, incomingValue, nodes, openProviderConnections, refreshServiceAccount, semanticGraphNodes, serviceAccounts, serviceConnections, mediaProviderAvailable, serviceModels, setEdges, setNodes, updateNode, higgsfieldPresets])
+  }, [activeCanvasId, activePageId, graphAtOrigin, patchOriginNode, higgsfieldJobs, refreshHiggsfieldJobs, falSchema, higgsfieldSchema, loadFalContract, history, incomingValue, nodes, openProviderConnections, refreshServiceAccount, semanticGraphNodes, serviceAccounts, serviceConnections, mediaProviderAvailable, serviceModels, setEdges, setNodes, updateNode, higgsfieldPresets])
 
   const runSequence = useCallback(async () => {
     const origin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
@@ -4442,6 +4471,8 @@ export function App() {
   }, [activeCanvasId, activePageId, commitOriginGraph, graphAtOrigin, patchOriginNode])
 
   const stopNode = useCallback(async (id: string) => {
+    const token = nativeVideoBatchTokens.current.get(id)
+    if (token) token.cancelled = true
     await window.prism.generation.cancel(id)
     updateNode(id, { runState: 'idle', progress: 'Stopped', error: undefined })
   }, [updateNode])
@@ -5782,7 +5813,10 @@ export function App() {
       .filter((edge) => edge.source === storyboardId && edge.targetHandle === 'storyboard-in')
       .map((edge) => nodes.find((node) => node.id === edge.target))
       .filter((node): node is StudioNode => node?.data.kind === 'video-generator')
-      .map((node) => node.data.higgsfieldNative?.endpointId.startsWith('bytedance/seedance-2.5/') ? 'seedance' as const : resolveVideoModel(node.data.videoEngine).family))
+      .map((node) => {
+        if (!node.data.higgsfieldNative) return resolveVideoModel(node.data.videoEngine).family
+        try { return higgsfieldPromptFamily(node.data.higgsfieldNative.endpointId) } catch { return 'generic' }
+      }))
     return families.size === 1 ? [...families][0] : undefined
   }, [edges, nodes])
   const connectedStoryboardVideo = useCallback((storyboardId: string) => resolveConnectedStoryboardVideo(nodes, edges, storyboardId, endpointId => falSchema(endpointId).contract, endpointId => higgsfieldSchema(endpointId).contract), [edges, nodes, falSchema, higgsfieldSchema])
@@ -5791,7 +5825,7 @@ export function App() {
     const node = nodes.find((candidate) => candidate.id === nodeId)
     const connected = Boolean(node && edges.some((edge) => edge.target === nodeId && edge.targetHandle === 'storyboard-in'))
     if (!node || node.data.kind !== 'video-generator') return null
-    if (node.data.higgsfieldNative && !node.data.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) {
+    if (node.data.higgsfieldNative && higgsfieldSourceOwnsTimeline(node.data.higgsfieldNative.endpointId)) {
       const prompt = node.data.manualPromptDraft ?? node.data.prompt ?? ''
       return { connected: false, mode: 'manual' as const, autoPrompt: '', manualPrompt: prompt, activePrompt: prompt, fingerprint: '', resetDisabled: true }
     }
@@ -6025,12 +6059,42 @@ export function App() {
   const inspectorPromptTags = inspectorNode ? [...new Set(connectedInputRules(inspectorNode.id).flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))] : []
   const inspectorAvailablePromptTags = inspectorNode ? availablePromptTags(inspectorNode.id) : inspectorPromptTags
   const inspectorVideoModel = inspectorNode?.data.kind === 'video-generator' && !inspectorNode.data.higgsfieldNative ? resolveVideoModel(inspectorNode.data.videoEngine) : undefined
+  const inspectorVideoGroups = inspectorNode?.data.kind === 'video-generator' ? videoModelGroups(serviceModels.fal, serviceModels.higgsfield, inspectorNode.data) : []
+  const inspectorVideoValue = inspectorNode?.data.kind === 'video-generator'
+    ? inspectorNode.data.higgsfieldNative ? `higgsfield-native::${inspectorNode.data.higgsfieldNative.endpointId}` : inspectorNode.data.falNative ? `fal-native::${inspectorNode.data.falNative.endpointId}` : resolveVideoModel(inspectorNode.data.videoEngine).id
+    : ''
+  const selectInspectorVideoModel = (engine: string) => {
+    if (!inspectorNode || inspectorNode.data.kind !== 'video-generator') return
+    if (engine.startsWith('higgsfield-native::')) { selectHiggsfieldModel(inspectorNode.id, engine.slice('higgsfield-native::'.length)); return }
+    if (engine.startsWith('fal-native::')) { selectFalModel(inspectorNode.id, engine.slice(12)); return }
+    const model = resolveVideoModel(engine)
+    const frameRate = model.frameRates.length ? (model.frameRates.includes(inspectorNode.data.frameRate || 24) ? inspectorNode.data.frameRate || 24 : model.frameRates[0]) : undefined
+    const duration = videoDurationOptions(engine, frameRate).filter((value): value is number => typeof value === 'number')[0]
+    updateNode(inspectorNode.id, { ...preserveFalNativeSelection(inspectorNode.data), videoEngine: engine,
+      aspectRatio: defaultVideoRatio(model) || inspectorNode.data.aspectRatio, duration, autoDuration: false,
+      generateAudio: model.nativeAudio ? inspectorNode.data.generateAudio : false,
+      resolution: model.resolutions.length ? (model.resolutions.includes(inspectorNode.data.resolution || '') ? inspectorNode.data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined,
+      frameRate, motionCadence: normalizedMotionCadence(model, frameRate, inspectorNode.data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : inspectorNode.data.inferenceSteps,
+      guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : inspectorNode.data.guidanceScale,
+      acceleration: model.family === 'wan' ? 'regular' : inspectorNode.data.acceleration })
+  }
   const inspectorRunnable = inspectorNode && isRunnableNodeKind(inspectorNode.data.kind)
   const inspectorInspection = inspectorNode && inspectorRunnable
     ? inspectGenerationRequest(inspectorNode, semanticGraphNodes, edges)
     : { request: null, error: null }
   const inspectorRequest = inspectorInspection.request
   const inspectorReferenceCount = inspectorRequest ? generationMediaInputCount(inspectorRequest) : 0
+  const inspectorHiggsfieldInputSummary = inspectorNode?.data.higgsfieldNative ? (() => {
+    const state = inspectorNode.data.higgsfieldNative!
+    try { if (higgsfieldModel(state.endpointId).kind === 'genjutsu') return 'One source video · image references across all image sockets · source supplies cuts and audio' } catch { /* preserve the saved bindings below */ }
+    const view = higgsfieldSchema(state.endpointId)
+    const media = view.contract?.endpointId === state.endpointId ? view.contract.media : state.media || []
+    const summary = media.filter(binding => !('retired' in binding && binding.retired)).map(binding => {
+      const count = binding.maximum !== undefined ? `up to ${binding.maximum}` : binding.multiple ? 'multiple' : 'one'
+      return `${binding.label} · ${binding.type} · ${count}`
+    }).join(' · ')
+    return summary || (view.loading ? 'Loading native media inputs' : 'No native media inputs declared')
+  })() : undefined
   const inspectorImageModelId = inspectorNode && inspectorRequest && ['image-generator', 'image-editor', 'element', 'location'].includes(inspectorNode.data.kind)
     ? inspectorNode.data.imageProvider === 'openai' || inspectorNode.data.imageProvider === 'google'
       ? inspectorRequest.imageModelId || ''
@@ -6699,14 +6763,10 @@ export function App() {
               {['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind)
                 ? <div className="inspector-model">{modelCompanyFor(inspectorImageModelId, inspectorImageModelLabel) && <CompanyIcon provider={modelCompanyFor(inspectorImageModelId, inspectorImageModelLabel)!} />}<span>{inspectorImageModelLabel}{inspectorReferenceCount ? ' · references' : ' · text to image'}</span></div>
                 : inspectorNode.data.kind === 'video-generator'
-                  ? <><GroupedMenuSelect catalog className="inspector-model-select" menuClassName="video-model-menu" ariaLabel="Video model" displayLabel={inspectorNode.data.higgsfieldNative?.label || inspectorNode.data.falNative?.label} value={inspectorNode.data.higgsfieldNative ? `higgsfield-native::${inspectorNode.data.higgsfieldNative.endpointId}` : inspectorNode.data.falNative ? `fal-native::${inspectorNode.data.falNative.endpointId}` : resolveVideoModel(inspectorNode.data.videoEngine).id} groups={videoModelGroups(serviceModels.fal, serviceModels.higgsfield, inspectorNode.data)} onChange={(engine) => {
-                    if (engine.startsWith('higgsfield-native::')) { selectHiggsfieldModel(inspectorNode.id, engine.slice('higgsfield-native::'.length)); return }
-                    if (engine.startsWith('fal-native::')) { selectFalModel(inspectorNode.id, engine.slice(12)); return }
-                    const model = resolveVideoModel(engine)
-                    const frameRate = model.frameRates.length ? (model.frameRates.includes(inspectorNode.data.frameRate || 24) ? inspectorNode.data.frameRate || 24 : model.frameRates[0]) : undefined
-                    const duration = videoDurationOptions(engine, frameRate).filter((value): value is number => typeof value === 'number')[0]
-                    updateNode(inspectorNode.id, { ...preserveFalNativeSelection(inspectorNode.data), videoEngine: engine, aspectRatio: defaultVideoRatio(model) || inspectorNode.data.aspectRatio, duration, autoDuration: false, generateAudio: model.nativeAudio ? inspectorNode.data.generateAudio : false, resolution: model.resolutions.length ? (model.resolutions.includes(inspectorNode.data.resolution || '') ? inspectorNode.data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined, frameRate, motionCadence: normalizedMotionCadence(model, frameRate, inspectorNode.data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : inspectorNode.data.inferenceSteps, guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : inspectorNode.data.guidanceScale, acceleration: model.family === 'wan' ? 'regular' : inspectorNode.data.acceleration })
-                  }} /><p className="inspector-model-capability"><strong>INPUTS</strong>{inspectorNode.data.higgsfieldNative ? 'One source video · image references across all image sockets · source supplies cuts and audio' : inspectorNode.data.falNative ? inspectorNode.data.falNative.media.filter(field => !field.retired).map(field => `${field.label}${field.maximum === undefined ? '' : ` (up to ${field.maximum})`}`).join(' · ') || 'No media inputs declared' : videoInputSummary(resolveVideoModel(inspectorNode.data.videoEngine))}</p></>
+                  ? <>
+                    <GroupedMenuSelect catalog className="inspector-model-select" menuClassName="video-model-menu" ariaLabel="Video model" displayLabel={inspectorNode.data.higgsfieldNative?.label || inspectorNode.data.falNative?.label} value={inspectorVideoValue} groups={inspectorVideoGroups} onChange={engine => selectInspectorVideoModel(engine)} />
+                    <p className="inspector-model-capability"><strong>INPUTS</strong>{inspectorNode.data.higgsfieldNative ? inspectorHiggsfieldInputSummary : inspectorNode.data.falNative ? inspectorNode.data.falNative.media.filter(field => !field.retired).map(field => `${field.label}${field.maximum === undefined ? '' : ` (up to ${field.maximum})`}`).join(' · ') || 'No media inputs declared' : videoInputSummary(resolveVideoModel(inspectorNode.data.videoEngine))}</p>
+                  </>
                   : inspectorNode.data.kind === 'voiceover'
                     ? <VoiceModelSelect className="inspector-model-select" data={inspectorNode.data} falAvailability={serviceModels.fal} fishAvailability={serviceModels.fish} onFalSelect={(endpointId) => selectFalModel(inspectorNode.id, endpointId)} models={serviceModels.elevenlabs?.models || []} onChange={(patch) => updateNode(inspectorNode.id, patch)} />
                     : inspectorNode.data.kind === 'sound-effects' ? <SoundModelSelect className="inspector-model-select" data={inspectorNode.data} falAvailability={serviceModels.fal} onFalSelect={(endpointId) => selectFalModel(inspectorNode.id, endpointId)} onChange={(patch) => updateNode(inspectorNode.id, patch)} />
@@ -6724,7 +6784,7 @@ export function App() {
                   const sourceKind = port.id === 'text-in' ? 'prompt' : port.id === 'storyboard-in' ? 'storyboard' : port.id === 'character-in' ? 'character' : port.id === 'wardrobe-in' ? 'wardrobe' : port.id === 'element-in' ? 'element' : port.id === 'location-in' ? 'location' : port.id === 'style-in' ? 'style-reference' : 'upload'
                   return <button key={port.id} disabled={port.maxConnections === 0} onClick={() => addInspectorReference(inspectorNode.id, sourceKind, port.id)}><GeneratorInputIcon id={port.id} signal={port.signal} kind="video-generator" /><span>{generatorInputLabel(port.id, port.label).replace(/^Add /, '')}</span><small>{port.maxConnections === 1 ? 'Single input' : port.maxConnections ? `Up to ${port.maxConnections}` : 'Connect node'}</small></button>
                 })}
-              </div><p className="reference-budget">{inspectorNode.data.higgsfieldNative?.label || inspectorVideoModel?.label} · {inspectorNode.data.higgsfieldNative ? 'image capacity applies across every connected reference socket.' : inspectorNode.data.falNative ? 'connected media use this exact model’s declared inputs.' : 'semantic inputs automatically select a legal reference-capable route.'}</p></> : <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload')}>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? <Video size={17} /> : <ImageIcon size={17} />}<span>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'Input video' : 'Input image'}</span><small>One {inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'video' : inspectorNode.data.kind === 'upscaler' ? 'image' : 'or more images'}</small></button></div>}
+              </div><p className="reference-budget">{inspectorNode.data.higgsfieldNative?.label || inspectorVideoModel?.label} · {inspectorNode.data.higgsfieldNative ? 'connected media use this exact model’s declared inputs and limits.' : inspectorNode.data.falNative ? 'connected media use this exact model’s declared inputs.' : 'semantic inputs automatically select a legal reference-capable route.'}</p></> : <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload')}>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? <Video size={17} /> : <ImageIcon size={17} />}<span>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'Input video' : 'Input image'}</span><small>One {inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'video' : inspectorNode.data.kind === 'upscaler' ? 'image' : 'or more images'}</small></button></div>}
             </section>}
 
             {inspectorNode.data.kind !== 'upscaler' && !(isElevenDialogue(inspectorNode.data) && !inspectorNode.data.falNative) && <section className="inspector-section inspector-routine-prompt">
@@ -6993,14 +7053,15 @@ export function App() {
                 const connected = serviceConnections[service.id]
                 const hasAccounts = providerProfiles.length > 0 || connected
                 const expanded = activeService === service.id
+                const showAccountManager = expanded && providerProfiles.length > 0
                 const editingKey = expanded && (signInProfileId === 'new' || providerProfiles.some((profile) => profile.id === signInProfileId))
 
                 return <article data-service={service.id} className={`service-card ${connected ? 'is-connected' : ''} ${expanded ? 'is-expanded' : ''}`} key={service.id}>
-                  <div className="service-card-head"><span className={`service-icon brand-${service.id}`}><ServiceBrandLogo provider={service.id} /></span><div><strong>{service.name}</strong><small>{service.company}</small></div>{connected && <span className="connection-badge"><i /> Connected</span>}</div>
+                  <div className="service-card-head"><span className={`service-icon brand-${service.id}`}><ServiceBrandLogo provider={service.id} /></span><div><strong>{service.name}</strong><small>{service.company}</small></div>{connected && <span className="connection-badge"><i /> Connected</span>}{expanded && providerProfiles.length === 0 && <button className="fal-account-manager-collapse" aria-label={`Collapse ${service.name} Accounts`} onClick={() => { setActiveService(null); setSignInProfileId(null) }}><X size={14} /></button>}</div>
                   <p>{service.description}</p>
                   {serviceModels[service.id]?.catalogError && <p role="status" title={serviceModels[service.id]?.catalogError}>{serviceModels[service.id]?.catalogStale ? 'Model catalog unavailable' : 'Model catalog incomplete'} · saved choices preserved</p>}
                   <div className="service-capabilities">{service.capabilities.map((capability) => <span key={capability}>{capability}</span>)}</div>
-                  {service.id === 'omniroute' ? <footer><span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span><button className="connect-service" disabled={serviceBusy} onClick={() => void refreshOmniRoute()}><Route size={13} />{connected ? 'Refresh Models' : 'Check Local Gateway'}</button></footer> : expanded ? <div className="fal-account-manager">
+                  {service.id === 'omniroute' ? <footer><span className="service-connection-method" title="API connection"><KeyRound size={13} aria-hidden="true" /><span>API</span></span><button className="connect-service" disabled={serviceBusy} onClick={() => void refreshOmniRoute()}><Route size={13} />{connected ? 'Refresh Models' : 'Check Local Gateway'}</button></footer> : showAccountManager ? <div className="fal-account-manager">
                     <div className="fal-account-manager-head"><button aria-label={`Collapse ${service.name} Accounts`} onClick={() => { setActiveService(null); setSignInProfileId(null) }}><X size={14} /></button></div>
                     <div className="fal-account-list">
                       {providerProfiles.map((profile) => {
@@ -7029,7 +7090,7 @@ export function App() {
                     {editingKey ? <>
                       <input className="service-key-input" autoFocus disabled={serviceBusy} type="password" aria-label={`${service.name} API key`} value={serviceDrafts[service.id]} onChange={(event) => setServiceDrafts((current) => ({ ...current, [service.id]: event.target.value }))} placeholder={service.placeholder} autoComplete="off" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); const footer = event.currentTarget.closest('footer'); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); requestAnimationFrame(() => footer?.querySelector<HTMLButtonElement>('button')?.focus()) } else if (event.key === 'Enter' && !serviceBusy && serviceDrafts[service.id].trim().length >= 20) { event.preventDefault(); void saveService(service.id, event.currentTarget.closest('footer')) } }} />
                       <div className="service-key-actions"><button className="service-key-cancel" disabled={serviceBusy} onClick={(event) => { const footer = event.currentTarget.closest('footer'); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); requestAnimationFrame(() => footer?.querySelector<HTMLButtonElement>('button')?.focus()) }}>Cancel</button><button className="service-key-connect" disabled={serviceBusy || serviceDrafts[service.id].trim().length < 20} onClick={(event) => void saveService(service.id, event.currentTarget.closest('footer'))}>{signInProfileId === 'new' ? 'Connect' : 'Save'}</button></div>
-                    </> : expanded ? <button className="fal-add-account" onClick={() => { setSignInProfileId('new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })) }}><Plus size={13} />Add Account</button> : <button className="connect-service" onClick={() => { setActiveService(service.id); setSignInProfileId(null); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); setServiceError('') }}>{hasAccounts ? <UserRound size={13} /> : <Plus size={13} />}{hasAccounts ? 'Manage Accounts' : 'Connect'}</button>}
+                  </> : expanded ? <button className="fal-add-account" onClick={() => { setSignInProfileId('new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })) }}><Plus size={13} />Add Account</button> : <button className="connect-service" onClick={() => { setActiveService(service.id); setSignInProfileId(hasAccounts ? null : 'new'); setServiceDrafts((current) => ({ ...current, [service.id]: '' })); setServiceError('') }}>{hasAccounts ? <UserRound size={13} /> : <Plus size={13} />}{hasAccounts ? 'Manage Accounts' : 'Connect'}</button>}
                   </footer>}
                 </article>
               })}

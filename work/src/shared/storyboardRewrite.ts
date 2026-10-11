@@ -1,3 +1,4 @@
+import { selectedLensInstruction } from './shotRecipes'
 import { assertStoryboardPhysicalCast } from './storyboardPhysicalCast'
 import type { Edge } from '@xyflow/react'
 import type { StoryboardPanel, StudioNode } from './types'
@@ -276,13 +277,16 @@ export function storyboardBridgeConstraintManifest(panels: StoryboardPanel[], mo
   const lines = plans.filter((plan) => plan.transition === 'continue').map((plan) => [
     `boundary=${plan.boundaryIndex + 1}->${plan.boundaryIndex + 2}`,
     'incoming-transition=continue',
-    plan.source ? `source-framing=${plan.source.shotSize} ${plan.source.fovDegrees}°` : '',
-    plan.target ? `target-framing=${plan.target.shotSize} ${plan.target.fovDegrees}°` : '',
+    plan.source ? `source-framing=${plan.source.shotSize}` : '',
+    plan.target ? `target-framing=${plan.target.shotSize}` : '',
     `bridge-kind=${plan.kind}`,
     `bridge-reserve=${plan.reservedSeconds}s`,
+    plan.concurrent ? 'camera-and-action=concurrent' : '',
+    plan.source?.lensMm !== undefined ? `source-lens=${plan.source.lensMm}mm` : '',
+    plan.target?.lensMm !== undefined ? `target-lens=${plan.target.lensMm}mm` : '',
     plan.bridgeText ? `compiler-bridge=${plan.bridgeText}` : '',
   ].filter(Boolean).join(' | '))
-  return lines.length ? `IMMUTABLE COMPILER BRIDGE CONSTRAINTS (HIDDEN):\n${lines.map((line) => `- ${line}`).join('\n')}\nProvider may phrase action naturally but must not alter timing, FOV, transition, bridge kind/reserve, panel order, or compiler metadata.` : ''
+  return lines.length ? `IMMUTABLE COMPILER BRIDGE CONSTRAINTS (HIDDEN):\n${lines.map((line) => `- ${line}`).join('\n')}\nProvider may phrase action naturally but must not alter timing, framing, selected focal length, transition, bridge kind/reserve, panel order, or compiler metadata.` : ''
 }
 
 export function storyboardTypedContinuityManifest(panels: StoryboardPanel[]): string {
@@ -376,7 +380,7 @@ export function storyboardRewriteInstruction(panels: StoryboardPanel[], panelId:
     const camera = panelSetting(panel.camera, 'static')
     const transition = normalizedStoryboardTransition(panel.transitionToNext, index, panels.length)
     const transitionLabel = transition === 'continue' ? index === panels.length - 1 ? 'FINAL PANEL · OUTGOING CONTINUE HOOK; DO NOT INVENT THE NEXT PANEL' : 'TRANSITION AFTER: CONTINUE IN SAME UNBROKEN TAKE' : transition === 'hard-cut' ? 'TRANSITION AFTER: HARD CUT' : 'FINAL PANEL'
-    return `SHOT ${index + 1} · ${duration}s · ${shotSize} · ${camera}${panel.locked ? ' · LOCKED' : ''} · ${transitionLabel}\n${panel.prompt.trim() || '[empty]'}`
+    return `SHOT ${index + 1} · ${duration}s · ${shotSize}${panel.lensMm !== undefined ? ` · ${selectedLensInstruction(panel.lensMm)}` : ''} · ${camera}${panel.locked ? ' · LOCKED' : ''} · ${transitionLabel}\n${panel.prompt.trim() || '[empty]'}`
   }).join('\n\n')
   const connectedContextBlock = connectedContext.trim() ? `\n\n${connectedContext.trim()}` : ''
 
@@ -466,6 +470,7 @@ export interface StoryboardBatchContextPanel {
   prompt: string
   duration: number
   shotSize: string
+  lensMm?: number
   camera: string
   locked: boolean
   editable: boolean
@@ -488,6 +493,7 @@ export function storyboardBatchTargets(panels: StoryboardPanel[]): StoryboardBat
       prompt: panel.prompt,
       duration: Number(panelSetting(panel.duration, '1')),
       shotSize: panelSetting(panel.shotSize, 'wide'),
+      lensMm: panel.lensMm,
       camera: panelSetting(panel.camera, 'static'),
       locked: Boolean(panel.locked),
       editable: targetIds.has(panel.id),

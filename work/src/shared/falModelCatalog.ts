@@ -25,6 +25,7 @@ const modeLabels: Readonly<Record<string, string>> = {
   'text-to-speech': 'Text to Speech', 'text-to-audio': 'Text to Audio',
   'audio-to-audio': 'Audio to Audio', 'image-to-audio': 'Image to Audio',
   'video-to-audio': 'Video to Audio', 'audio-to-video': 'Audio to Video',
+  'first-last-frame-to-video': 'Start / End to Video',
 }
 const record = (value: unknown): Record<string, unknown> | undefined => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
 const text = (value: unknown): string | undefined => typeof value === 'string' && Boolean(value.trim()) ? value.trim() : undefined
@@ -50,9 +51,16 @@ export function falCatalogModel(value: unknown): FalCatalogModel | null {
   const vendor = parts[0] === 'fal-ai' ? parts[1] || parts[0] : parts[0]
   const knownVendor = Object.keys(companies).sort((a, b) => b.length - a.length).find((key) => vendor === key || vendor.startsWith(`${key}-`) || new RegExp(`^${key}[0-9]`).test(vendor))
   const company = knownVendor ? companies[knownVendor] : vendor.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ')
-  const mode = modeLabels[parts.at(-1)!] || modeLabels[category] || category.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ')
+  // Tiers/LoRA can follow the input mode in the endpoint path.
+  const groupMode = text(record(metadata.group)?.label)
+  const namedGroupMode = groupMode && Object.values(modeLabels).find(mode => groupMode.toLowerCase().startsWith(mode.toLowerCase()))
+  const mode = [...parts].reverse().map(part => modeLabels[part]).find(Boolean) || namedGroupMode || groupMode || modeLabels[category] || category.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ')
   // Release labels preserve variants (Max, Turbo, Pro) while grouping input modes.
-  const release = label.replace(/\s*[-·:]?\s*(?:Text[ -]to[ -](?:Video|Image|Audio|Speech)|Image[ -]to[ -](?:Video|Image|Audio)|Reference[ -]to[ -]Video|Video[ -]to[ -](?:Video|Audio)|Audio[ -]to[ -](?:Video|Audio))\s*$/i, '').trim() || label
+  let release = label.replace(/\s*[-·:]?\s*(?:Text[ -]to[ -](?:Video|Image|Audio|Speech)|Image[ -]to[ -](?:Video|Image|Audio)|Reference[ -]to[ -]Video|Video[ -]to[ -](?:Video|Audio)|Audio[ -]to[ -](?:Video|Audio))\b/gi, ' ').replace(/\(\s*\)|\[\s*\]/g, '').replace(/\s+/g, ' ').trim() || label
+  // Some published display names reuse a sibling's tier. The declared group
+  // and exact endpoint agree on this suffix (for example LTX text Pro vs Fast).
+  const groupTier = /\((pro|fast|standard|turbo|mini|lite|max)\)\s*$/i.exec(groupMode || '')?.[1]
+  if (groupTier && parts.at(-1)?.toLowerCase() === groupTier.toLowerCase()) release = release.replace(/\s+(?:pro|fast|standard|turbo|mini|lite|max)$/i, ` ${groupTier[0].toUpperCase()}${groupTier.slice(1).toLowerCase()}`)
   const releasedAt = text(metadata.date)
   return { id, label, category, description: text(metadata.description), updatedAt: text(metadata.updated_at),
     catalog: { service: 'fal.ai', company, release, mode, ...(releasedAt ? { releasedAt } : {}) } }

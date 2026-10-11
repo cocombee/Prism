@@ -1,0 +1,1439 @@
+{
+  "verifiedAt": "2026-10-11",
+  "qualification": "Reviewed exact published field purposes and shapes; generic inputs receive physical transport only. Fresh provider schema remains authoritative.",
+  "sources": {
+    "openai/gpt-image-2.5/sunburst/edit": {
+      "documentationUrl": "https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api",
+      "capturedSchemaSha256": "72379652b54c57d04fdd540e372e1b8ec776cbc1a549cc9ba7318f413cf70905"
+    },
+    "bytedance/seedream/v5/pro/edit": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seedream/v5/pro/edit/api",
+      "capturedSchemaSha256": "e6129b045994e42583336ec34df658a232ac28b45a72bc7835470a1408f87bdf"
+    },
+    "ideogram/v4.5/edit": {
+      "documentationUrl": "https://fal.ai/models/ideogram/v4.5/edit/api",
+      "capturedSchemaSha256": "e734438a12d6392dcab74ddf83ea6285a5ded11d86a195683753c3dd7fb515dc"
+    },
+    "fal-ai/nano-banana-2/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/nano-banana-2/edit/api",
+      "capturedSchemaSha256": "477c44c1cdebfeab2c3f153c0a74c2d071ac84d0d7d0bc2fdc52ed812aa595b8"
+    },
+    "bytedance/seedream/v5/flash/edit": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seedream/v5/flash/edit/api",
+      "capturedSchemaSha256": "03a3a057160141906c1ff0dd3e67809fd6adeefb9cefb194685c82011341fa8f"
+    },
+    "openai/gpt-image-2.5/flare/edit": {
+      "documentationUrl": "https://fal.ai/models/openai/gpt-image-2.5/flare/edit/api",
+      "capturedSchemaSha256": "b4220fbbbe238ed35de7374e1949a1d1ce6012fbbacf59e2fb1002736b6bfd6d"
+    },
+    "fal-ai/nano-banana-pro/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/nano-banana-pro/edit/api",
+      "capturedSchemaSha256": "9a7bb9e178ad967ba7dd9847e1535d60d0e58584f03084f665f2a0a89c9df949"
+    },
+    "bytedance/seedream/v5/pro/layerize": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seedream/v5/pro/layerize/api",
+      "capturedSchemaSha256": "f066c44153e8a50bf104d03645afe6e5cd19d5dc6b0a7332895febeb983b65a4"
+    },
+    "bytedance/seedream/v5/lite/edit": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seedream/v5/lite/edit/api",
+      "capturedSchemaSha256": "70f1f4a46c4583bb1d19fccaa4377cde9e2c390ef0ce7669e61c0d9ec119ad51"
+    },
+    "bytedance/seedream/v5/flash/layerize": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seedream/v5/flash/layerize/api",
+      "capturedSchemaSha256": "e52529d83d6db635f865fee4937c68ab5d50244b284f340042e8df756a33c808"
+    },
+    "fal-ai/flux-2-pro/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-pro/edit/api",
+      "capturedSchemaSha256": "f0ff8f941f619f5d74d9cccc60cdbee6f340d9b33b8e7e4649ce741c1934254b"
+    },
+    "fal-ai/flux-2/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/edit/api",
+      "capturedSchemaSha256": "498a371ca458ce8d38e32800237766f6338c4a67b89c7fa9afde6f6d56d5f915"
+    },
+    "fal-ai/flux-2/flash/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/flash/edit/api",
+      "capturedSchemaSha256": "948c97eb50ee65c984800a8edece4ec66b5e9936b1b5c85a213fb070d6cb63d8"
+    },
+    "fal-ai/flux-2-pro/outpaint": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-pro/outpaint/api",
+      "capturedSchemaSha256": "921d0150bf8fbfec62d1799e2d85d7829ed1554815756149c536fb307756cb48"
+    },
+    "fal-ai/flux-2/turbo/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/turbo/edit/api",
+      "capturedSchemaSha256": "5256db0157c1c9b4df63adc4bdd696d2781f0ed1b4a42b3d65c763dfa62f232e"
+    },
+    "fal-ai/flux-2/lora/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/lora/edit/api",
+      "capturedSchemaSha256": "ab35658b6488ab7f293d294037ce0add5c3c6aa4391bfae5c6149452a644b2a8"
+    },
+    "fal-ai/flux-2-max/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-max/edit/api",
+      "capturedSchemaSha256": "ca378094aaf8289ba304d5d37508ff553c3acb5b60d67cb085dad97f72528e77"
+    },
+    "fal-ai/flux-2-flex/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-flex/edit/api",
+      "capturedSchemaSha256": "32d4c77e32345b7e6967a1075ebf4b62d66fb0cae7a2edbdc48d1e77821e3fca"
+    },
+    "fal-ai/flux-2-lora-gallery/multiple-angles": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-lora-gallery/multiple-angles/api",
+      "capturedSchemaSha256": "ea6d0c6fb096270341e0c3ade2e82045d1ecb0534c4ed463ae586bb62f858e61"
+    },
+    "fal-ai/flux-2-lora-gallery/apartment-staging": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-lora-gallery/apartment-staging/api",
+      "capturedSchemaSha256": "4292a7f80271b6fd774e86d181980edf5989fad5f57dd25b8e8b00e0f626cccd"
+    },
+    "fal-ai/flux-2-lora-gallery/virtual-tryon": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-lora-gallery/virtual-tryon/api",
+      "capturedSchemaSha256": "df94671dd81f80738d3a0efab83c2d0d40e9ce5b1fd0143766404253ae709248"
+    },
+    "fal-ai/flux-2-lora-gallery/face-to-full-portrait": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2-lora-gallery/face-to-full-portrait/api",
+      "capturedSchemaSha256": "343b977d6c7103095b29ae36f3be40487c8a796b34e834c91fc8465b3c56c017"
+    },
+    "fal-ai/flux-pro/v1.1-ultra": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/v1.1-ultra/api",
+      "capturedSchemaSha256": "444d03631a86f13d5fff8b484ca607e38fb7b04df8e1d6b8e70e361bb409e22d"
+    },
+    "fal-ai/flux-pro/v1.1-ultra/redux": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/v1.1-ultra/redux/api",
+      "capturedSchemaSha256": "fa5c507d560bb5fe2256ab093965cdaf28e790736d58761657cdc64c9641fac6"
+    },
+    "fal-ai/flux-pro/v1.1/redux": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/v1.1/redux/api",
+      "capturedSchemaSha256": "d0b186c70fa36d5ec7521cb49c4efeecc01104828552ed644281fa0b44e5110f"
+    },
+    "fal-ai/flux-pro/v1.1-ultra-finetuned": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/v1.1-ultra-finetuned/api",
+      "capturedSchemaSha256": "b6a8c3ae6c35657b6b86b7378418a163a37d9161659617ceabc77c9ec682fbf8"
+    },
+    "fal-ai/flux-pro/kontext": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/kontext/api",
+      "capturedSchemaSha256": "66d3aa908f9f6084a9277a57e354a96b4ec5916f0cef1b0f422f52bbe9f689fe"
+    },
+    "fal-ai/flux-pro/kontext/multi": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/kontext/multi/api",
+      "capturedSchemaSha256": "706bc5a070ad33429a903477fbc37e557dd6893ca36a824f3347355ddee27ed2"
+    },
+    "fal-ai/flux-2/klein/9b/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/9b/edit/api",
+      "capturedSchemaSha256": "0d6ad5d7601f0ae2c356c4114f955649f1e879e0df61636609eac9bd2331c1db"
+    },
+    "fal-ai/flux-pro/kontext/max": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/kontext/max/api",
+      "capturedSchemaSha256": "c5d6df028cc68c6696d69d8f102a59bdd4473e848d576b3ea5824d547a8e6559"
+    },
+    "fal-ai/flux-pro/kontext/max/multi": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-pro/kontext/max/multi/api",
+      "capturedSchemaSha256": "0bdd49ff6c4403bfeb7b0255d2c9266c1a93a25d97d95b4c4b7731b88e97430c"
+    },
+    "fal-ai/flux-2/klein/4b/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/4b/edit/api",
+      "capturedSchemaSha256": "a1b6291747b9f89003b8881eaee5c8702adf5daa5b075be882e8ff1dce38e6cd"
+    },
+    "fal-ai/flux-kontext/dev": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-kontext/dev/api",
+      "capturedSchemaSha256": "d53de3ee94a816d029c218c3ea4898ba7fb21cb77394f5a2c8b54509c68588b8"
+    },
+    "fal-ai/flux-2/klein/9b/base/edit/lora": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/9b/base/edit/lora/api",
+      "capturedSchemaSha256": "39111e8c3c1be25a499d5540df8ec8b0c3e85c64832233b03afc72ad19062912"
+    },
+    "fal-ai/flux-2/klein/9b/base/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/9b/base/edit/api",
+      "capturedSchemaSha256": "741596d3974e8300fb18c2b198ab252c0493cc9d927b60355123faf99faedc20"
+    },
+    "fal-ai/flux-2/klein/9b/edit/lora": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/9b/edit/lora/api",
+      "capturedSchemaSha256": "cdc7a3e96a622672400f85dc1fa4672903ef7930b500d2f0b58894835452cdb8"
+    },
+    "fal-ai/flux-2/klein/4b/base/edit": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/4b/base/edit/api",
+      "capturedSchemaSha256": "9bca4781d81a71be6918654480f9b8bd23a677629b57276bab8b2085a039d6d0"
+    },
+    "fal-ai/flux-2/klein/4b/edit/lora": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/4b/edit/lora/api",
+      "capturedSchemaSha256": "76a7348c5c43b51b1d990de546b937bd3cce54b15c6fb4f1cf8280c0eb504bbb"
+    },
+    "fal-ai/flux-2/klein/4b/base/edit/lora": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/flux-2/klein/4b/base/edit/lora/api",
+      "capturedSchemaSha256": "9e500b9ef3ced36f6589341f6114085245d7f4ddfa4fbe984bac302bc80caef0"
+    },
+    "recraft/v4/style/text-to-image": {
+      "documentationUrl": "https://fal.ai/models/recraft/v4/style/text-to-image/api",
+      "capturedSchemaSha256": "6d30cd2d62197cec2ba2daef4dad889f249cffbc6425efcd425d8e91569c836d"
+    },
+    "recraft/v4/style/pro/text-to-image": {
+      "documentationUrl": "https://fal.ai/models/recraft/v4/style/pro/text-to-image/api",
+      "capturedSchemaSha256": "7c20563758265b0b63eb346706c3a35e1e0982d302dced51c58a44907c201c34"
+    },
+    "recraft/v4/style/text-to-vector": {
+      "documentationUrl": "https://fal.ai/models/recraft/v4/style/text-to-vector/api",
+      "capturedSchemaSha256": "2abb79f92265c7bef882fc06a11509d47685424a71e795a1c0de50751bbf8784"
+    },
+    "recraft/v4/style/pro/text-to-vector": {
+      "documentationUrl": "https://fal.ai/models/recraft/v4/style/pro/text-to-vector/api",
+      "capturedSchemaSha256": "dea67bcbd0c6503b17af031bc2ad8bc1727d8f8fb216c019cf42a4ef8d919f06"
+    },
+    "fal-ai/minimax/voice-clone": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/minimax/voice-clone/api",
+      "capturedSchemaSha256": "64ba047ef2efd91584719b5586d4b23dbfa7b5891d9a7a5c4032cb82d48e4ba2"
+    },
+    "fal-ai/chatterbox/text-to-speech": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/chatterbox/text-to-speech/api",
+      "capturedSchemaSha256": "92c28ffd24287c78547e0930eb7c9da42c07c9a9fb274608549819911c8cad36"
+    },
+    "resemble-ai/chatterboxhd/speech-to-speech": {
+      "documentationUrl": "https://fal.ai/models/resemble-ai/chatterboxhd/speech-to-speech/api",
+      "capturedSchemaSha256": "2c8e05c72a3315bd90ab72617502ae1da4fe972ec073647bb2851a2dcbc35035"
+    },
+    "fal-ai/chatterbox/speech-to-speech": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/chatterbox/speech-to-speech/api",
+      "capturedSchemaSha256": "173abd3341fab83178edde73696026fbffc517a36a81ea72062f67d1968e8b0e"
+    },
+    "fal-ai/index-tts-2/text-to-speech": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/index-tts-2/text-to-speech/api",
+      "capturedSchemaSha256": "c9809044135adb1286c2198cb9ec8a1a2729eb81f21325bec1844bb14bb94b91"
+    },
+    "resemble-ai/chatterboxhd/text-to-speech": {
+      "documentationUrl": "https://fal.ai/models/resemble-ai/chatterboxhd/text-to-speech/api",
+      "capturedSchemaSha256": "c8d2fcca3e87cc63a5ec6b9460c3174bdbc7e160b0e083b22bd3bd3bff15159f"
+    },
+    "fal-ai/zonos2": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/zonos2/api",
+      "capturedSchemaSha256": "42c4a086f0cac6adcffcfe0534f5dced2cdc354862c87e48bdfc2df5a226ee98"
+    },
+    "xai/grok-voice/realtime": {
+      "documentationUrl": "https://fal.ai/models/xai/grok-voice/realtime/api",
+      "capturedSchemaSha256": "24323bff16a4ca8ca6d80e802ff938dcf39eca2b93c14c400de243eb5f40d9a0"
+    },
+    "xai/grok-voice": {
+      "documentationUrl": "https://fal.ai/models/xai/grok-voice/api",
+      "capturedSchemaSha256": "fdc8f62685d618de576cea7b3e7b60ca8c839c1c8331278d98666cf8efc61bdf"
+    },
+    "fal-ai/demucs": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/demucs/api",
+      "capturedSchemaSha256": "fc26d983295d5e2cb3c2a68f4954377cacee40fa01e712422e5f1274c19a923e"
+    },
+    "google/lyria-3.5": {
+      "documentationUrl": "https://fal.ai/models/google/lyria-3.5/api",
+      "capturedSchemaSha256": "d9eb8839d651bc9abb9dc9ab3032dd71e8250036267725734e23cd51ace02281"
+    },
+    "fal-ai/lyria3/pro": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/lyria3/pro/api",
+      "capturedSchemaSha256": "ab124af5fa5684d34b0e0c0ed3bce2289f9d120639c38ffd5bd42008f1793307"
+    },
+    "bytedance/seed-audio-1.0": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seed-audio-1.0/api",
+      "capturedSchemaSha256": "c76827b19aecc913e8ca9db8ee181d06c2615cedec4f74a0c2affc3a43663ee9"
+    },
+    "fal-ai/elevenlabs/audio-isolation": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/elevenlabs/audio-isolation/api",
+      "capturedSchemaSha256": "c35345db811792813cb35feb52649e29434e974c14bfbcbeb1973cd53d43f886"
+    },
+    "fal-ai/audio-understanding": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/audio-understanding/api",
+      "capturedSchemaSha256": "6675c3ecabf94404e608c7f8d36cb38a94214f111b73ce61dfb8e6d4b8aa2fc9"
+    },
+    "fal-ai/sam-audio/separate": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/sam-audio/separate/api",
+      "capturedSchemaSha256": "dd05068a4ea6ebf8618ecdffd07d67a858a31158b3d57a636b928e5e3b9764db"
+    },
+    "fal-ai/elevenlabs/voice-changer": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/elevenlabs/voice-changer/api",
+      "capturedSchemaSha256": "f68be0027a6c7743be1dcca62cbb57a575c259566ca95e1a4b9750d7acbf9c52"
+    },
+    "fal-ai/lyria3": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/lyria3/api",
+      "capturedSchemaSha256": "56bcbdb6eac0273e40b08ceed8cb42b4d4e2ef0f63ff1f8a381ee3470bfbd471"
+    },
+    "sonilo/v1.1/video-to-sound-effects": {
+      "documentationUrl": "https://fal.ai/models/sonilo/v1.1/video-to-sound-effects/api",
+      "capturedSchemaSha256": "e5ad3068807045b2c709202c36bc565df340858ef064ee93ec048b28d3fa6645"
+    },
+    "sonilo/v1.1/video-to-music": {
+      "documentationUrl": "https://fal.ai/models/sonilo/v1.1/video-to-music/api",
+      "capturedSchemaSha256": "f8663492d455de956ebd78b38d23104004a18f5256490d7055a94385814dd738"
+    },
+    "fal-ai/ffmpeg-api/merge-audios": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/ffmpeg-api/merge-audios/api",
+      "capturedSchemaSha256": "a7eae2242e597ca2238363ac57bfb9cbbbc143159bd1cc8f2cbbc945ba910772"
+    },
+    "fal-ai/deepfilternet3": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/deepfilternet3/api",
+      "capturedSchemaSha256": "ec348ad8412e9047a33ad4b98f0f9cc3f38edb781fde8423ce6c5576e817aa85"
+    },
+    "fal-ai/f5-tts": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/f5-tts/api",
+      "capturedSchemaSha256": "a42d594a87e42af0815310db155952d116e6e98e33457a5cdbe78f092b208b87"
+    },
+    "veed/clean-audio": {
+      "documentationUrl": "https://fal.ai/models/veed/clean-audio/api",
+      "capturedSchemaSha256": "5186264d9665449117c6e7459887a768b4dba89fbee86140c77bc1df9ca51016"
+    },
+    "mirelo-ai/sfx-v1.5/video-to-audio": {
+      "documentationUrl": "https://fal.ai/models/mirelo-ai/sfx-v1.5/video-to-audio/api",
+      "capturedSchemaSha256": "b2d9b30977c7034646a93bbe72d1f9ed5e29a75de71b8b6ab1a1238930f970b7"
+    },
+    "fal-ai/ace-step/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/ace-step/audio-to-audio/api",
+      "capturedSchemaSha256": "70aa3096da1093b08b81b73cbf978001e17486520b8b4442ca0ed878a5d12f58"
+    },
+    "fal-ai/stable-audio-25/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-25/audio-to-audio/api",
+      "capturedSchemaSha256": "f257344d9205b44f4b31978f4be598021262d3be5700fc4f263681bf596b679f"
+    },
+    "fal-ai/minimax-music": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/minimax-music/api",
+      "capturedSchemaSha256": "4da5fb913dde1699c59230c864efb781e5ad9be7342f8c5907427f119bb917fa"
+    },
+    "fal-ai/stable-audio-3/medium/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/medium/audio-to-audio/api",
+      "capturedSchemaSha256": "b8bc9fc87c0e56ac8f00167d6d370df9606f3ee8389a57adfe51bb7c088935fe"
+    },
+    "fal-ai/sam-audio/span-separate": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/sam-audio/span-separate/api",
+      "capturedSchemaSha256": "f7c6c93600b118ab9527df8fb3505e5bcaa196aaef4cdc9ceded00bae34befa1"
+    },
+    "fal-ai/stable-audio-3/small/music/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/music/audio-to-audio/api",
+      "capturedSchemaSha256": "843bad229667cbfec84c727a80f2746dda5cdb54bf28baa7317734e7f59e7ccf"
+    },
+    "fal-ai/stable-audio-3/small/sfx/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/sfx/audio-to-audio/api",
+      "capturedSchemaSha256": "a789e5299d281daadb18ee5b15811ad1fd9382917c2c3719c6ee4eded142fd1b"
+    },
+    "fal-ai/diffrhythm": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/diffrhythm/api",
+      "capturedSchemaSha256": "c27402eead8aa83cd54e261b49a246e676e9a4f725e5afff3e6f2e8df3de8101"
+    },
+    "fal-ai/ace-step/audio-outpaint": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/ace-step/audio-outpaint/api",
+      "capturedSchemaSha256": "6075525ee653b47b04606cffd9ecd4b761aec3a3e43f877aff76112a8dd36ddc"
+    },
+    "fal-ai/ace-step/audio-inpaint": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/ace-step/audio-inpaint/api",
+      "capturedSchemaSha256": "e709fc803df92264354ac081e400c393dc4ae8de28dac0d6bc90507103aba9e2"
+    },
+    "fal-ai/stable-audio-3/medium/audio-inpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/medium/audio-inpainting/api",
+      "capturedSchemaSha256": "b0c0b107aca6abcab497d54b247b7f11f76e6b63dd40d36527d2327eb61551bb"
+    },
+    "fal-ai/stable-audio-3/medium/audio-outpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/medium/audio-outpainting/api",
+      "capturedSchemaSha256": "01a7fa73438a572f2fb5dfbfe2d881d59c6ed21c26f1cf40308e495c9b3bbe9f"
+    },
+    "fal-ai/sam-audio/visual-separate": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/sam-audio/visual-separate/api",
+      "capturedSchemaSha256": "2e7bf8a57700f04c8c769e6baff7ea2a1e2b3f3fc1d50672a0a1849928f15b6c"
+    },
+    "fal-ai/stable-audio-3/medium/base/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/medium/base/audio-to-audio/api",
+      "capturedSchemaSha256": "7bc2fe2f849b494d06f5556a1c1e019dbf3d542157ecaddea2dba1228e9e7c1d"
+    },
+    "mirelo-ai/sfx-v1/video-to-audio": {
+      "documentationUrl": "https://fal.ai/models/mirelo-ai/sfx-v1/video-to-audio/api",
+      "capturedSchemaSha256": "634a306fed948dfa8a7dd9e510c5f18ef9ea1391f9504750b5c52419fc185568"
+    },
+    "fal-ai/zonos": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/zonos/api",
+      "capturedSchemaSha256": "45549c0c062137bba004cf130a5e53a2635a9f9715cb74bc5b7fcb1b6d720fe9"
+    },
+    "fal-ai/stable-audio-3/medium/base/audio-inpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/medium/base/audio-inpainting/api",
+      "capturedSchemaSha256": "3227ee798d3010a9c99761b3807cc11adeb1a3bb660e7403a536002d6024f45a"
+    },
+    "fal-ai/stable-audio-3/small/music/audio-outpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/music/audio-outpainting/api",
+      "capturedSchemaSha256": "4e682c76b8f206bc9fe3f9721031b6f94ca5def93a84520e016b736798697aa3"
+    },
+    "fal-ai/stable-audio-25/inpaint": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-25/inpaint/api",
+      "capturedSchemaSha256": "3798460eece5c2aec18ad9ea36da97427171ce39618a707a1654cdb3cc2de4b2"
+    },
+    "fal-ai/stable-audio-3/medium/base/audio-outpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/medium/base/audio-outpainting/api",
+      "capturedSchemaSha256": "751b9e9a4474817c2fa5102cdb73c669be1975f241f90ff9240c969a17c51b64"
+    },
+    "fal-ai/stable-audio-3/small/music/audio-inpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/music/audio-inpainting/api",
+      "capturedSchemaSha256": "7bedb072bade12564177075bc487a02cc3c1eb49a6ee5fa0414d64804096a533"
+    },
+    "fal-ai/stable-audio-3/small/sfx/audio-outpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/sfx/audio-outpainting/api",
+      "capturedSchemaSha256": "68c631cda95c4ae7437494128dac2cb1e817acbc5883bc9af5c74b1c4fee2348"
+    },
+    "fal-ai/stable-audio-3/small/music/base/audio-inpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/music/base/audio-inpainting/api",
+      "capturedSchemaSha256": "51555e549ca200ca1e4de73b7347f8e985db90fe5e9867b84266792fcbd6e1f2"
+    },
+    "fal-ai/tada/3b/text-to-speech": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/tada/3b/text-to-speech/api",
+      "capturedSchemaSha256": "e40e59e71425bd772471a51fd2865d27b25d21d957cde5b29612a12763c186bd"
+    },
+    "fal-ai/stable-audio-3/small/sfx/base/audio-inpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/sfx/base/audio-inpainting/api",
+      "capturedSchemaSha256": "ef85e84bec9a5838984bf67842e2c98c6dd18e9dcf4e77da57401784442cab43"
+    },
+    "fal-ai/stable-audio-3/small/sfx/base/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/sfx/base/audio-to-audio/api",
+      "capturedSchemaSha256": "24bd012d92f4439c308c1ab5624913becd5dfb7df0d245fd72518f5deeab19a4"
+    },
+    "fal-ai/stable-audio-3/small/music/base/audio-to-audio": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/music/base/audio-to-audio/api",
+      "capturedSchemaSha256": "fe58fd26aa2f57ecf1bdc7d3e9c0e4116c9eacbe2f272177fe016b50b49948b9"
+    },
+    "fal-ai/stable-audio-3/small/sfx/base/audio-outpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/sfx/base/audio-outpainting/api",
+      "capturedSchemaSha256": "9009c8778db40e12f6050f53b1ca95bf807039929215e978e6d47ae678292cd6"
+    },
+    "fal-ai/tada/1b/text-to-speech": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/tada/1b/text-to-speech/api",
+      "capturedSchemaSha256": "9070af141b2e0f671e58950d6f92e31cd2a3d4c6c36bd9251938448e5861d225"
+    },
+    "mirelo-ai/sfx1.6/extend-audio": {
+      "documentationUrl": "https://fal.ai/models/mirelo-ai/sfx1.6/extend-audio/api",
+      "capturedSchemaSha256": "5027126e4d9f3e4b8ca96f765858f689cbe32a4151e7ae8c8318afe486e5b3bc"
+    },
+    "fal-ai/stable-audio-3/small/music/base/audio-outpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/music/base/audio-outpainting/api",
+      "capturedSchemaSha256": "312371c60d45e1d73b6e0bb0cfd8e1b62839475dfcfa5a262a20589360b3b152"
+    },
+    "fal-ai/stable-audio-3/small/sfx/audio-inpainting": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/stable-audio-3/small/sfx/audio-inpainting/api",
+      "capturedSchemaSha256": "ff105e0cf551169e00ba89ce2cb032aa07c6093435b2a9280419abf903b19a9f"
+    },
+    "mirelo-ai/sfx1.6/inpaint-audio": {
+      "documentationUrl": "https://fal.ai/models/mirelo-ai/sfx1.6/inpaint-audio/api",
+      "capturedSchemaSha256": "5f8576e860f8c5b35e4ba8e24adf4bcce9d9a251f90918afd8414dea39b0f1c6"
+    },
+    "bytedance/seedance-2.0/us/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/bytedance/seedance-2.0/us/reference-to-video/api",
+      "normalizedFieldSha256": "c8edf231b9f08b2762ccdb98b1eb8a8791b813e5d11ca11c25f9d48ae7c1546e"
+    },
+    "fal-ai/kling-video/v3/pro/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/kling-video/v3/pro/image-to-video/api",
+      "normalizedFieldSha256": "fe570753f274d7bd108e062ebe8ebda048b3a7d6c7e78f2ee7230069f4083c26"
+    },
+    "google/gemini-omni-flash/v1.1/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/google/gemini-omni-flash/v1.1/reference-to-video/api",
+      "capturedSchemaSha256": "60f53acac122b7ae7dafe2fe57152990182f18ac3814bd87b8c720af0535e68d"
+    },
+    "google/gemini-omni-flash/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/google/gemini-omni-flash/reference-to-video/api",
+      "capturedSchemaSha256": "177c27a3f714e3fc30a15af31f040a289e8819a8ee9e83a46a4cccc88a557d27"
+    },
+    "alibaba/wan-3.0/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/alibaba/wan-3.0/reference-to-video/api",
+      "capturedSchemaSha256": "0e5ce102dfdc789c8eb015aaf3b68af6657d11b86c08fac8c2d66c81049fe770"
+    },
+    "lightricks/ltx-2.5/image-to-video/pro": {
+      "documentationUrl": "https://fal.ai/models/lightricks/ltx-2.5/image-to-video/pro/api",
+      "capturedSchemaSha256": "962c8b3db317062d133c22f4bca8c6df2104903f1e35dfcadddf95d45dee2fa8"
+    },
+    "fal-ai/ltx-2.3-quality/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/ltx-2.3-quality/image-to-video/api",
+      "capturedSchemaSha256": "e81519b5e9f81724421d602c849e2f640b3b2909e5633f2f6c704d0b028d6dec"
+    },
+    "minimax/h3-max/text-to-video": {
+      "documentationUrl": "https://fal.ai/models/minimax/h3-max/text-to-video/api",
+      "capturedSchemaSha256": "558f9bdcfa9bf561f70e963802a3e62a410a6e214bbd88a7e76a107d0135b4f4"
+    },
+    "minimax/h3-max/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/minimax/h3-max/reference-to-video/api",
+      "capturedSchemaSha256": "fcd380e0a134d4e2b6747c9692cccc53e3c11c2d50d26a5c3a1ee9928fecb101"
+    },
+    "fal-ai/minimax/hailuo-02/standard/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/minimax/hailuo-02/standard/image-to-video/api",
+      "capturedSchemaSha256": "57e2bdf7daa7e54afb18a6fba5d3fb87f554722dd0441e28f5e3db7ed9ac816f"
+    },
+    "fal-ai/pixverse/v6/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/pixverse/v6/image-to-video/api",
+      "capturedSchemaSha256": "d18d205ba8a34f9dfd3a5c8f7fe02c70530325d94e58f5ef33b983d6bd41cb3e"
+    },
+    "fal-ai/pixverse/v5.6/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/pixverse/v5.6/image-to-video/api",
+      "capturedSchemaSha256": "eb1feb50bc26a2e73738110b0a8c6eceb32f95be5d26ff22823cc3f292c05da8"
+    },
+    "fal-ai/veo3.1/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/veo3.1/reference-to-video/api",
+      "capturedSchemaSha256": "a5e9b28a39bb4185b7e1150da31d4d0361cc3ac9d16b679937ed766b533e8256"
+    },
+    "fal-ai/wan/v2.7/reference-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/wan/v2.7/reference-to-video/api",
+      "normalizedFieldSha256": "2d4896b531fcc8c07b6d0f853670dc1425f7e1cf78a3ad08ca9d19a9483ab9ac"
+    },
+    "fal-ai/kling-video/v2.6/pro/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/kling-video/v2.6/pro/image-to-video/api",
+      "normalizedFieldSha256": "fe570753f274d7bd108e062ebe8ebda048b3a7d6c7e78f2ee7230069f4083c26"
+    },
+    "fal-ai/minimax/hailuo-2.3/standard/image-to-video": {
+      "documentationUrl": "https://fal.ai/models/fal-ai/minimax/hailuo-2.3/standard/image-to-video/api",
+      "normalizedFieldSha256": "05c49df49c17f34a29a8f5a29634354017ce32ee090d979e75a9e7aefe1875a3"
+    }
+  },
+  "models": {
+    "openai/gpt-image-2.5/sunburst/edit": {
+      "mask_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      },
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "bytedance/seedream/v5/pro/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 10
+      }
+    },
+    "ideogram/v4.5/edit": {
+      "mask_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      },
+      "reference_image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/nano-banana-2/edit": {
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      },
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "bytedance/seedream/v5/flash/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 10
+      }
+    },
+    "openai/gpt-image-2.5/flare/edit": {
+      "mask_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      },
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/nano-banana-pro/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "bytedance/seedream/v5/pro/layerize": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "bytedance/seedream/v5/lite/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 10
+      }
+    },
+    "bytedance/seedream/v5/flash/layerize": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-2-pro/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/flash/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2-pro/outpaint": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-2/turbo/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/lora/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2-max/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2-flex/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2-lora-gallery/multiple-angles": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2-lora-gallery/apartment-staging": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2-lora-gallery/virtual-tryon": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2-lora-gallery/face-to-full-portrait": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-pro/v1.1-ultra": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-pro/v1.1-ultra/redux": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-pro/v1.1/redux": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-pro/v1.1-ultra-finetuned": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-pro/kontext": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-pro/kontext/multi": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2/klein/9b/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-pro/kontext/max": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-pro/kontext/max/multi": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/flux-2/klein/4b/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-kontext/dev": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/flux-2/klein/9b/base/edit/lora": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/klein/9b/base/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/klein/9b/edit/lora": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/klein/4b/base/edit": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/klein/4b/edit/lora": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "fal-ai/flux-2/klein/4b/base/edit/lora": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true,
+        "maximum": 4
+      }
+    },
+    "recraft/v4/style/text-to-image": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "recraft/v4/style/pro/text-to-image": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "recraft/v4/style/text-to-vector": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "recraft/v4/style/pro/text-to-vector": {
+      "image_urls": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/minimax/voice-clone": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/chatterbox/text-to-speech": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "resemble-ai/chatterboxhd/speech-to-speech": {
+      "target_voice_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      },
+      "source_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/chatterbox/speech-to-speech": {
+      "target_voice_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      },
+      "source_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/index-tts-2/text-to-speech": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "resemble-ai/chatterboxhd/text-to-speech": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/zonos2": {
+      "reference_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "xai/grok-voice/realtime": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "xai/grok-voice": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/demucs": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "google/lyria-3.5": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/lyria3/pro": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "bytedance/seed-audio-1.0": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      },
+      "audio_urls": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/elevenlabs/audio-isolation": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      },
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/audio-understanding": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/sam-audio/separate": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/elevenlabs/voice-changer": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/lyria3": {
+      "image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "sonilo/v1.1/video-to-sound-effects": {
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "sonilo/v1.1/video-to-music": {
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/ffmpeg-api/merge-audios": {
+      "audio_urls": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": true
+      }
+    },
+    "fal-ai/deepfilternet3": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/f5-tts": {
+      "ref_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "veed/clean-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "mirelo-ai/sfx-v1.5/video-to-audio": {
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/ace-step/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-25/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/minimax-music": {
+      "reference_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/medium/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/sam-audio/span-separate": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/music/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/sfx/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/diffrhythm": {
+      "reference_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/ace-step/audio-outpaint": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/ace-step/audio-inpaint": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/medium/audio-inpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/medium/audio-outpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/sam-audio/visual-separate": {
+      "mask_video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      },
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/medium/base/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "mirelo-ai/sfx-v1/video-to-audio": {
+      "video_url": {
+        "type": "video",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/zonos": {
+      "reference_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/medium/base/audio-inpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/music/audio-outpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-25/inpaint": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/medium/base/audio-outpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/music/audio-inpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/sfx/audio-outpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/music/base/audio-inpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/tada/3b/text-to-speech": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/sfx/base/audio-inpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/sfx/base/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/music/base/audio-to-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/sfx/base/audio-outpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/tada/1b/text-to-speech": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "mirelo-ai/sfx1.6/extend-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/music/base/audio-outpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "fal-ai/stable-audio-3/small/sfx/audio-inpainting": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "mirelo-ai/sfx1.6/inpaint-audio": {
+      "audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "bytedance/seedance-2.0/us/reference-to-video": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "video_urls": {
+        "type": "video",
+        "role": "reference-video",
+        "multiple": true
+      },
+      "audio_urls": {
+        "type": "audio",
+        "role": "reference-audio",
+        "multiple": true
+      }
+    },
+    "fal-ai/kling-video/v3/pro/image-to-video": {
+      "start_image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      },
+      "end_image_url": {
+        "type": "image",
+        "role": "end-frame",
+        "multiple": false
+      }
+    },
+    "google/gemini-omni-flash/v1.1/reference-to-video": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "reference_video_urls": {
+        "type": "video",
+        "role": "reference-video",
+        "multiple": true
+      }
+    },
+    "google/gemini-omni-flash/reference-to-video": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "alibaba/wan-3.0/reference-to-video": {
+      "reference_image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "reference_video_urls": {
+        "type": "video",
+        "role": "reference-video",
+        "multiple": true
+      },
+      "reference_audio_urls": {
+        "type": "audio",
+        "role": "reference-audio",
+        "multiple": true
+      }
+    },
+    "lightricks/ltx-2.5/image-to-video/pro": {
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      },
+      "end_image_url": {
+        "type": "image",
+        "role": "end-frame",
+        "multiple": false
+      }
+    },
+    "fal-ai/ltx-2.3-quality/image-to-video": {
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      }
+    },
+    "minimax/h3-max/text-to-video": {
+      "target_audio_url": {
+        "type": "audio",
+        "role": "native-input",
+        "multiple": false
+      }
+    },
+    "minimax/h3-max/reference-to-video": {
+      "middle_image_url": {
+        "type": "image",
+        "role": "native-input",
+        "multiple": false
+      },
+      "reference_audio_urls": {
+        "type": "audio",
+        "role": "reference-audio",
+        "multiple": true
+      },
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      },
+      "end_image_url": {
+        "type": "image",
+        "role": "end-frame",
+        "multiple": false
+      },
+      "reference_image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "reference_video_urls": {
+        "type": "video",
+        "role": "reference-video",
+        "multiple": true
+      }
+    },
+    "fal-ai/minimax/hailuo-02/standard/image-to-video": {
+      "end_image_url": {
+        "type": "image",
+        "role": "end-frame",
+        "multiple": false
+      },
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      }
+    },
+    "fal-ai/pixverse/v6/image-to-video": {
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      }
+    },
+    "fal-ai/pixverse/v5.6/image-to-video": {
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      }
+    },
+    "fal-ai/veo3.1/reference-to-video": {
+      "image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      }
+    },
+    "fal-ai/wan/v2.7/reference-to-video": {
+      "reference_image_urls": {
+        "type": "image",
+        "role": "reference-image",
+        "multiple": true
+      },
+      "reference_video_urls": {
+        "type": "video",
+        "role": "reference-video",
+        "multiple": true
+      }
+    },
+    "fal-ai/kling-video/v2.6/pro/image-to-video": {
+      "start_image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      },
+      "end_image_url": {
+        "type": "image",
+        "role": "end-frame",
+        "multiple": false
+      }
+    },
+    "fal-ai/minimax/hailuo-2.3/standard/image-to-video": {
+      "image_url": {
+        "type": "image",
+        "role": "start-frame",
+        "multiple": false
+      }
+    }
+  }
+}

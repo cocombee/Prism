@@ -15,14 +15,33 @@ describe('independent Higgsfield native catalog identity', () => {
     const options = videoModelGroups(undefined, availability, saved).find(group => group.label === 'Higgsfield')!.options
     expect(options.map(option => option.value)).not.toContain('higgsfield-native::image/only')
     expect(options.find(option => option.value.includes('seedance-3.0'))).toMatchObject({ provider: 'bytedance', disabled: true, catalog: availability.models[0].catalog })
-    expect(options.find(option => option.value.includes('minimax/'))?.provider).toBeUndefined()
-    expect(options.find(option => option.value.endsWith('restyle/v1.0'))?.disabled).toBe(false)
+    expect(options.find(option => option.value.includes('minimax/'))).toMatchObject({ provider: 'minimax', disabled: true })
+    expect(options.find(option => option.value.endsWith('restyle/v1.0'))).toBeUndefined()
     expect(options.find(option => option.value.endsWith('saved/retired'))).toMatchObject({ disabled: true, label: 'Unavailable (Saved Retired)' })
     expect(saved).toEqual(original)
   })
+  it('removes bundled, discovered and documentation Genjutsu entries without losing Higgsfield video models or saved data', () => {
+    const bundled = videoModelGroups().find(group => group.service === 'higgsfield')!
+    expect(bundled.options.some(option => /genjutsu/i.test(option.value + option.label))).toBe(false)
+    expect(bundled.options.some(option => option.value.endsWith('seedance-2.5/video-edit'))).toBe(true)
+    const saved = { higgsfieldNative: { endpointId: 'higgsfield/genjutsu/object-swap/v1.0', label: 'Genjutsu · Object Swap', contractRevision: 'original', values: { prompt: '  Exact prompt  ', resolution: '1080p' } } }
+    const original = structuredClone(saved)
+    const availability: ServiceModelAvailability = { provider: 'higgsfield', verified: true, models: [
+      { id: saved.higgsfieldNative.endpointId, label: saved.higgsfieldNative.label },
+      { id: 'documentation::https://open.higgsfield.ai/models/workflows/genjutsu/playground', label: 'Workflow', catalog: { service: 'Higgsfield', company: 'Higgsfield', release: 'Genjutsu 1.0' } },
+      { id: 'future/opaque/workflow', label: 'Native workflow', catalog: { service: 'Higgsfield', company: 'Higgsfield', release: 'Genjutsu 2.0' } },
+      { id: 'bytedance/seedance-2.5/video-edit', label: 'Seedance 2.5 · Video Edit' },
+    ] }
+    const groups = videoModelGroups({ provider: 'fal', verified: true, models: [{ id: 'fal-ai/fixture/video', label: 'Fal fixture', category: 'text-to-video' }] }, availability, saved)
+    expect(groups.find(group => group.service === 'higgsfield')!.options.map(option => option.value)).toEqual(['higgsfield-native::bytedance/seedance-2.5/video-edit'])
+    expect(groups.some(group => group.options.some(option => option.value.startsWith('byteplus/')))).toBe(true)
+    expect(groups.some(group => group.service === 'fal')).toBe(true)
+    expect(saved).toEqual(original)
+    expect(availability.models).toHaveLength(4)
+  })
   it('uses the actual vendor rather than the native namespace for known and unknown logos', () => {
     expect(modelCompanyFor('higgsfield-native::bytedance/seedance-3.0/reference-to-video', 'ByteDance')).toBe('bytedance')
-    expect(modelCompanyFor('higgsfield-native::minimax/future/text-to-video', 'MiniMax')).toBeUndefined()
+    expect(modelCompanyFor('higgsfield-native::minimax/future/text-to-video', 'MiniMax')).toBe('minimax')
     expect(modelCompanyFor('Higgsfield')).toBe('higgsfield')
     expect(modelCompanyFor('fal-native::kling-video/v3', 'Kling')).toBe('kuaishou')
   })

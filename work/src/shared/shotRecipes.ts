@@ -1,4 +1,5 @@
 import { cameraSupportSemantics } from './cameraSupportSemantics'
+import { storyboardTimecodes } from './storyboardTimecodes'
 
 export type ShotRecipeKind = 'shot-size' | 'camera'
 export type ShotRecipeFamily = 'generic' | 'seedance' | 'kling' | 'veo' | 'wan'
@@ -8,19 +9,21 @@ export interface ShotRecipeEntry {
   text: string
   /** Quantified movement wording used by the production shot specification. */
   spec?: string
-  /** Numeric horizontal field-of-view authority used by deterministic planners. */
+  /** Legacy numeric field retained for older recipe readers; framing no longer derives FOV. */
   degrees?: number
 }
 
 const RECIPES: Record<ShotRecipeKind, Record<string, Partial<Record<ShotRecipeFamily, ShotRecipeEntry>>>> = {
   'shot-size': {
     auto: { generic: { version: 'shot-size-auto-g1', text: 'Auto — choose the clearest framing for action and emotion while preserving spatial continuity' } },
-    wide: { generic: { version: 'shot-size-wide-g2', text: 'Wide — establish subject, environment, and spatial relationships', spec: '63° wide', degrees: 63 } },
-    medium: { generic: { version: 'shot-size-medium-g2', text: 'Medium — balance performance, gesture, and surrounding context', spec: '47° neutral', degrees: 47 } },
-    'close-up': { generic: { version: 'shot-size-close-up-g2', text: 'Close-Up — prioritize facial performance and emotional detail', spec: '29° portrait compression', degrees: 29 } },
-    detail: { generic: { version: 'shot-size-detail-g2', text: 'Detail — isolate the important hand, object, or action detail', spec: '8° detail compression', degrees: 8 } },
-    establishing: { generic: { version: 'shot-size-establishing-g1', text: 'Establishing — map architecture and complete spatial relationships', spec: '84° architectural wide', degrees: 84 } },
-    architectural: { generic: { version: 'shot-size-architectural-g1', text: 'Architectural — preserve full environment geometry and scale', spec: '84° architectural wide', degrees: 84 } },
+    'extreme-wide': { generic: { version: 'shot-size-extreme-wide-g1', text: 'Extreme Wide Shot', spec: 'Environment dominates; the performer occupies a small part of the frame' } },
+    wide: { generic: { version: 'shot-size-wide-g4', text: 'Wide Shot', spec: 'Full performer visible within meaningful surroundings' } },
+    medium: { generic: { version: 'shot-size-medium-g4', text: 'Medium Shot', spec: 'Approximately waist-up, keeping expression and gestures readable' } },
+    'close-up': { generic: { version: 'shot-size-close-up-g4', text: 'Close-up', spec: 'Face dominates the frame, approximately head and shoulders' } },
+    'extreme-close-up': { generic: { version: 'shot-size-extreme-close-up-g1', text: 'Extreme Close-up', spec: 'Only the selected facial feature fills the frame; the whole face is outside the crop' } },
+    detail: { generic: { version: 'shot-size-detail-g4', text: 'Detail / Insert', spec: 'Isolate the authored hand, object or action detail' } },
+    establishing: { generic: { version: 'shot-size-establishing-g3', text: 'Establishing', spec: 'Establish the subject within the environment and its spatial relationships' } },
+    architectural: { generic: { version: 'shot-size-architectural-g3', text: 'Architectural', spec: 'Preserve the environment geometry and scale in the selected framing' } },
   },
   camera: {
     auto: { generic: { version: 'camera-auto-g3', text: 'Auto — choose motivated camera treatment from the action; stay static when movement adds no story value', spec: 'Use one motivated, physically coherent camera treatment; keep magnitude and timing unspecified unless authored.' } },
@@ -98,7 +101,7 @@ export function shotFov(value: string, family?: string): string {
 }
 
 export function shotFovDegrees(value: string, family?: string): number | undefined {
-  return shotRecipeDetails('shot-size', value, family).degrees
+  return undefined // A shot-size choice does not establish an angle of view.
 }
 
 export function quantifiedCameraRecipe(value: string, family?: string): string {
@@ -117,4 +120,28 @@ export function quantifiedCameraRecipe(value: string, family?: string): string {
 
 export function allShotRecipeEntries(): ShotRecipeEntry[] {
   return Object.values(RECIPES).flatMap((byValue) => Object.values(byValue).flatMap((byFamily) => Object.values(byFamily).filter((entry): entry is ShotRecipeEntry => Boolean(entry))))
+}
+
+/** Ordinal crop relationship only, never a measured angle or focal length. */
+export function shotFramingRank(value: string): number | undefined {
+  return ({ 'extreme-wide': 0, establishing: 0, architectural: 0, wide: 1, medium: 2, 'close-up': 3, 'extreme-close-up': 4, detail: 4 } as Record<string, number>)[value]
+}
+
+export function selectedLensInstruction(lensMm?: number): string {
+  if (lensMm === undefined) return ''
+  if (!Number.isFinite(lensMm) || lensMm <= 0) throw new Error('Selected lens focal length must be a positive finite mm value.')
+  return `Lens: ${lensMm}mm. Camera-to-subject distance achieves the selected framing; preserve the authored capture format and lens projection.`
+}
+
+export function timedCameraRecipe(camera: string, seconds: number, authoredPrompt = '', family?: string): string {
+  if (!camera || camera === 'auto') return shotRecipe('camera', camera || 'auto', family)
+  const mechanism = quantifiedCameraRecipe(camera, family)
+  const interval = `${storyboardTimecodes([Number(seconds)]).format(Number(seconds))}s`
+  const support = cameraSupportSemantics(camera)
+  if (support) return mechanism
+  if (camera === 'static') return `${mechanism} Maintain the selected view for ${interval}; no camera travel is added.`
+  const authoredPace = /\b(?:slow(?:ly)?|fast|rapid(?:ly)?)\s+(?:camera|dolly|track|truck|crane|jib|zoom|pan|tilt|orbit|push|pull)\b|\b(?:camera|dolly|track|truck|crane|jib|zoom|pan|tilt|orbit|push|pull)\b(?:\s+(?:moves?|moving|dollies|tracks?|tracking|pans?|zooms?|tilts?|in|out|left|right|up|down|forward|backward|at|with|a|an|the|very|extremely)){0,5}\s+(?:slow(?:ly)?|fast|rapid(?:ly)?|constant (?:physical )?speed|speed ramp|\d+(?:\.\d+)?\s*(?:m\/s|degrees per second))\b/i.test(authoredPrompt)
+  const legacyPace = /slow|fast|whip|crash|snap/.test(camera)
+  if (authoredPace || legacyPace) return `${mechanism} Preserve the authored pace and extent within the ${interval} interval; do not slow or stretch the movement merely to fill the interval, and do not invent a hold.`
+  return `${mechanism} Execute this operation over the selected ${interval} interval; action continues concurrently. Preserve authored endpoints and the extent specified by this choice; do not invent additional travel distance or rotation.`
 }

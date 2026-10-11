@@ -38,6 +38,14 @@ function dependencies(contract: FalSchemaContract, changes: Partial<FalNativeGen
 }
 
 describe('fresh schema-bound native fal execution', () => {
+  it('passes exact current file-byte limits into authorized preparation and rejects oversized media before client/upload/submit', async () => {
+    const contract = future(50, { audio_url: {type:'string',uiField:'audio',maxFileSize:60_000_000} })
+    const request = requestFor(contract,{new_references:sources(1,'image',true),audio_url:sources(1,'audio',true)})
+    const {deps}=dependencies(contract,{prepareSource:vi.fn(async(source,type,maximumBytes)=>{if(type==='audio'){expect(maximumBytes).toBe(60_000_000);throw Error('File exceeds 60 MB')}return source})})
+    const before=JSON.stringify(request)
+    await expect(executeFalNativeGeneration(request,'video-generator',deps)).rejects.toThrow('60 MB')
+    expect(deps.client).not.toHaveBeenCalled();expect(deps.upload).not.toHaveBeenCalled();expect(deps.submit).not.toHaveBeenCalled();expect(JSON.stringify(request)).toBe(before)
+  })
   it.each([20, 30])('uses the actual captured reference contract with %i images', async count => {
     const contract = reference(), request = requestFor(contract, { image_urls: sources(count) }), { deps } = dependencies(contract)
     const result = await executeFalNativeGeneration(request, 'video-generator', deps)

@@ -32,3 +32,7 @@
 | Ratio-aware previews | library and large preview contain the selected/natural ratio without crop | active-renderer source and physical QA |
 
 A Storyboard change must run all affected rows, not only its local unit test.
+
+- Lens/framing: independent crop/focal-length prompts, optional old-project migration, unfamiliar saved mm, serialized reopen, rewrite and append, maximum 20-panel extreme fields, native Kling dispatch entries.
+- Timing: 1.0/1.5 authoring, full-interval operation, preserved explicit fast/slow camera pace, independent subject speed, static framing-change diagnostics and optical direction conflicts.
+- UI: existing production four-selector family, wide/narrow fluid allocation, six sizes and direct-mm menu; legacy movement selected-only compatibility and retained handheld/orbit/rig varieties.

@@ -14,6 +14,20 @@ afterEach(() => { vi.useRealTimers() })
 const settle = async () => { await Promise.resolve(); await Promise.resolve() }
 
 describe('service availability refresh ownership', () => {
+  it('publishes retained display metadata during the first live read then replaces it with the complete response, including an empty catalog', async () => {
+    const live=deferred<ServiceModelAvailability>(),onModels=vi.fn()
+    const stop=startServiceAvailabilityRefresh({connected:['fal'],snapshot:async()=>({provider:'fal',verified:false,catalogStale:true,models:[{id:'fixture/video',label:'Retained model'}]}),models:()=>live.promise,account:vi.fn(),onModels,onAccount:vi.fn()})
+    await settle()
+    expect(onModels).toHaveBeenCalledWith('fal',expect.objectContaining({verified:false,catalogStale:true}))
+    live.resolve({provider:'fal',verified:true,models:[]});await settle()
+    expect(onModels).toHaveBeenLastCalledWith('fal',{provider:'fal',verified:true,models:[]});stop()
+  })
+  it('rejects late retained metadata and live responses after disconnection', async () => {
+    const cached=deferred<ServiceModelAvailability>(),onModels=vi.fn()
+    const stop=startServiceAvailabilityRefresh({connected:['fal'],snapshot:()=>cached.promise,models:async()=>({provider:'fal',verified:true,models:[]}),account:vi.fn(),onModels,onAccount:vi.fn()})
+    stop();cached.resolve({provider:'fal',verified:false,models:[{id:'fixture/video',label:'Old profile'}]});await settle()
+    expect(onModels).not.toHaveBeenCalled()
+  })
   it('refreshes public Fish engine advertisements without querying credentials/account state and deduplicates connected entries', async () => {
     vi.useFakeTimers()
     const models = vi.fn(async () => ({ ...catalog, provider: 'fish' as const })), loadAccount = vi.fn(), onModels = vi.fn()

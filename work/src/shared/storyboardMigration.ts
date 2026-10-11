@@ -2,7 +2,7 @@ import type { Edge } from '@xyflow/react'
 import type { StudioNode } from './types'
 import { migrateShutterSelection } from './shutter'
 import { reconcileStoryboardDurationBudget, STORYBOARD_DURATION_FALLBACK_OPTIONS } from './storyboardDurationBudget'
-import { migrateStoryboardPanelDuration } from './storyboardPanels'
+import { createStoryboardPanel, migrateStoryboardPanelDuration } from './storyboardPanels'
 import { resolveVideoModel } from './videoModels'
 
 const unifiedStoryboardTitle = (title?: string) => {
@@ -33,8 +33,8 @@ function reconciledStoryboardDurationData(data: StudioNode['data'], nodeId: stri
   const numericDurations = model.durations.filter((value): value is number => typeof value === 'number')
   const modelDurationOptions = numericDurations.length ? numericDurations : [...STORYBOARD_DURATION_FALLBACK_OPTIONS]
   const migratedPanels = (data.storyboardPanels?.length ? data.storyboardPanels : [
-    { id: `${nodeId}-panel-1`, prompt: '', duration: 1, shotSize: 'wide' as const, camera: 'static', audioCue: '', locked: false },
-    { id: `${nodeId}-panel-2`, prompt: '', duration: 1, shotSize: 'wide' as const, camera: 'static', audioCue: '', locked: false },
+    createStoryboardPanel(`${nodeId}-panel-1`),
+    createStoryboardPanel(`${nodeId}-panel-2`),
   ]).map(migrateStoryboardPanelDuration)
   const budget = reconcileStoryboardDurationBudget({
     panels: migratedPanels,

@@ -124,7 +124,7 @@ export function cinematicDirection(request: GenerationRequest): string {
     const kept = [] as typeof sections
     for (const section of sections) {
       const candidate = renderShotSpecSections([...kept, section])
-      if (candidate.length <= 600) kept.push(section)
+      if (section.required || candidate.length <= 600) kept.push(section)
     }
     return renderShotSpecSections(kept)
   }

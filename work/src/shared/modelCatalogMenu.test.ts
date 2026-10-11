@@ -58,6 +58,21 @@ describe('two latest releases per service/company/family', () => {
     expect(modelCatalogMenu([{ label: 'Native', options }], 100)[0].featured).toHaveLength(1)
   })
 
+  it('keeps the default two-release limit and supports an explicit full-catalog projection', () => {
+    const options = ['4.0', '3.0', '2.0', '1.0'].map(version => ({
+      value: `model-${version}`,
+      label: `Model ${version}`,
+      catalog: { service: 'fal.ai', company: 'Fixture', release: `Model ${version}` },
+    }))
+    const before = structuredClone(options)
+    const groups = [{ label: 'fal.ai', options }]
+    const limited = modelCatalogMenu(groups)[0]
+    const full = modelCatalogMenu(groups, 5, Date.now(), 'all')[0]
+    expect(limited.releases.map(release => release.label)).toEqual(['Model 4.0', 'Model 3.0'])
+    expect(full.releases.map(release => release.label)).toEqual(['Model 4.0', 'Model 3.0', 'Model 2.0', 'Model 1.0'])
+    expect(options).toEqual(before)
+  })
+
   it('deduplicates exact options and excludes disabled releases only from featured', () => {
     const first = { value: 'saved', label: 'Unavailable saved model', disabled: true }
     const available = { value: 'live', label: 'Live model' }

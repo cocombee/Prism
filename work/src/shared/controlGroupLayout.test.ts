@@ -1,3 +1,4 @@
+import { selectorReferenceTrackWidth } from './controlGroupLayout'
 import { describe, expect, it } from 'vitest'
 import {
   activeControlDescriptors,
@@ -453,5 +454,42 @@ describe('node-wide whole-group fluid control optimizer', () => {
     expect(allocations).toBe(5)
     expect(controlGroupWidthChanged(315, 315.1)).toBe(false)
     expect(controlGroupWidthChanged(315, 315.25)).toBe(true)
+  })
+})
+
+
+describe('selected field baseline cap', () => {
+  it('caps longer names and releases shorter names without consuming measured chrome', () => {
+    expect(selectorReferenceTrackWidth(160, 90, 41)).toBe(131)
+    expect(selectorReferenceTrackWidth(90, 90, 41)).toBe(131)
+    expect(selectorReferenceTrackWidth(35, 90, 41)).toBe(76)
+    expect(selectorReferenceTrackWidth(0, 90, 41)).toBe(41)
+  })
+})
+
+describe('reference-sized row slack', () => {
+  const field = (id: string, selected: number, reference: number): MixedControlInput => {
+    const width = selectorReferenceTrackWidth(selected, reference, 40)
+    return { id, kind: 'selector', intrinsicWidth: width, minimumWidth: width, preferredWidth: width, referenceSized: true }
+  }
+  it('keeps long names at baseline and shares released short-name space equally', () => {
+    const baseline = allocateMixedControlRows([field('model', 100, 100), field('ratio', 30, 30)], 300, 6)[0]
+    const long = allocateMixedControlRows([field('model', 230, 100), field('ratio', 30, 30)], 300, 6)[0]
+    const short = allocateMixedControlRows([field('model', 50, 100), field('ratio', 30, 30)], 300, 6)[0]
+    expect(long.controls.map(x => x.width)).toEqual(baseline.controls.map(x => x.width))
+    expect(short.controls[0].width).toBe(baseline.controls[0].width - 25)
+    expect(short.controls[1].width).toBe(baseline.controls[1].width + 25)
+    expect(occupied(short)).toBe(300)
+  })
+  it('fills a sole selector row and keeps fixed action tokens unchanged', () => {
+    const controls: MixedControlInput[] = [field('model', 50, 100), { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28 }, { id: 'run', kind: 'fixed-action', intrinsicWidth: 28 }]
+    expect(allocateMixedControlRows(controls, 300, 6)[0].controls.map(x => x.width)).toEqual([232, 28, 28])
+  })
+  it('shares mixed-row slack equally after symmetric bounded quantity breathing room', () => {
+    const controls: MixedControlInput[] = [field('model', 100, 100), field('duration', 20, 20), { id: 'quantity', kind: 'bounded-elastic', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5 }]
+    const row = allocateMixedControlRows(controls, 300, 6)[0]
+    expect(row.controls[0].width - 140).toBe(row.controls[1].width - 60)
+    expect(row.controls[2].width).toBe(52)
+    expect(row.controls[2].leftPadding).toBe(row.controls[2].rightPadding)
   })
 })

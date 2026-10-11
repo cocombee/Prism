@@ -1,0 +1,1983 @@
+[
+  {
+    "endpointId": "openai/gpt-image-2.5/sunburst/edit",
+    "category": "image-to-image",
+    "field": "mask_url",
+    "schema": {
+      "title": "Mask URL",
+      "description": "The URL of the mask image to use for the generation. This indicates what part of the image to edit.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "openai/gpt-image-2.5/sunburst/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images to use as a reference for the generation. A maximum of 16 images are allowed.",
+      "maxItems": 16,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "bytedance/seedream/v5/pro/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of URLs of input reference images. Up to 10 images are supported; if more are sent, only the last 10 are used.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "ideogram/v4.5/edit",
+    "category": "image-to-image",
+    "field": "mask_url",
+    "schema": {
+      "title": "Mask URL",
+      "description": "Mask matching the source dimensions. Black edits, white preserves. Must contain both regions after rounding.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "ideogram/v4.5/edit",
+    "category": "image-to-image",
+    "field": "reference_image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Image URLs",
+      "description": "Up to four references plus the primary source, or three references plus the primary source and mask.",
+      "maxItems": 4,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "ideogram/v4.5/edit",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "Primary source image to edit."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/nano-banana-2/edit",
+    "category": "image-to-image",
+    "field": "video_url",
+    "schema": {
+      "title": "Video URL",
+      "description": "Optional video to use as input context. Accepts an http(s)/data URL to a video file (downloaded and sent inline, max 15MB) or a YouTube URL (passed through to the model without downloading).",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/nano-banana-2/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images to use for image-to-image generation or image editing. Optional when at least one of `video_url`, `audio_url`, or `pdf_url` is provided.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/nano-banana-2/edit",
+    "category": "image-to-image",
+    "field": "audio_url",
+    "schema": {
+      "title": "Audio URL",
+      "description": "Optional audio file to use as input context. Accepts an http(s)/data URL (downloaded and sent inline, max 15MB).",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "bytedance/seedream/v5/flash/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of URLs of input reference images. Up to 10 images are supported; if more are sent, only the last 10 are used.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "openai/gpt-image-2.5/flare/edit",
+    "category": "image-to-image",
+    "field": "mask_url",
+    "schema": {
+      "title": "Mask URL",
+      "description": "The URL of the mask image to use for the generation. This indicates what part of the image to edit.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "openai/gpt-image-2.5/flare/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images to use as a reference for the generation. A maximum of 16 images are allowed.",
+      "maxItems": 16,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/nano-banana-pro/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images to use for image-to-image generation or image editing.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "bytedance/seedream/v5/pro/layerize",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image Url",
+      "description": "URL of the image to decompose into a base image and independently editable layers. The image must contain between 512x512 and 6000x6000 total pixels, have an aspect ratio between 1/16 and 16, and be no larger than 30 MB."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "bytedance/seedream/v5/lite/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of URLs of input images for editing. Presently, up to 10 image inputs are allowed. If over 10 images are sent, only the last 10 will be used.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "bytedance/seedream/v5/flash/layerize",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image Url",
+      "description": "URL of the image to decompose into a base image and independently editable layers. The image must contain between 512x512 and 6000x6000 total pixels, have an aspect ratio between 1/16 and 16, and be no larger than 30 MB."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-pro/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of URLs of input images for editing",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed, if more are provided, only the first 4 will be used.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/flash/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed, if more are provided, only the first 4 will be used.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-pro/outpaint",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "The image URL to expand using outpainting."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/turbo/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed, if more are provided, only the first 4 will be used.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/lora/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "maxItems": 4,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-max/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of URLs of input images for editing",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-flex/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "List of URLs of input images for editing",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-lora-gallery/multiple-angles",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URL of the image to adjust camera angle for.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-lora-gallery/apartment-staging",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URL of the empty room image to furnish.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-lora-gallery/virtual-tryon",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for virtual try-on. Provide person image and clothing image.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2-lora-gallery/face-to-full-portrait",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URL of the cropped face image.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/v1.1-ultra",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "title": "Image URL",
+      "description": "The image URL to generate an image from.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/v1.1-ultra/redux",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "The image URL to generate an image from. Needs to match the dimensions of the mask."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/v1.1/redux",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "The image URL to generate an image from. Needs to match the dimensions of the mask."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/v1.1-ultra-finetuned",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "title": "Image URL",
+      "description": "The image URL to generate an image from.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/kontext",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "Image prompt for the omni model.",
+      "minLength": 1
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/kontext/multi",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URL",
+      "description": "Image prompt for the omni model.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/9b/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/kontext/max",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "Image prompt for the omni model.",
+      "minLength": 1
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-pro/kontext/max/multi",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URL",
+      "description": "Image prompt for the omni model.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/4b/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-kontext/dev",
+    "category": "image-to-image",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "The URL of the image to edit.\n\nMax width: 14142px, Max height: 14142px, Timeout: 20s"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/9b/base/edit/lora",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/9b/base/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/9b/edit/lora",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/4b/base/edit",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/4b/edit/lora",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/flux-2/klein/4b/base/edit/lora",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "The URLs of the images for editing. A maximum of 4 images are allowed.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "recraft/v4/style/text-to-image",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "title": "Image URLs",
+      "description": "The URLs of the style reference images. Supports PNG, JPG, and WEBP; provide between 1 and 10 images.",
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "recraft/v4/style/pro/text-to-image",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "title": "Image URLs",
+      "description": "The URLs of the style reference images. Supports PNG, JPG, and WEBP; provide between 1 and 10 images.",
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "recraft/v4/style/text-to-vector",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "title": "Image URLs",
+      "description": "The URLs of the style reference images. Supports PNG, JPG, and WEBP; provide between 1 and 10 images.",
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "recraft/v4/style/pro/text-to-vector",
+    "category": "image-to-image",
+    "field": "image_urls",
+    "schema": {
+      "title": "Image URLs",
+      "description": "The URLs of the style reference images. Supports PNG, JPG, and WEBP; provide between 1 and 10 images.",
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/minimax/voice-clone",
+    "category": "text-to-speech",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "\n            URL of the input audio file for voice cloning. Should be at least 10 seconds\n            long. To retain the voice permanently, use it with a TTS (text-to-speech)\n            endpoint at least once within 7 days. Otherwise, it will be\n            automatically deleted.\n        "
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/chatterbox/text-to-speech",
+    "category": "text-to-speech",
+    "field": "audio_url",
+    "schema": {
+      "title": "Audio Url",
+      "description": "Optional URL to an audio file to use as a reference for the generated speech. If provided, the model will try to match the style and tone of the reference audio.",
+      "default": "https://storage.googleapis.com/chatterbox-demo-samples/prompts/male_rickmorty.mp3",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "resemble-ai/chatterboxhd/speech-to-speech",
+    "category": "text-to-speech",
+    "field": "target_voice_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Target Voice Audio Url",
+      "description": "URL to the audio file which represents the voice of the output audio. If provided, this will override the target_voice setting. If neither target_voice nor target_voice_audio_url are provided, the default target voice will be used."
+    },
+    "required": false
+  },
+  {
+    "endpointId": "resemble-ai/chatterboxhd/speech-to-speech",
+    "category": "text-to-speech",
+    "field": "source_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Source Audio Url",
+      "description": "URL to the source audio file to be voice-converted."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/chatterbox/speech-to-speech",
+    "category": "text-to-speech",
+    "field": "target_voice_audio_url",
+    "schema": {
+      "title": "Target Voice Audio Url",
+      "description": "Required URL to an audio file to use as the target reference voice for speech-to-speech voice conversion.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/chatterbox/speech-to-speech",
+    "category": "text-to-speech",
+    "field": "source_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Source Audio Url"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/index-tts-2/text-to-speech",
+    "category": "text-to-speech",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "The audio file to generate the speech from."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "resemble-ai/chatterboxhd/text-to-speech",
+    "category": "text-to-speech",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL to the audio sample to use as a voice prompt for zero-shot TTS voice cloning. Providing a audio sample will override the voice setting. If neither voice nor audio_url are provided, a random voice will be used."
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/zonos2",
+    "category": "text-to-speech",
+    "field": "reference_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Reference Audio Url",
+      "description": "Reference audio to clone the voice from."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "xai/grok-voice/realtime",
+    "category": "text-to-speech",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio URL",
+      "description": "URL of the audio containing the user's speech. The Grok agent listens to it and replies with speech. Most common audio formats are supported; the audio is converted to 16-bit 24 kHz mono PCM before being sent to Grok. Maximum duration 10 minutes, maximum file size 50 MB."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "xai/grok-voice",
+    "category": "text-to-speech",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio URL",
+      "description": "URL of the audio containing the user's speech. The Grok agent listens to it and replies with speech. Most common audio formats are supported; the audio is converted to 16-bit 24 kHz mono PCM before being sent to Grok. Maximum duration 10 minutes, maximum file size 50 MB."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/demucs",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to separate into stems"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "google/lyria-3.5",
+    "category": "audio-to-audio",
+    "field": "image_url",
+    "schema": {
+      "title": "Image Url",
+      "description": "Optional image URL to use as visual inspiration for music generation. The model will create music that matches the mood and theme of the image.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/lyria3/pro",
+    "category": "audio-to-audio",
+    "field": "image_url",
+    "schema": {
+      "title": "Image Url",
+      "description": "Optional image URL to use as inspiration for music generation. The model will create music that matches the mood and theme of the image.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "bytedance/seed-audio-1.0",
+    "category": "audio-to-audio",
+    "field": "image_url",
+    "schema": {
+      "title": "Image URL",
+      "description": "A single reference image URL (jpeg/png/webp, up to 10MB). Cannot be combined with audio references.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "bytedance/seed-audio-1.0",
+    "category": "audio-to-audio",
+    "field": "audio_urls",
+    "schema": {
+      "type": "array",
+      "title": "Audio URLs",
+      "description": "Up to 3 reference audio URLs, referenced in prompt as @Audio1, @Audio2, @Audio3. Each clip: up to 30s, 10MB, wav/mp3/pcm/ogg_opus.",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/elevenlabs/audio-isolation",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "title": "Audio Url",
+      "description": "URL of the audio file to isolate voice from",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/elevenlabs/audio-isolation",
+    "category": "audio-to-audio",
+    "field": "video_url",
+    "schema": {
+      "title": "Video Url",
+      "description": "Video file to use for audio isolation. Either `audio_url` or `video_url` must be provided.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/audio-understanding",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to analyze"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/sam-audio/separate",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to process (WAV, MP3, FLAC supported)"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/elevenlabs/voice-changer",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "The input audio file"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/lyria3",
+    "category": "audio-to-audio",
+    "field": "image_url",
+    "schema": {
+      "title": "Image Url",
+      "description": "Optional image URL to use as inspiration for music generation. The model will create music that matches the mood and theme of the image.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "sonilo/v1.1/video-to-sound-effects",
+    "category": "audio-to-audio",
+    "field": "video_url",
+    "schema": {
+      "type": "string",
+      "title": "Video Url",
+      "description": "The video to add sound to (public URL, or upload a file). The generated audio matches the video's length."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "sonilo/v1.1/video-to-music",
+    "category": "audio-to-audio",
+    "field": "video_url",
+    "schema": {
+      "type": "string",
+      "title": "Video Url",
+      "description": "Public http(s) URL of the source video to score."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/ffmpeg-api/merge-audios",
+    "category": "audio-to-audio",
+    "field": "audio_urls",
+    "schema": {
+      "type": "array",
+      "title": "Audio Urls",
+      "description": "List of audio URLs to merge in order. The 0th stream of the audio will be considered as the merge candidate.",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/deepfilternet3",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio URL",
+      "description": "The URL of the audio to enhance."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/f5-tts",
+    "category": "audio-to-audio",
+    "field": "ref_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Reference Audio URL",
+      "description": "The URL of the reference audio file."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "veed/clean-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio",
+      "description": "The recording to clean. Any audio or video ffmpeg can decode (wav, mp3, m4a, aac, ogg, mp4, mov, webm, ...); a video's audio track is used (call /video to get the video back with the cleaned track) and multi-channel input is mixed down to mono. Up to 30 minutes and 512 MB. A public URL or a data URI."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "mirelo-ai/sfx-v1.5/video-to-audio",
+    "category": "audio-to-audio",
+    "field": "video_url",
+    "schema": {
+      "type": "string",
+      "title": "Video Url",
+      "description": "A video url that can accessed from the API to process and add sound effects",
+      "format": "uri",
+      "minLength": 1,
+      "maxLength": 2083
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/ace-step/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to be outpainted."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-25/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "The audio clip to transform"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/minimax-music",
+    "category": "audio-to-audio",
+    "field": "reference_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Reference Audio Url",
+      "description": "Reference song, should contain music and vocals. Must be a .wav or .mp3 file longer than 15 seconds."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/medium/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to transform."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/sam-audio/span-separate",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to process."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/music/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to transform."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/sfx/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to transform."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/diffrhythm",
+    "category": "audio-to-audio",
+    "field": "reference_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Reference Audio URL",
+      "description": "The URL of the reference audio to use for the music generation."
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/ace-step/audio-outpaint",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to be outpainted."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/ace-step/audio-inpaint",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio file to be inpainted."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/medium/audio-inpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio. Only the masked region is regenerated."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/medium/audio-outpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to extend."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/sam-audio/visual-separate",
+    "category": "audio-to-audio",
+    "field": "mask_video_url",
+    "schema": {
+      "title": "Mask Video Url",
+      "description": "URL of the mask video (binary mask indicating target object). Black=target, White=background.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/sam-audio/visual-separate",
+    "category": "audio-to-audio",
+    "field": "video_url",
+    "schema": {
+      "type": "string",
+      "title": "Video Url",
+      "description": "URL of the video file to process (MP4, MOV, etc.)"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/medium/base/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to transform."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "mirelo-ai/sfx-v1/video-to-audio",
+    "category": "audio-to-audio",
+    "field": "video_url",
+    "schema": {
+      "type": "string",
+      "title": "Video Url",
+      "description": "A video url that can accessed from the API to process and add sound effects",
+      "format": "uri",
+      "minLength": 1,
+      "maxLength": 2083
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/zonos",
+    "category": "audio-to-audio",
+    "field": "reference_audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Reference Audio Url",
+      "description": "The reference audio."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/medium/base/audio-inpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio. Only the masked region is regenerated."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/music/audio-outpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to extend."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-25/inpaint",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "The audio clip to inpaint"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/medium/base/audio-outpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to extend."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/music/audio-inpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio. Only the masked region is regenerated."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/sfx/audio-outpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to extend."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/music/base/audio-inpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio. Only the masked region is regenerated."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/tada/3b/text-to-speech",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the reference audio file for voice cloning. The model will replicate this speaker's voice characteristics."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/sfx/base/audio-inpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio. Only the masked region is regenerated."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/sfx/base/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to transform."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/music/base/audio-to-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to transform."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/sfx/base/audio-outpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to extend."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/tada/1b/text-to-speech",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the reference audio file for voice cloning. The model will replicate this speaker's voice characteristics."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "mirelo-ai/sfx1.6/extend-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the audio prefix to extend. The prefix duration must be 3\u201359 seconds; the total output (prefix + append_duration) is capped at 60 seconds."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/music/base/audio-outpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio to extend."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/stable-audio-3/small/sfx/audio-inpainting",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "Source audio. Only the masked region is regenerated."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "mirelo-ai/sfx1.6/inpaint-audio",
+    "category": "audio-to-audio",
+    "field": "audio_url",
+    "schema": {
+      "type": "string",
+      "title": "Audio Url",
+      "description": "URL of the source audio. Maximum 10 seconds \u2014 longer clips are rejected. The model regenerates only the region defined by `segment`; everything outside it is preserved."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "bytedance/seedance-2.0/us/reference-to-video",
+    "category": "image-to-video",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image Urls",
+      "description": "Reference images to guide video generation. Refer to them in the prompt as @Image1, @Image2, etc. Supported formats: JPEG, PNG, WebP. Max 30 MB per image. Up to 9 images. Total files across all modalities must not exceed 12.",
+      "maxItems": 9,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/kling-video/v3/pro/image-to-video",
+    "category": "image-to-video",
+    "field": "start_image_url",
+    "schema": {
+      "type": "string",
+      "title": "Start Image Url",
+      "description": "URL of the image to be used for the video"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "google/gemini-omni-flash/v1.1/reference-to-video",
+    "category": "image-to-video",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "URLs of reference images to incorporate into the video.",
+      "maxItems": 10,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "google/gemini-omni-flash/v1.1/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_video_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Video URLs",
+      "description": "URLs of up to three reference videos. Each video must be at most three seconds long.",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "google/gemini-omni-flash/reference-to-video",
+    "category": "image-to-video",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image URLs",
+      "description": "URLs of the reference images to incorporate into the video.",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "alibaba/wan-3.0/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Image Urls",
+      "description": "Up to 10 reference image URLs.",
+      "maxItems": 10,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "alibaba/wan-3.0/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_video_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Video Urls",
+      "description": "Up to 5 reference video URLs totaling at most 15 seconds. Each clip must be at least 16 fps. Input video duration is billed in addition to output duration.",
+      "maxItems": 5,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "alibaba/wan-3.0/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_audio_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Audio Urls",
+      "description": "Up to 5 reference audio URLs totaling at most 15 seconds.",
+      "maxItems": 5,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "lightricks/ltx-2.5/image-to-video/pro",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Start Image URL",
+      "description": "The URL of the start image to use for the generated video."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "lightricks/ltx-2.5/image-to-video/pro",
+    "category": "image-to-video",
+    "field": "end_image_url",
+    "schema": {
+      "title": "End Image URL",
+      "description": "The URL of the end image to use for the generated video. When provided, generates a transition video between start and end frames.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/ltx-2.3-quality/image-to-video",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image URL",
+      "description": "The URL of the starting image."
+    },
+    "required": true
+  },
+  {
+    "endpointId": "minimax/h3-max/text-to-video",
+    "category": "image-to-video",
+    "field": "target_audio_url",
+    "schema": {
+      "title": "Target Audio Url",
+      "description": "Optional URL of an audio clip at least 2 seconds long (maximum 15 MB) to pin to the generated soundtrack. Longer clips are trimmed to the generated video's length, keeping the beginning. The original audio replaces the output soundtrack, padded with silence if shorter than the video, without changing playback speed. Exceptionally high sample rates may be resampled to 96 kHz. Accepts an HTTP(S) URL or a base64 data URI.",
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "minimax/h3-max/reference-to-video",
+    "category": "image-to-video",
+    "field": "middle_image_url",
+    "schema": {
+      "title": "Middle Image",
+      "description": "Optional image to guide the video at middle_frame_time. Requires start and end images and native 480P or 768P resolution.",
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "minimax/h3-max/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_audio_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Audio URLs",
+      "description": "URLs of reference audio clips (2-15 seconds each, combined duration at most 15 seconds), referenced in the prompt as Audio 1, Audio 2, and so on. Images, videos, and audio can be provided individually or together. Reference images, videos, and audio clips must add up to at most 12 files.",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "minimax/h3-max/reference-to-video",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "title": "Start Image URL",
+      "description": "Optional URL of the image to use as the first frame. The video opens exactly on this image while the references keep the subjects consistent; the output canvas follows this image.",
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "minimax/h3-max/reference-to-video",
+    "category": "image-to-video",
+    "field": "end_image_url",
+    "schema": {
+      "title": "End Image URL",
+      "description": "Optional URL of the image to use as the last frame. The video ends exactly on this image.",
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "minimax/h3-max/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Image URLs",
+      "description": "URLs of subject/style reference images, referenced in the prompt as Image 1, Image 2, and so on. Reference images, videos, and audio clips must add up to at most 12 files.",
+      "maxItems": 9,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "minimax/h3-max/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_video_urls",
+    "schema": {
+      "type": "array",
+      "title": "Reference Video URLs",
+      "description": "URLs of motion/reference video clips (2-15 seconds each, combined duration at most 15 seconds), referenced in the prompt as Video 1, Video 2, and so on. Reference images, videos, and audio clips must add up to at most 12 files.",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/minimax/hailuo-02/standard/image-to-video",
+    "category": "image-to-video",
+    "field": "end_image_url",
+    "schema": {
+      "title": "End Image Url",
+      "description": "Optional URL of the image to use as the last frame of the video",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/minimax/hailuo-02/standard/image-to-video",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image Url"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/pixverse/v6/image-to-video",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image Url",
+      "description": "URL of the image to use as the first frame"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/pixverse/v5.6/image-to-video",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image Url",
+      "description": "URL of the image to use as the first frame"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/veo3.1/reference-to-video",
+    "category": "image-to-video",
+    "field": "image_urls",
+    "schema": {
+      "type": "array",
+      "title": "Image Urls",
+      "description": "URLs of the reference images to use for consistent subject appearance",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/wan/v2.7/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_image_urls",
+    "schema": {
+      "title": "Reference Image Urls",
+      "description": "Reference image URLs for character/object appearance. Pass multiple images for multi-subject generation. Max 20 MB each.",
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "uiField": "image"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/wan/v2.7/reference-to-video",
+    "category": "image-to-video",
+    "field": "reference_video_urls",
+    "schema": {
+      "title": "Reference Video Urls",
+      "description": "Reference video URLs for character/object appearance and motion. Pass multiple videos for multi-subject generation. Max 100 MB each.",
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "uiField": "video"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "bytedance/seedance-2.0/us/reference-to-video",
+    "category": "image-to-video",
+    "field": "video_urls",
+    "schema": {
+      "type": "array",
+      "title": "Video Urls",
+      "description": "Reference videos to guide video generation. Refer to them in the prompt as @Video1, @Video2, etc. Supported formats: MP4, MOV. Up to 3 videos, combined duration must be between 2 and 15 seconds, total size under 50 MB. Each video must be between ~480p (640x640) and ~720p (834x1112) in resolution.",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "uiField": "video"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "bytedance/seedance-2.0/us/reference-to-video",
+    "category": "image-to-video",
+    "field": "audio_urls",
+    "schema": {
+      "type": "array",
+      "title": "Audio Urls",
+      "description": "Reference audio to guide video generation. Refer to them in the prompt as @Audio1, @Audio2, etc. Supported formats: MP3, WAV. Up to 3 files, combined duration must not exceed 15 seconds. Max 15 MB per file. At least one reference image or video is required.",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "uiField": "audio"
+      }
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/kling-video/v3/pro/image-to-video",
+    "category": "image-to-video",
+    "field": "end_image_url",
+    "schema": {
+      "title": "End Image Url",
+      "description": "URL of the image to be used for the end of the video",
+      "anyOf": [
+        {
+          "type": "string",
+          "uiField": "image"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/kling-video/v2.6/pro/image-to-video",
+    "category": "image-to-video",
+    "field": "start_image_url",
+    "schema": {
+      "type": "string",
+      "title": "Start Image Url",
+      "description": "URL of the image to be used for the video",
+      "uiField": "image"
+    },
+    "required": true
+  },
+  {
+    "endpointId": "fal-ai/kling-video/v2.6/pro/image-to-video",
+    "category": "image-to-video",
+    "field": "end_image_url",
+    "schema": {
+      "title": "End Image Url",
+      "description": "URL of the image to be used for the end of the video",
+      "anyOf": [
+        {
+          "type": "string",
+          "uiField": "image"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "required": false
+  },
+  {
+    "endpointId": "fal-ai/minimax/hailuo-2.3/standard/image-to-video",
+    "category": "image-to-video",
+    "field": "image_url",
+    "schema": {
+      "type": "string",
+      "title": "Image Url",
+      "description": "URL of the image to use as the first frame",
+      "uiField": "image"
+    },
+    "required": true
+  }
+]

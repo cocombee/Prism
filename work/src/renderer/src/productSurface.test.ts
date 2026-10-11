@@ -149,7 +149,7 @@ describe('global product-surface regressions', () => {
 
   it('never restores a deleted generated result from stale run state or a missing managed file', () => {
     expect(appSource).toContain('mergeLiveGeneratedResults(liveGeneratedResults, batchGeneratedResults)')
-    expect(appSource).toContain('const liveNodeData = nodeLayoutRef.current.find((candidate) => candidate.id === id)?.data || node.data')
+    expect(appSource).toContain('const liveNodeData = (repeatNativeVideo ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data')
     expect(appSource).toContain('semanticAssetGenerationPatch(liveNodeData, batchGeneratedResults)')
     expect(mainSource).toContain('pruneMissingGeneratedResults(nodes, availableGeneratedPaths)')
     expect(mainSource).toContain('A deleted managed result must not survive project hydration.')
@@ -410,11 +410,11 @@ describe('global product-surface regressions', () => {
     expect(nodeCardSource).toContain('allocateMixedControlRows(measuredDescriptors, availableWidth, gap, allocation)')
     expect(nodeCardSource).toContain('data-equalized-default={fillTrack ? defaultLabel : undefined}')
     expect(nodeCardSource).toContain('metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight')
-    expect(nodeCardSource).toContain('const fullWidth = paintedWidth(selector, fullLabel) + fixedChrome')
-    expect(nodeCardSource).toContain('const compactWidth = paintedWidth(selector, compactLabel) + fixedChrome')
+    expect(nodeCardSource).toContain('selectorReferenceTrackWidth(paintedWidth(selector, fullLabel), paintedWidth(selector, referenceLabel), fixedChrome)')
+    expect(nodeCardSource).toContain('const fixedChrome = selectorChromeWidth(selector)')
     expect(nodeCardSource).not.toContain("label.querySelector<HTMLElement>(':scope > span')?.scrollWidth")
     expect(nodeCardSource).toContain("selector.dataset.equalizedDefault || descriptor.defaultLabel || ''")
-    expect(nodeCardSource).toContain('const operationalWidth = Math.max(descriptor.intrinsicWidth, fullWidth)')
+    expect(nodeCardSource).toContain('referenceSized: true')
     expect(nodeCardSource).not.toContain('const widestValue = Math.max(...optionLabels.map((value) => renderedInkWidth(context, value)), 0)')
     expect(nodeCardSource).not.toContain('data-equalized-min={fillTrack ? fittedWidth : undefined}')
     expect(nodeCardSource).not.toContain('className="voice-primary-input voice-primary-number"')
@@ -1408,7 +1408,7 @@ describe('global product-surface regressions', () => {
   it('never exposes an internal image route or drops its provider icon when a saved model is temporarily absent from the menu', () => {
     expect(nodeCardSource).toContain("const fallbackModelId = value.replace(/^[^:]+::/, '')")
     expect(nodeCardSource).toContain("const selectedLabel = displayLabel || selected?.label || modelDisplayName(fallbackModelId)")
-    expect(nodeCardSource).toContain('const selectedCompany = selected?.provider || modelCompanyFor(value, selectedLabel)')
+    expect(nodeCardSource).toContain('const selectedCompany = catalogModelCompany(selected, value)')
     expect(nodeCardSource).not.toContain('selected?.label || value')
   })
 

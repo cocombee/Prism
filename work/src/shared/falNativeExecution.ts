@@ -159,7 +159,7 @@ export function planFalNativeExecution(contract: FalSchemaContract, request: Fal
     preflightInput[key] = field.media.multiple ? urls : urls[0]
     media.push({ field, sources: clone(sources) })
   }
-  if (runtime.capacity && media.reduce((sum, binding) => sum + binding.sources.length, 0) > runtime.capacity.total) throw new Error(`This model accepts at most ${runtime.capacity.total} total media references.`)
+  if (runtime.capacity && media.filter(binding => !runtime.capacity?.keys || runtime.capacity.keys.includes(binding.field.key)).reduce((sum, binding) => sum + binding.sources.length, 0) > runtime.capacity.total) throw new Error(`This model accepts at most ${runtime.capacity.total} total media references.`)
   if (contract.endpointId === 'bytedance/seedance-2.5/reference-to-video' && media.some(binding => binding.field.key === 'audio_urls') && !media.some(binding => ['image_urls', 'video_urls'].includes(binding.field.key))) throw new Error('Seedance audio references require at least one image or video reference.')
   const expected = request.flow === 'image' ? 'image' : request.flow === 'video' ? 'video' : 'audio'
   return { endpointId, values, media, preflightSchema: deferFields(contract.input, localFields), preflightInput, outputType: expected, outputs: outputBindings(contract.output, expected) }

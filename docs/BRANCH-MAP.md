@@ -30,6 +30,7 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `CHANGE-IMPACT-STORYBOARD-TEXT-PROVIDERS-2026-08-23.md`
 - `CHANGE-IMPACT-TEMPLATE.md`
 - `CURRENT-STATE.md`
+- `Selector And Model Contracts Change Impact.md`
 - `DOCUMENT-OWNERSHIP.md`
 - `MIGRATION-CLAUSE-MAP.md`
 - `README.md`
@@ -132,4 +133,4 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `testing/flight-tester-release-gate.md`
 - `testing/regression-firewall.md`
 
-Populated Markdown files excluding this map: **86**.
+Populated Markdown files excluding this map: **87**.

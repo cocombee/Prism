@@ -33,6 +33,7 @@ const api: PrismAPI = {
     save: (provider, key) => ipcRenderer.invoke('services:save', provider, key),
     remove: (provider) => ipcRenderer.invoke('services:remove', provider),
     models: (provider) => ipcRenderer.invoke('services:models', provider),
+    modelSnapshot: (provider) => ipcRenderer.invoke('services:model-snapshot', provider),
     higgsfieldPresets: (refresh?: boolean) => ipcRenderer.invoke('services:higgsfield-presets', refresh),
     higgsfieldSchema: (endpointId) => ipcRenderer.invoke('services:higgsfield-schema', endpointId),
     falSchema: (endpointId) => ipcRenderer.invoke('services:fal-schema', endpointId),

@@ -26,7 +26,7 @@ export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine'
   if (data.higgsfieldNative && data.kind === 'video-generator') {
     const state = data.higgsfieldNative
     let nativeSeedance = false
-    try { nativeSeedance = higgsfieldModel(state.endpointId).kind === 'seedance' } catch { /* Preserve unavailable saved ports below. */ }
+    try { nativeSeedance = higgsfieldModel(state.endpointId).kind !== 'genjutsu' } catch { /* Preserve unavailable saved ports below. */ }
     if (nativeSeedance) {
       const bindings: NonNullable<typeof state.media> = state.media || describeHiggsfieldInputContract(state.endpointId, higgsfieldInputSchema(state.endpointId), '').media
       const ports: NodeInputPortContract[] = [text(), ...(!higgsfieldSourceOwnsTimeline(state.endpointId) ? [storyboard()] : []), style()]

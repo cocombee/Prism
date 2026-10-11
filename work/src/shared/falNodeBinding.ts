@@ -13,6 +13,7 @@ export interface FalNodeMediaBinding {
   role: FalInputRole
   multiple: boolean
   maximum?: number
+  maximumBytes?: number
   required: boolean
   retired?: boolean
 }
@@ -49,7 +50,7 @@ export function falNodeMediaBindings(runtime: FalRuntimeInputs): FalNodeMediaBin
     let portId = legacyRolePort[role] || falFieldPortId(field.key)
     if (occupied.has(portId)) portId = falFieldPortId(field.key)
     occupied.add(portId)
-    return [{ key: field.key, portId, label: field.label, type: field.media.type, role, multiple: field.media.multiple, required: field.required, ...(field.media.maximum !== undefined ? { maximum: field.media.maximum } : {}) }]
+    return [{ key: field.key, portId, label: field.media.maximumBytes === undefined ? field.label : `${field.label} · Max ${field.media.maximumBytes / 1_000_000} MB`, type: field.media.type, role, multiple: field.media.multiple, required: field.required, ...(field.media.maximumBytes !== undefined ? { maximumBytes: field.media.maximumBytes } : {}), ...(field.media.maximum !== undefined ? { maximum: field.media.maximum } : {}) }]
   })
 }
 
@@ -73,7 +74,12 @@ export function reconcileFalNodeBinding(state: FalNativeNodeState, contract: Fal
   for (const old of state.media) {
     const next = media.find(binding => binding.key === old.key)
     if (!next) { media.push({ ...old, retired: true }); repairs.push(`${old.label} is no longer declared. Review its preserved connections.`) }
-    else if (old.type !== next.type || old.role !== next.role || old.multiple !== next.multiple) repairs.push(`${old.label} changed its media binding. Review its connections.`)
+    else {
+      // New semantic role knowledge must not orphan an existing physical edge
+      // to the same unchanged provider field and media shape.
+      if (old.type === next.type && old.multiple === next.multiple) next.portId = old.portId
+      if (old.type !== next.type || old.role !== next.role || old.multiple !== next.multiple) repairs.push(`${old.label} changed its media binding. Review its connections.`)
+    }
   }
   if (state.timing && JSON.stringify(state.timing) !== JSON.stringify(contract.runtime.timing)) repairs.push('The model timing field or unit changed. Review the preserved duration and Storyboard.')
   const promptField = state.promptField === null ? null : state.promptField || ['prompt', 'text'].find(key => contract.runtime!.fields.some(field => field.key === key && field.control === 'text'))

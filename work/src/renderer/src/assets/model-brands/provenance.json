@@ -1,0 +1,46 @@
+{
+  "assets": {
+    "hailuo-favicon.png": {
+      "sourceUrl": "https://cdn.hailuoai.video/open-hailuo-video-web/public_assets/favicon.png",
+      "sourcePage": "https://hailuoai.video/",
+      "sourceEvidence": "Codex/Apps/Prism/Hailuo Official Brand Page.html",
+      "sha256": "457a9656ca95bd4b35278b0dbd82210bc6ad2548698e542a6138fca8a7deec8f",
+      "format": "PNG 64x64 RGBA"
+    },
+    "ltx-favicon-256x256.png": {
+      "sourceUrl": "https://cdn.prod.website-files.com/65bb6b901cb133d784d16166/68fa1561b2f334cd012acbb6_ltx-favicon-256x256.png",
+      "sourcePage": "https://ltx.io/studio",
+      "sourceEvidence": "Codex/Apps/Prism/LTX Official Brand Page.html",
+      "sha256": "aa7ffa522fe6eb9622c6b4bbf906c0bfe7715397728e24bc57eeff43933381f4",
+      "format": "PNG 256x256 RGBA"
+    },
+    "pixverse-favicon.svg": {
+      "sourceUrl": "https://cdn.pixverse.ai/media/pixverse/favicon.svg",
+      "sourcePage": "https://pixverse.ai/en",
+      "sourceEvidence": "Codex/Apps/Prism/PixVerse Official Brand Page.html",
+      "sha256": "d9e42b3ba2518d299a097963fd4d27a92a1db838b7540d77ec29246751eaacf0",
+      "format": "SVG"
+    }
+  },
+  "derivedMasks": {
+    "pixverse-mark-mask.svg": {
+      "derivedFrom": "pixverse-favicon.svg",
+      "derivation": "Preserves the exact d geometry of official favicon path elements 2 and 3, omits only path element 1 (the rounded-square background tile), and sets both mark fills to white for an alpha CSS mask. The source favicon remains unchanged.",
+      "sha256": "bc83365444dd43e12564e4ae671704f1c25d38a6893d4b3dcb30f5019cff4d05",
+      "format": "SVG alpha mask, viewBox 0 0 1024 1024"
+    },
+    "hailuo-mark.svg": {
+      "sourceUrl": "https://hailuoai.video/",
+      "sourceEvidence": "Codex/Apps/Prism/Hailuo Official Brand Page.html",
+      "sourceLocation": "Official page header brand anchor (<a href=\"/\">), inline 32x32 SVG mark",
+      "derivation": "Preserves the exact official path d geometry and 0 0 32 32 viewBox; replaces the gradient paint with solid white for an alpha CSS mask. No background tile or new geometry.",
+      "sha256": "974d35eb9f379769a6c4b84e9c9affbeb940dd63f59e32e8053fe6eb23ca6f99",
+      "format": "SVG alpha mask, viewBox 0 0 32 32"
+    }
+  },
+  "rendering": {
+    "hailuo": "Use unchanged official colored favicon at existing 12px identity-mark size. Its alpha includes the white tile and a monochrome alpha mask loses spiral detail; do not ship that mask.",
+    "ltx": "Unchanged official source through luminance mask; currentColor matches existing identity role; mask viewport excludes canvas margins.",
+    "pixverse": "Exact official mark geometry, background tile omitted; alpha mask uses currentColor in existing identity role."
+  }
+}

@@ -14,6 +14,15 @@ function contract(properties: FalSchemaContract['input']['properties']) {
 const empty = (): FalNativeNodeState => ({ endpointId: 'fixture/future/reference-to-video', label: 'Future', flow: 'video', values: {}, media: [] })
 
 describe('saved native model bindings', () => {
+  it('preserves an existing physical socket when reviewed role knowledge changes for the same provider field', () => {
+    const contract = {endpointId:'google/gemini-omni-flash/v1.1/reference-to-video',schemaPath:'/fixture',input:{type:'object' as const,properties:{image_urls:{type:'array' as const,items:{type:'string' as const}}}},output:{type:'object' as const}}
+    const runtime = describeFalRuntimeInputs(contract)
+    const old={endpointId:contract.endpointId,label:'Omni',flow:'video' as const,values:{},media:[{key:'image_urls',portId:'existing-physical-image-socket',label:'Images',type:'image' as const,role:'native-input' as const,multiple:true,required:false}]}
+    const next=reconcileFalNodeBinding(old,{...contract,runtime:{...runtime,fingerprint:'new-role'}})
+    expect(next.media[0].portId).toBe('existing-physical-image-socket')
+    expect(next.media[0].role).toBe('reference-image')
+    expect(next.repairs?.some(message=>message.includes('changed its media binding'))).toBe(true)
+  })
   it('retains zero, false, null and multiline values across defaults and JSON save/reopen', () => {
     const model = contract({ seed: { type: 'integer', default: 7 }, enabled: { type: 'boolean', default: true }, nullable: { anyOf: [{ type: 'string' }, { type: 'null' }], default: 'fallback' }, prompt: { type: 'string' } })
     const state = { ...empty(), values: { seed: 0, enabled: false, nullable: null, prompt: '  Malay\n\n[spoken] Salam.  ' } }

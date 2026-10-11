@@ -1,3 +1,4 @@
+import reviewedMedia from './falReviewedMediaFields.json'
 import { falProductionFlow } from './falModelFlow'
 import { inferFalVideoTiming, type FalVideoTiming } from './videoTiming'
 import { validateFalSchema } from './falSchemaBinding'
@@ -14,21 +15,21 @@ export interface FalRuntimeField {
   control: 'text' | 'number' | 'boolean' | 'choice' | 'json' | 'media' | 'unsupported'
   placement: 'primary' | 'advanced'
   choices?: FalJson[]
-  media?: { type: FalMediaType; role?: FalInputRole; multiple: boolean; maximum?: number; provenance: 'provider-annotation' | 'verified-adapter' }
+  media?: { type: FalMediaType; role?: FalInputRole; multiple: boolean; maximum?: number; maximumBytes?: number; provenance: 'provider-annotation' | 'verified-adapter' }
 }
 export interface FalRuntimeInputs {
   adapterRevision: string
   timing?: FalVideoTiming
   fields: FalRuntimeField[]
   unsupportedInputs: Array<{ key: string; reason: string }>
-  capacity?: { images: number; videos: number; audios: number; total: number; source: string; verifiedAt: string }
+  capacity?: { images: number; videos: number; audios: number; total: number; keys?: string[]; source: string; verifiedAt: string }
 }
-export const FAL_INPUT_ADAPTER_REVISION = 'prism-fal-inputs-2026-10-09-v2'
+export const FAL_INPUT_ADAPTER_REVISION = 'prism-fal-inputs-2026-10-11-v3'
 const owned = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key)
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
 /** Exact verified fields only. Descriptions, filenames and model-name guesses never authorize media roles. */
-function verifiedFields(endpointId: string): Record<string, { type: FalMediaType; role: FalInputRole; maximum?: number }> {
+function verifiedFields(endpointId: string): Record<string, { type: FalMediaType; role: FalInputRole; maximum?: number; multiple?: boolean }> {
   if (endpointId === 'bytedance/seedance-2.5/image-to-video') return {
     image_url: { type: 'image', role: 'start-frame' }, end_image_url: { type: 'image', role: 'end-frame' },
   }
@@ -37,7 +38,15 @@ function verifiedFields(endpointId: string): Record<string, { type: FalMediaType
     video_urls: { type: 'video', role: 'reference-video', maximum: 10 },
     audio_urls: { type: 'audio', role: 'reference-audio', maximum: 10 },
   }
-  return {}
+  // Exact fields from the captured public utility contracts. They are audio
+  // inputs only and gain no Character/camera/reference authority.
+  if (endpointId === 'fal-ai/workflow-utilities/audio-compressor') return {
+    audio_url: { type: 'audio', role: 'native-input' },
+  }
+  if (endpointId === 'fal-ai/workflow-utilities/impulse-response') return {
+    audio_url: { type: 'audio', role: 'native-input' }, impulse_response_url: { type: 'audio', role: 'native-input' },
+  }
+  return Object.hasOwn(reviewedMedia.models, endpointId) ? reviewedMedia.models[endpointId as keyof typeof reviewedMedia.models] as Record<string, {type:FalMediaType;role:FalInputRole;maximum?:number;multiple?:boolean}> : {}
 }
 
 /** Presentation projection only: the original schema still owns validation, including all alternatives. */
@@ -80,6 +89,8 @@ export function describeFalRuntimeInputs(contract: FalSchemaContract): FalRuntim
     const choices = unambiguous(projection.map(item => item.enum))
     const maxima = projection.flatMap(item => item.maxItems === undefined ? [] : [item.maxItems])
     const schemaMaximum = maxima.length ? Math.min(...maxima) : undefined
+    const fileLimits = [...projection, ...(items ? layers(items) : [])].flatMap(item => item.maxFileSize === undefined ? [] : [item.maxFileSize])
+    const maximumBytes = fileLimits.length ? Math.min(...fileLimits) : undefined
     const field: FalRuntimeField = { key, label: projection.find(item => item.title)?.title || key.replace(/_/g, ' '), schema,
       required: required.has(key), nullable: projection.some(item => item.type === 'null' || item.anyOf?.some(child => child.type === 'null')),
       control: choices ? 'choice' : type === 'boolean' ? 'boolean' : type === 'number' || type === 'integer' ? 'number' : type === 'string' ? 'text' : 'json',
@@ -88,22 +99,29 @@ export function describeFalRuntimeInputs(contract: FalSchemaContract): FalRuntim
     if (annotation && !annotatedType) {
       field.control = 'unsupported'; unsupportedInputs.push({ key, reason: `Input type ${annotation} needs a supported Prism adapter.` })
     } else if (declaredType) {
-      if (annotation && rule && annotatedType !== rule.type || scalarType !== 'string') {
+      if (annotation && rule && annotatedType !== rule.type || scalarType !== 'string' || rule?.multiple !== undefined && rule.multiple !== multiple) {
         field.control = 'unsupported'; unsupportedInputs.push({ key, reason: 'Media field shape/type differs from its verified binding; review its adapter.' })
       } else {
         field.control = 'media'
         field.media = { type: declaredType, role: rule?.role || 'native-input', multiple,
           ...(schemaMaximum !== undefined || rule?.maximum !== undefined ? { maximum: schemaMaximum ?? rule?.maximum } : {}),
+          ...(maximumBytes !== undefined ? { maximumBytes } : {}),
           provenance: rule ? 'verified-adapter' : 'provider-annotation' }
         // A declared native input binds only this exact field; it inherits no camera/appearance authority.
       }
+    }
+    if (maximumBytes !== undefined && !field.media) {
+      field.control = 'unsupported'; unsupportedInputs.push({ key, reason: 'This file-size limit needs a verified native media binding.' })
     }
     return field
   })
   if (!fields.length && (contract.input.type !== 'object' || contract.input.additionalProperties)) unsupportedInputs.push({ key: '$', reason: 'The root input needs a supported structured adapter.' })
   const timing = falProductionFlow(contract.category) === 'video' ? inferFalVideoTiming(fields) : undefined
   if (timing) for (const field of fields) if (timing.kind === 'seconds' ? field.key === timing.field : [timing.framesField, timing.fpsField].includes(field.key)) field.placement = 'primary'
-  return { adapterRevision: FAL_INPUT_ADAPTER_REVISION, fields, unsupportedInputs, ...(timing ? { timing } : {}),
+  const referenceKeys = contract.endpointId === 'bytedance/seedance-2.0/us/reference-to-video' ? ['image_urls','video_urls','audio_urls']
+    : contract.endpointId === 'minimax/h3-max/reference-to-video' ? ['reference_image_urls','reference_video_urls','reference_audio_urls'] : undefined
+  const reviewedCapacity = referenceKeys ? { images: fields.find(field => field.key === referenceKeys[0])?.media?.maximum ?? 9, videos: fields.find(field => field.key === referenceKeys[1])?.media?.maximum ?? 3, audios: fields.find(field => field.key === referenceKeys[2])?.media?.maximum ?? 3, total:12, keys:referenceKeys, source:`https://fal.ai/models/${contract.endpointId}/api`,verifiedAt:'2026-10-11' } : undefined
+  return { adapterRevision: FAL_INPUT_ADAPTER_REVISION, fields, unsupportedInputs, ...(timing ? { timing } : {}), ...(reviewedCapacity ? {capacity:reviewedCapacity} : {}),
     ...(contract.endpointId === 'bytedance/seedance-2.5/reference-to-video' ? { capacity: { images: fields.find(field => field.key === 'image_urls')?.media?.maximum ?? 30, videos: fields.find(field => field.key === 'video_urls')?.media?.maximum ?? 10, audios: fields.find(field => field.key === 'audio_urls')?.media?.maximum ?? 10, total: 50,
       source: 'https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api', verifiedAt: '2026-10-09' } } : {}) }
 }

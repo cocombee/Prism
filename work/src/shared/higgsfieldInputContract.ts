@@ -1,4 +1,6 @@
 import type { FalJson, FalSchemaNode } from './falSchemaBinding'
+import { HIGGSFIELD_REFERENCE_VIDEO_MEDIA, higgsfieldReferenceVideoOmittedControls } from './higgsfieldReferenceVideo'
+import { higgsfieldTextVideoOmittedControls } from './higgsfieldTextVideo'
 import { describeFalRuntimeInputs, type FalRuntimeField } from './falRuntimeInputs'
 import { higgsfieldContractRevision, higgsfieldInputSchema, higgsfieldModel, higgsfieldSourceOwnsTimeline } from './higgsfieldNative'
 
@@ -42,12 +44,19 @@ export function describeHiggsfieldInputContract(endpointId: string, input: FalSc
   const model = higgsfieldModel(endpointId), schema = structuredClone(input)
   // Prefix deliberately prevents fal's exact-endpoint role/capacity adapters from applying.
   const projection = describeFalRuntimeInputs({ endpointId: `higgsfield:${endpointId}`, schemaPath: `/${endpointId}`, input: schema, output: { type: 'object' } })
-  const unsupportedInputs = projection.unsupportedInputs.filter(item => item.key !== '$conditional')
   const baseline = higgsfieldInputSchema(endpointId)
+  // Reviewed main-prompt adapters omit unimplemented optional structured fields.
+  // Their planners reject authored values for these keys before credentials.
+  const omitted = new Set(model.kind==='text-video'?higgsfieldTextVideoOmittedControls(endpointId):model.kind==='reference-video'?higgsfieldReferenceVideoOmittedControls(endpointId):[])
+  const unsupportedInputs = projection.unsupportedInputs.filter(item => item.key !== '$conditional' && !omitted.has(item.key))
   const conditional = (value: FalSchemaNode) => ({ if: value.if, then: value.then, else: value.else, anyOf: value.anyOf, oneOf: value.oneOf, allOf: value.allOf, not: value.not })
-  if (schema.type !== 'object' || schema.additionalProperties !== false || !schema.properties) unsupportedInputs.push({ key: '$', reason: 'This native input shape needs a reviewed Higgsfield adapter.' })
+  // Some reviewed primary routes omit JSON Schema's closure flag. Their adapters
+  // independently whitelist declared keys; omission never grants arbitrary input.
+  const reviewedImplicitClosure = (model.kind === 'text-video' || model.kind === 'reference-video')
+    && baseline.additionalProperties === undefined && schema.additionalProperties === undefined
+  if (schema.type !== 'object' || (!reviewedImplicitClosure && schema.additionalProperties !== false) || !schema.properties) unsupportedInputs.push({ key: '$', reason: 'This native input shape needs a reviewed Higgsfield adapter.' })
   if (!same(conditional(schema), conditional(baseline))) unsupportedInputs.push({ key: '$conditional', reason: 'The native input alternatives changed. Review the preserved fields and bindings.' })
-  const fields = projection.fields.map(field => {
+  const fields = projection.fields.filter(field=>!omitted.has(field.key)).map(field => {
     if(field.key==='prompt' && field.schema.type!=='string') {
       unsupportedInputs.push({key:field.key,reason:'The current prompt field needs a reviewed Higgsfield text adapter; authored text is preserved.'})
       return {...field,control:'unsupported' as const,media:undefined}
@@ -56,7 +65,8 @@ export function describeHiggsfieldInputContract(endpointId: string, input: FalSc
       unsupportedInputs.push({key:field.key,reason:'The current output formats need a reviewed Higgsfield movie adapter; saved values are preserved.'})
       return {...field,control:'unsupported' as const,media:undefined}
     }
-    const known = Object.hasOwn(MEDIA,field.key) ? MEDIA[field.key] : undefined, expected = Object.hasOwn(baseline.properties || {},field.key) ? baseline.properties?.[field.key] : undefined
+    const adapterMedia=model.kind==='reference-video'&&Object.hasOwn(HIGGSFIELD_REFERENCE_VIDEO_MEDIA,field.key)?HIGGSFIELD_REFERENCE_VIDEO_MEDIA[field.key]:undefined
+    const known = adapterMedia ? {type:adapterMedia.type,role:adapterMedia.role,multiple:adapterMedia.array,label:adapterMedia.label} : Object.hasOwn(MEDIA,field.key) ? MEDIA[field.key] : undefined, expected = Object.hasOwn(baseline.properties || {},field.key) ? baseline.properties?.[field.key] : undefined
     if (known && expected) {
       const matches = known.multiple ? field.schema.type === 'array' && field.schema.items?.type === 'string' : field.schema.type === 'string'
       if (!matches) {

@@ -9,6 +9,7 @@ import { extname } from 'node:path'
 import { createHash } from 'node:crypto'
 import ts from 'typescript'
 import { executeFalNativeGeneration } from './falNativeGeneration'
+import { assertFalMediaFileLimit } from './falMediaFileLimit'
 import { assertGenerationRequirements } from '../shared/generationReadiness'
 import { compileFalSchemaContract } from '../shared/falSchemaBinding'
 import { describeFalRuntimeInputs, falRuntimeFingerprintMaterial } from '../shared/falRuntimeInputs'
@@ -34,7 +35,7 @@ function setup() {
   }
   const client = { owned: true }
   const bindings = { assertVideoProviderPromptPreflight, effectiveProviderPromptOwnership, requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError, SeedancePromptIntegrityError,
-    executeFalNativeGeneration, authoredTimelineSeconds,
+    executeFalNativeGeneration, authoredTimelineSeconds, assertFalMediaFileLimit,
     readOwnedFalSchema: vi.fn(async () => contract),
     runtimeServiceFailures: { assertCurrent: vi.fn(), delete: vi.fn() }, assertGenerationCommit: vi.fn(),
     assertManagedMediaPath: vi.fn(async path => path), mimeFor: vi.fn(() => 'image/png'), stat: vi.fn(async () => ({ size: 1 })),

@@ -10,7 +10,7 @@ export async function resolveHiggsfieldCurrentInput(request: HiggsfieldNativeReq
   readContract(endpointId: string, assertCurrent: () => void): Promise<FalSchemaNode>
 }) {
   const native = structuredClone(request), captured = planHiggsfieldNativeInput(native)
-  const scoped = higgsfieldModel(native.endpointId).kind === 'seedance' && native.fingerprint !== undefined
+  const scoped = higgsfieldModel(native.endpointId).kind !== 'genjutsu' && native.fingerprint !== undefined
   const read = async () => {
     dependencies.assertCurrent()
     if (scoped) {
@@ -21,7 +21,7 @@ export async function resolveHiggsfieldCurrentInput(request: HiggsfieldNativeReq
     }
     const schema = await dependencies.readContract(native.endpointId, dependencies.assertCurrent)
     dependencies.assertCurrent()
-    if (captured.kind === 'seedance') for (const [key, field] of Object.entries(captured.schema.properties || {})) {
+    if (captured.kind !== 'genjutsu') for (const [key, field] of Object.entries(captured.schema.properties || {})) {
       if (!Object.hasOwn(native.values, key) && Object.hasOwn(field, 'default') && JSON.stringify(schema.properties?.[key]?.default) !== JSON.stringify(field.default)) throw new Error(`The selected native default for ${key} changed. Review its current controls; saved values were preserved.`)
     }
     return schema

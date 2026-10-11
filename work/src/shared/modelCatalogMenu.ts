@@ -34,6 +34,8 @@ export interface ModelMenuProvider<T extends ModelMenuOption> {
   featured: ModelMenuRelease<T>[]
 }
 
+export type ModelCatalogReleaseLimit = number | 'all'
+
 /** A release badge requires a real, recent release date; ranking never invents one. */
 export function isRecentModelRelease(releasedAt: string | undefined, now = Date.now()): boolean {
   const date = modelReleaseDate(releasedAt, now)
@@ -83,6 +85,7 @@ export function modelCatalogMenu<T extends ModelMenuOption>(
   groups: readonly { label: string; options: readonly T[] }[],
   featuredCount = 5,
   now = Date.now(),
+  releaseLimit: ModelCatalogReleaseLimit = 2,
 ): ModelMenuProvider<T>[] {
   const providers = new Map<string, ModelMenuProvider<T>>()
   const seen = new Set<string>()
@@ -120,10 +123,12 @@ export function modelCatalogMenu<T extends ModelMenuOption>(
       siblings.push(release)
       families.set(key, siblings)
     }
-    // Limit releases, not modes or tiers. Discovery retains the full catalog;
-    // this menu projection cannot mutate a persisted older selection.
-    provider.releases = [...families.values()].flatMap(releases => releases.sort(newestRelease).slice(0, 2))
-    provider.featured = [...families.values()].flatMap(releases => releases.slice(0, 1))
+    // Default menus retain two releases per provider/family. Flat media menus
+    // may request the full admitted catalog so older routes remain searchable.
+    const orderedFamilies = [...families.values()].map(releases => releases.sort(newestRelease))
+    const releaseCount = releaseLimit === 'all' ? undefined : Math.max(0, Math.floor(releaseLimit))
+    provider.releases = orderedFamilies.flatMap(releases => releaseCount === undefined ? releases : releases.slice(0, releaseCount))
+    provider.featured = orderedFamilies.flatMap(releases => releaseCount === 0 ? [] : releases.slice(0, 1))
       .filter(release => !release.options.every(option => option.disabled))
       .sort((a, b) => {
         if (a.releasedAt && b.releasedAt) return Date.parse(b.releasedAt) - Date.parse(a.releasedAt)

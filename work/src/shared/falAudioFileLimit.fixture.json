@@ -1,0 +1,365 @@
+{
+  "endpoint_id": "fal-ai/workflow-utilities/audio-compressor",
+  "openapi": {
+    "openapi": "3.0.4",
+    "info": {
+      "title": "Queue OpenAPI for fal-ai/workflow-utilities/audio-compressor",
+      "version": "1.0.0",
+      "description": "The OpenAPI schema for the fal-ai/workflow-utilities/audio-compressor queue.",
+      "x-fal-metadata": {
+        "endpointId": "fal-ai/workflow-utilities/audio-compressor",
+        "category": "audio-to-audio",
+        "thumbnailUrl": "https://v3b.fal.media/files/b/0a8d4636/KrltA9CgCSERiJeQDn5YE_eaced6c54cd140deb36a1c2804e1f935.png",
+        "playgroundUrl": "https://fal.ai/models/fal-ai/workflow-utilities/audio-compressor",
+        "documentationUrl": "https://fal.ai/models/fal-ai/workflow-utilities/audio-compressor/api",
+        "about": "Apply dynamic range compression to audio.\n\nUses FFmpeg's acompressor filter to reduce the dynamic range of audio,\nmaking quiet sounds louder and loud sounds quieter.\nSupports threshold, ratio, attack, release, and makeup gain controls."
+      }
+    },
+    "components": {
+      "securitySchemes": {
+        "apiKeyAuth": {
+          "type": "apiKey",
+          "in": "header",
+          "name": "Authorization",
+          "description": "Fal Key"
+        }
+      },
+      "schemas": {
+        "QueueStatus": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "IN_QUEUE",
+                "IN_PROGRESS",
+                "COMPLETED"
+              ]
+            },
+            "request_id": {
+              "type": "string",
+              "description": "The request id."
+            },
+            "response_url": {
+              "type": "string",
+              "description": "The response url."
+            },
+            "status_url": {
+              "type": "string",
+              "description": "The status url."
+            },
+            "cancel_url": {
+              "type": "string",
+              "description": "The cancel url."
+            },
+            "logs": {
+              "type": "object",
+              "description": "The logs.",
+              "additionalProperties": true
+            },
+            "metrics": {
+              "type": "object",
+              "description": "The metrics.",
+              "additionalProperties": true
+            },
+            "queue_position": {
+              "type": "integer",
+              "description": "The queue position."
+            }
+          },
+          "required": [
+            "status",
+            "request_id"
+          ]
+        },
+        "WorkflowUtilitiesAudioCompressorInput": {
+          "properties": {
+            "knee": {
+              "maximum": 8,
+              "type": "number",
+              "minimum": 1,
+              "default": 2.83,
+              "title": "Knee",
+              "description": "Knee width in dB for soft knee compression (0 = hard knee)"
+            },
+            "release": {
+              "maximum": 9000,
+              "type": "number",
+              "minimum": 0.01,
+              "default": 50,
+              "title": "Release",
+              "description": "Release time in milliseconds (how fast compression stops)"
+            },
+            "attack": {
+              "maximum": 2000,
+              "type": "number",
+              "minimum": 0.01,
+              "default": 5,
+              "title": "Attack",
+              "description": "Attack time in milliseconds (how fast compression starts)"
+            },
+            "ratio": {
+              "maximum": 20,
+              "type": "number",
+              "minimum": 1,
+              "default": 3,
+              "title": "Ratio",
+              "description": "Compression ratio (1 = no compression, higher = more compression)"
+            },
+            "threshold": {
+              "maximum": 0,
+              "type": "number",
+              "minimum": -60,
+              "default": -18,
+              "title": "Threshold",
+              "description": "Threshold level in dB above which compression is applied (-60 to 0)"
+            },
+            "audio_url": {
+              "examples": [
+                "https://v3.fal.media/files/panda/1-0iezBUIePBa3Sz5YY5B_tmpy1jyshw9.wav"
+              ],
+              "type": "string",
+              "title": "Audio Url",
+              "max_file_size": 60000000,
+              "description": "URL of the audio file to compress"
+            },
+            "makeup": {
+              "maximum": 64,
+              "type": "number",
+              "minimum": 0,
+              "default": 8,
+              "title": "Makeup",
+              "description": "Makeup gain in dB to compensate for volume reduction"
+            },
+            "output_bitrate": {
+              "type": "string",
+              "default": "192k",
+              "title": "Output Bitrate",
+              "enum": [
+                "128k",
+                "192k",
+                "256k",
+                "320k"
+              ],
+              "description": "Output audio bitrate"
+            }
+          },
+          "type": "object",
+          "x-fal-order-properties": [
+            "audio_url",
+            "threshold",
+            "ratio",
+            "attack",
+            "release",
+            "makeup",
+            "knee",
+            "output_bitrate"
+          ],
+          "title": "AudioCompressorInput",
+          "required": [
+            "audio_url"
+          ],
+          "description": "Input model for audio dynamic range compression"
+        },
+        "WorkflowUtilitiesAudioCompressorOutput": {
+          "properties": {
+            "audio": {
+              "examples": [
+                {
+                  "content_type": "application/octet-stream",
+                  "file_size": 1234567,
+                  "url": "https://v3b.fal.media/files/b/panda/compressed_audio.wav",
+                  "file_name": "compressed_audio.wav"
+                }
+              ],
+              "$ref": "#/components/schemas/AudioFile",
+              "description": "The compressed audio file"
+            }
+          },
+          "type": "object",
+          "x-fal-order-properties": [
+            "audio"
+          ],
+          "title": "AudioCompressorOutput",
+          "required": [
+            "audio"
+          ],
+          "description": "Output model for compressed audio"
+        },
+        "AudioFile": {
+          "properties": {
+            "content_type": {
+              "type": "string",
+              "title": "Content Type",
+              "description": "Content type of the audio file"
+            },
+            "file_size": {
+              "type": "integer",
+              "title": "File Size",
+              "description": "Size of the audio file in bytes"
+            },
+            "url": {
+              "type": "string",
+              "title": "Url",
+              "description": "URL of the audio file"
+            },
+            "file_name": {
+              "type": "string",
+              "title": "File Name",
+              "description": "Name of the audio file"
+            }
+          },
+          "type": "object",
+          "x-fal-order-properties": [
+            "url",
+            "content_type",
+            "file_name",
+            "file_size"
+          ],
+          "title": "AudioFile",
+          "required": [
+            "url",
+            "content_type",
+            "file_name",
+            "file_size"
+          ],
+          "description": "Audio file with url field"
+        }
+      }
+    },
+    "paths": {
+      "/fal-ai/workflow-utilities/audio-compressor/requests/{request_id}/status": {
+        "get": {
+          "parameters": [
+            {
+              "name": "request_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Request ID"
+              }
+            },
+            {
+              "name": "logs",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "number",
+                "description": "Whether to include logs (`1`) in the response or not (`0`)."
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "The request status.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/QueueStatus"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/fal-ai/workflow-utilities/audio-compressor/requests/{request_id}/cancel": {
+        "put": {
+          "parameters": [
+            {
+              "name": "request_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Request ID"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "The request was cancelled.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "success": {
+                        "type": "boolean",
+                        "description": "Whether the request was cancelled successfully."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/fal-ai/workflow-utilities/audio-compressor": {
+        "post": {
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowUtilitiesAudioCompressorInput"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "The request status.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/QueueStatus"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/fal-ai/workflow-utilities/audio-compressor/requests/{request_id}": {
+        "get": {
+          "parameters": [
+            {
+              "name": "request_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Request ID"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Result of the request.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/WorkflowUtilitiesAudioCompressorOutput"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "servers": [
+      {
+        "url": "https://queue.fal.run"
+      }
+    ],
+    "security": [
+      {
+        "apiKeyAuth": []
+      }
+    ]
+  }
+}

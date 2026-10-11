@@ -4,6 +4,7 @@ import type { ModelMenuMetadata } from '../shared/modelCatalogMenu'
 import { higgsfieldBundledCatalogModels } from '../shared/higgsfieldNative'
 import type { FalSchemaNode } from '../shared/falSchemaBinding'
 import { compileFalContractIsolated, validateFalContractValue } from './falSchemaValidation'
+import declaredDocumentSources from './higgsfieldDeclaredDocumentSources.json'
 
 export const HIGGSFIELD_PUBLIC_CATALOGS = ['https://open.higgsfield.ai/explore/video', 'https://open.higgsfield.ai/explore/image'] as const
 export const HIGGSFIELD_CATALOG_REVISION = 'prism-higgsfield-public-documents-v1'
@@ -161,8 +162,12 @@ export class HiggsfieldPublicCatalog {
   }
   async readContract(id: string, assertCurrent: () => void): Promise<FalSchemaNode> {
     assertCurrent()
-    const snapshot = await this.read(); assertCurrent()
-    const source = snapshot.documents.get(id)
+    // A selected known route must not wait for unrelated image/video discovery.
+    // These are captured published links, not URLs inferred from a model ID.
+    // The exact document is still fetched and its identity checked on each read.
+    const sources = declaredDocumentSources.documents as Readonly<Record<string, string>>
+    const source = this.snapshot?.documents.get(id) || sources[id] || (await this.read()).documents.get(id)
+    assertCurrent()
     if (!source) throw new Error('The selected Higgsfield model has no current declared input document. Preserve it and refresh the catalog.')
     const budget = this.budget({ ...defaultBounds, maxRequests: 1, totalMs: 10000 })
     const doc = await this.document(source, budget)

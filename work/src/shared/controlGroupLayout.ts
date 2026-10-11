@@ -150,6 +150,8 @@ export interface MixedControlInput<Id extends string = string> {
   fullLabel?: string
   compactLabel?: string
   shrinkPriority?: 'model' | 'operational'
+  /** Intrinsic content is reference-capped; row slack is shared equally by selectors. */
+  referenceSized?: boolean
   /** Optional capacity beyond the default; bounded elastic controls never reserve more than two painted characters. */
   maximumExtraWidth?: number
   shortCharacterWidth?: number
@@ -187,6 +189,7 @@ export function controlDescriptorSignature<Id extends string>(descriptors: reado
     descriptor.fullLabel ?? null,
     descriptor.compactLabel ?? null,
     descriptor.shrinkPriority ?? null,
+    descriptor.referenceSized ?? false,
     descriptor.maximumExtraWidth ?? null,
     descriptor.shortCharacterWidth ?? null,
     descriptor.priority ?? 0,
@@ -220,6 +223,11 @@ export interface MixedControlAllocationOptions<Id extends string = string> {
   preferredRows?: readonly (readonly Id[])[]
   /** Opt-in for groups whose approved contract prioritizes whole-group row balance over row-local selector slack. */
   enforceBalancedRows?: boolean
+}
+
+/** Closed fields grow no further than their reference name; shorter names release space to row peers. Chrome is measured at the actual rendered caller. */
+export function selectorReferenceTrackWidth(selectedTextWidth: number, referenceTextWidth: number, chromeWidth: number): number {
+  return Math.min(finiteWidth(selectedTextWidth), finiteWidth(referenceTextWidth)) + finiteWidth(chromeWidth)
 }
 
 function finiteWidth(value: number | undefined): number {
@@ -318,6 +326,29 @@ function allocateMixedRow<Id extends string>(
   let remaining = safeWidth - intrinsicOccupancy
   if (remaining < -0.001) return null
   const extras = controls.map(() => 0)
+
+  const referenceSelectors = controls.flatMap((control, index) => control.kind === 'selector' ? [index] : [])
+  if (referenceSelectors.length && referenceSelectors.every(index => controls[index].referenceSized)) {
+    // Predictable numeric/quantity fields retain their established symmetric
+    // breathing-room cap; remaining row space belongs equally to selectors.
+    for (const [index, control] of controls.entries()) {
+      if (control.kind !== 'bounded-elastic') continue
+      extras[index] = Math.min(remaining, Math.max(0, maximumControlWidth(control) - minimumControlWidth(control)))
+      remaining -= extras[index]
+    }
+    const sharedExtra = remaining / referenceSelectors.length
+    for (const index of referenceSelectors) extras[index] = sharedExtra
+    const allocated = controls.map((control, index): AllocatedMixedControl<Id> => ({
+      ...control, width: minimumControlWidth(control) + extras[index],
+      sidePadding: control.kind === 'bounded-elastic' ? extras[index] / 2 : 0,
+      leftPadding: control.kind === 'bounded-elastic' ? extras[index] / 2 : 0,
+      rightPadding: control.kind === 'bounded-elastic' ? extras[index] / 2 : 0,
+      labelTier: 'full',
+    }))
+    return { controls: allocated, gap: safeGap,
+      gridTemplateColumns: allocated.map(control => `${Number(control.width.toFixed(3))}px`).join(' '),
+      intrinsicOccupancy, unusedWidth: 0 }
+  }
 
   // A selector-only row standardizes its default painted text-to-chevron
   // clearance. Each track starts at its readable default and receives the

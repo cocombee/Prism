@@ -30,8 +30,8 @@ describe('migrateUnifiedStoryboards', () => {
     const migrated = migrateUnifiedStoryboards([node('result', 'storyboard-asset', { title: 'Storyboard Asset', outputPath: '/only.png' })], [])
     expect(migrated.nodes[0]).toMatchObject({ id: 'result', type: 'storyboard', data: { kind: 'storyboard', title: 'Storyboard', outputPath: '/only.png' } })
     expect(migrated.nodes[0].data.storyboardPanels).toEqual([
-      { id: 'result-panel-1', prompt: '', duration: 1, shotSize: 'wide', camera: 'static', audioCue: '', locked: false },
-      { id: 'result-panel-2', prompt: '', duration: 1, shotSize: 'wide', camera: 'static', audioCue: '', locked: false },
+      { id: 'result-panel-1', prompt: '', duration: 5, shotSize: 'close-up', lensMm: 50, camera: 'static', audioCue: '', locked: false },
+      { id: 'result-panel-2', prompt: '', duration: 5, shotSize: 'close-up', lensMm: 50, camera: 'static', audioCue: '', locked: false },
     ])
     expect(migrated.nodes[0].data).not.toHaveProperty('storyboardEditorOpen')
     expect(migrated.nodes[0].data).not.toHaveProperty('selectorDeployment')

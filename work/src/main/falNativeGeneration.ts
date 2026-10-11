@@ -8,7 +8,7 @@ import { validateFalContractValue } from './falSchemaValidation'
 export interface FalNativeGenerationDependencies<Client> {
   contract(endpointId: string): Promise<FalSchemaContract>
   assertCurrent(): void
-  prepareSource(source: FalNativeMediaSource, expectedType: FalMediaType): Promise<FalNativeMediaSource>
+  prepareSource(source: FalNativeMediaSource, expectedType: FalMediaType, maximumBytes?: number): Promise<FalNativeMediaSource>
   client(): Promise<Client>
   upload(client: Client, path: string): Promise<string>
   submit(client: Client, endpointId: string, input: Record<string, unknown>, signal?: AbortSignal): Promise<{ requestId: string; data: unknown }>
@@ -49,7 +49,7 @@ export async function executeFalNativeGeneration<Client>(request: FalNativeReque
   for (const binding of plan.media) {
     const sources: FalNativeMediaSource[] = []
     for (const source of binding.sources) {
-      const resolved = await dependencies.prepareSource(source, binding.field.media!.type)
+      const resolved = await dependencies.prepareSource(source, binding.field.media!.type, binding.field.media!.maximumBytes)
       assertCurrent()
       if (resolved.mediaType !== source.mediaType || Boolean(resolved.path) !== Boolean(source.path) || resolved.url !== source.url) throw new Error('Prepared media binding changed its type or transport.')
       sources.push(resolved)

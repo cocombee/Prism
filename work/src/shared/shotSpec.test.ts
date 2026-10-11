@@ -56,7 +56,7 @@ describe('production shot specification', () => {
     expect(request.multiPrompt?.map((shot) => shot.prompt)).toEqual(['First multi prompt.', 'Second multi prompt.'])
   })
 
-  it('quantifies optics and preserves the unknown fallback without throwing', () => {
+  it('describes framing without inventing optics and preserves the unknown fallback', () => {
     const text = renderShotSpecSections(productionShotSpecSections({
       ...base,
       storyboardShots: [
@@ -65,8 +65,9 @@ describe('production shot specification', () => {
         { prompt: 'Unknown.', duration: 1, shotSize: 'future-size', camera: 'future-move' },
       ],
     }))
-    expect(text).toContain('8°')
-    expect(text).toContain('63°')
+    expect(text).toContain('Isolate the authored hand, object or action detail')
+    expect(text).not.toMatch(/8°|63°/)
+    expect(text).toContain('Full performer visible within meaningful surroundings')
     expect(text).toContain('Future Size')
     expect(text.match(/No drift mid-segment\./g)).toHaveLength(1)
   })
@@ -219,8 +220,8 @@ describe('production shot specification', () => {
     expect(timeline).not.toContain('Overall action: @actor-c')
     expect(compiled.text).toContain('SHOT 1: Locked camera; 0 m/s translation.')
     expect(compiled.text).toContain('SHOT 2: Locked camera; 0 m/s translation.')
-    expect(compiled.text).toContain('SHOT 1: 63° wide.')
-    expect(compiled.text).toContain('SHOT 2: 63° wide.')
+    expect(compiled.text).toContain('SHOT 1: Full performer visible within meaningful surroundings.')
+    expect(compiled.text).toContain('SHOT 2: Full performer visible within meaningful surroundings.')
     expect(compiled.text).not.toMatch(/\b(?:Segment|CUT) [12]:/)
   })
 

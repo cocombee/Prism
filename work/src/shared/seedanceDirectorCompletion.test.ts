@@ -84,7 +84,7 @@ describe('local deterministic Seedance Director completion', () => {
     expect(body).not.toMatch(/^SHOT\s+\d+/gm)
     expect(body).not.toContain('HARD CUT.')
     expect(body.match(/REFERENCES · @maya/g)).toHaveLength(1)
-    expect(body).toContain('framing metadata only, not a lens or focal-length choice')
+    expect(body).toContain('Shot size describes subject framing independently of focal length and lens projection.')
     expect(body).not.toMatch(/6 m\/s|12°\/s|10%\/s|settle for 0\.5 s|Photoreal live-action capture/)
   })
 

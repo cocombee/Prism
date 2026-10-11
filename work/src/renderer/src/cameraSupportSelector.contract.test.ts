@@ -1,13 +1,19 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { CAMERA_MOVEMENT_GROUPS, storyboardCameraMovementOptions } from './StoryboardSharedControls'
 
 const source = readFileSync(new URL('StoryboardSharedControls.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('styles-next.css', import.meta.url), 'utf8')
 const group = source.split("{ label: 'Stabilized & Handheld', options: [")[1]?.split('] },')[0] || ''
 
 describe('Storyboard handheld selector visible contract', () => {
-  it('adds Dolly Down Slow beside and without replacing Dolly Down', () => {
-    expect(source).toContain("['dolly-down', 'Lower Camera On Dolly'], ['dolly-down-slow', 'Dolly Down Slow']")
+  it('keeps Dolly Down Slow only as a selected legacy value while exposing Dolly Down', () => {
+    const movementValues = CAMERA_MOVEMENT_GROUPS.flatMap((movementGroup) => movementGroup.options.map(([value]) => value))
+    expect(movementValues).toContain('dolly-down')
+    expect(movementValues).not.toContain('dolly-down-slow')
+    expect(storyboardCameraMovementOptions('dolly-down-slow').find((option) => option.value === 'dolly-down-slow')).toMatchObject({
+      value: 'dolly-down-slow', label: 'Dolly Down Slow', group: 'Saved selection',
+    })
     expect(source).toContain("'dolly-down-slow': 'Dolly Down Slow'")
   })
   it('keeps four exact values/help strings first and preserves the following stabilized options in order', () => {

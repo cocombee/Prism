@@ -146,7 +146,7 @@ export const RouterNode = memo(({ id, data, selected }: NodeProps<StudioNode>) =
 RouterNode.displayName = 'RouterNode'
 
 export { CAMERA_MOVEMENT_GROUPS, STORYBOARD_SHOT_SIZE_OPTIONS, StoryboardCompactSelect, durationChoices } from './StoryboardSharedControls'
-import { CAMERA_MOVEMENT_GROUPS, STORYBOARD_SHOT_SIZE_OPTIONS, StoryboardCompactSelect, cameraMovementHelp, cameraMovementName, type StoryboardMenuOption } from './StoryboardSharedControls'
+import { STORYBOARD_SHOT_SIZE_OPTIONS, StoryboardCompactSelect, storyboardCameraMovementOptions, storyboardLensOptions, type StoryboardMenuOption } from './StoryboardSharedControls'
 
 export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode>) => {
   const runtime = useContext(NodeRuntimeContext)
@@ -267,12 +267,13 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
                 ariaLabel={`Panel ${index + 1} controls`}
                 gap={5}
                 allocation={{ minRows: 1, maxRows: 1 }}
-                recalculationKey={`${panel.id}:${panel.shotSize || 'wide'}:${panelBudget.effectiveDuration}:${panel.camera || 'static'}:${panel.locked}`}
+                recalculationKey={`${panel.id}:${panel.shotSize || 'wide'}:${panel.lensMm ?? 'unspecified'}:${panelBudget.effectiveDuration}:${panel.camera || 'static'}:${panel.locked}`}
                 controls={([
-                  { id: 'shot-size', kind: 'selector', intrinsicWidth: 48, node: <StoryboardCompactSelect label="Shot Size" value={!panel.shotSize || panel.shotSize === 'auto' ? 'wide' : panel.shotSize} disabled={panel.locked} options={[...STORYBOARD_SHOT_SIZE_OPTIONS]} onChange={(value) => patchPanel(panel.id, { shotSize: value as typeof panel.shotSize })} /> },
-                  { id: 'duration', kind: 'selector', intrinsicWidth: 34, node: <StoryboardCompactSelect label="Duration" value={String(panelBudget.effectiveDuration)} disabled={panel.locked} exhausted={panelBudget.exhausted} description={durationDescription} triggerAriaLabel={durationAriaLabel} options={panelDurationOptions} onChange={(value) => patchPanel(panel.id, { duration: Number(value) })} /> },
-                  { id: 'camera', kind: 'selector', intrinsicWidth: 54, node: <StoryboardCompactSelect label="Camera Movement" value={!panel.camera || panel.camera === 'auto' ? 'static' : panel.camera} disabled={panel.locked} options={CAMERA_MOVEMENT_GROUPS.flatMap((group) => group.options.map(([value, help]) => ({ value, label: cameraMovementName(value), group: group.label, title: help })))} onChange={(value) => patchPanel(panel.id, { camera: value })} /> },
-                ]) as FluidGroupControl<'shot-size' | 'duration' | 'camera'>[]}
+                  { id: 'shot-size', kind: 'selector', intrinsicWidth: 48, node: <StoryboardCompactSelect defaultLabel="Close-up" label="Shot Size" value={!panel.shotSize || panel.shotSize === 'auto' ? 'wide' : panel.shotSize} disabled={panel.locked} options={[...STORYBOARD_SHOT_SIZE_OPTIONS]} onChange={(value) => patchPanel(panel.id, { shotSize: value as typeof panel.shotSize })} /> },
+                  { id: 'lens', kind: 'selector', intrinsicWidth: 54, node: <StoryboardCompactSelect defaultLabel="50mm" label="Lens / FOV" value={panel.lensMm === undefined ? 'unspecified' : String(panel.lensMm)} disabled={panel.locked} options={storyboardLensOptions(panel.lensMm)} onChange={(value) => patchPanel(panel.id, { lensMm: value === 'unspecified' ? undefined : Number(value) })} /> },
+                  { id: 'duration', kind: 'selector', intrinsicWidth: 34, node: <StoryboardCompactSelect defaultLabel="5.0s" label="Duration" value={String(panelBudget.effectiveDuration)} disabled={panel.locked} exhausted={panelBudget.exhausted} description={durationDescription} triggerAriaLabel={durationAriaLabel} options={panelDurationOptions} onChange={(value) => patchPanel(panel.id, { duration: Number(value) })} /> },
+                  { id: 'camera', kind: 'selector', intrinsicWidth: 54, node: <StoryboardCompactSelect defaultLabel="Static / Locked" label="Camera Movement" value={!panel.camera || panel.camera === 'auto' ? 'static' : panel.camera} disabled={panel.locked} options={storyboardCameraMovementOptions(!panel.camera || panel.camera === 'auto' ? 'static' : panel.camera)} onChange={(value) => patchPanel(panel.id, { camera: value })} /> },
+                ]) as FluidGroupControl<'shot-size' | 'lens' | 'duration' | 'camera'>[]}
               />
             </div>
           </section>

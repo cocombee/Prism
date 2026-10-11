@@ -30,6 +30,8 @@ export interface FalSchemaNode {
   exclusiveMaximum?: boolean | number
   multipleOf?: number
   minLength?: number
+  /** Native transport constraint; managed-file preparation validates bytes before upload. */
+  maxFileSize?: number
   maxLength?: number
   minItems?: number
   maxItems?: number
@@ -53,8 +55,8 @@ function compileFalSchemaDocument(endpointId: string, value: unknown): FalSchema
   // Keep compiler constants inside the serialized function so production
   // bundling cannot rename an external binding out of the worker program.
   const numeric = ['minimum', 'maximum', 'multipleOf', 'minLength', 'maxLength', 'minItems', 'maxItems', 'minProperties', 'maxProperties'] as const
-  const supported = new Set(['type', '$ref', '$schema', 'nullable', 'title', 'description', 'default', 'enum', 'const', 'properties', 'required', 'additionalProperties', 'items', 'anyOf', 'oneOf', 'allOf', 'not', 'if', 'then', 'else', 'exclusiveMinimum', 'exclusiveMaximum', 'uniqueItems', 'pattern', ...numeric])
-  const annotations = new Set(['examples', 'example', 'format', 'deprecated', 'readOnly', 'writeOnly', '$id', '_fal_ui_field'])
+  const supported = new Set(['type', '$ref', '$schema', 'nullable', 'title', 'description', 'default', 'enum', 'const', 'properties', 'required', 'additionalProperties', 'items', 'anyOf', 'oneOf', 'allOf', 'not', 'if', 'then', 'else', 'exclusiveMinimum', 'exclusiveMaximum', 'uniqueItems', 'pattern', 'max_file_size', ...numeric])
+  const annotations = new Set(['examples', 'example', 'format', 'deprecated', 'readOnly', 'writeOnly', '$id', '_fal_ui_field', 'ui', 'limit_description'])
   const id = endpointId, api = object(value), paths = object(api?.paths)
   if (!api || !paths) throw new Error('Missing fal OpenAPI model contract.')
   // fal's catalog namespace can differ from the path in its returned OpenAPI.
@@ -112,6 +114,18 @@ function compileFalSchemaDocument(endpointId: string, value: unknown): FalSchema
       if (typeof schema._fal_ui_field !== 'string' || schema._fal_ui_field.length > 128) throw new Error('Malformed fal field presentation.')
       node.uiField = schema._fal_ui_field
     }
+    if (schema.max_file_size !== undefined) {
+      if (!Number.isSafeInteger(schema.max_file_size) || Number(schema.max_file_size) <= 0) throw new Error('Malformed fal file-size limit.')
+      node.maxFileSize = schema.max_file_size as number
+    }
+    const presentation = object(schema.ui)
+    if (schema.ui !== undefined && !presentation) throw new Error('Malformed fal field presentation.')
+    if (presentation?.field !== undefined) {
+      if (typeof presentation.field !== 'string' || presentation.field.length > 128) throw new Error('Malformed fal field presentation.')
+      if (node.uiField && node.uiField !== presentation.field) throw new Error('Conflicting fal field presentation.')
+      node.uiField = presentation.field
+    }
+    if (schema.limit_description !== undefined && (typeof schema.limit_description !== 'string' || schema.limit_description.length > 4096)) throw new Error('Malformed fal limit annotation.')
     if (schema['x-fal-order-properties'] !== undefined) {
       const order = schema['x-fal-order-properties']
       if (!Array.isArray(order) || order.some((key) => typeof key !== 'string' || !safeKey(key)) || new Set(order).size !== order.length) throw new Error('Malformed fal field order.')

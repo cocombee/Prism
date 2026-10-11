@@ -1,6 +1,6 @@
 import type { GenerationRequest } from './types'
 import type { HiggsfieldMediaBinding } from './higgsfieldInputContract'
-import { compileProviderPrompt, completeStructuredSeedanceMaster, type PromptCompilation } from './referenceInstructions'
+import { compileProviderPrompt, completeStructuredSeedanceMaster, type PromptFamily, type PromptCompilation } from './referenceInstructions'
 
 type Reference = NonNullable<GenerationRequest['references']>[number]
 export interface HiggsfieldPromptSlot { binding: HiggsfieldMediaBinding; index: number; reference: Reference }
@@ -19,9 +19,9 @@ export function higgsfieldSeedanceReferenceMap(slots: readonly HiggsfieldPromptS
 }
 
 /** Source Edit consumes an existing shot, not a freshly invented shot list or camera setup. */
-export function compileHiggsfieldSeedancePrompt(request: GenerationRequest, slots: readonly HiggsfieldPromptSlot[]): PromptCompilation {
+export function compileHiggsfieldSeedancePrompt(request: GenerationRequest, slots: readonly HiggsfieldPromptSlot[], family:PromptFamily='seedance'): PromptCompilation {
   const authored = request.authoredPrompt ?? request.prompt ?? ''
-  if (completeStructuredSeedanceMaster(authored.trim())) return compileProviderPrompt({ ...request, providerPromptOverride: authored, providerPromptOwnership: 'compiled' }, { family: 'seedance' })
+  if (family==='seedance' && completeStructuredSeedanceMaster(authored.trim())) return compileProviderPrompt({ ...request, providerPromptOverride: authored, providerPromptOwnership: 'compiled' }, { family })
   const groups = new Map<string, Set<string>>()
   for (const {reference} of slots) if (reference.role === 'reference' && reference.tag) {
     const sources = groups.get(reference.tag) || new Set<string>()
@@ -50,7 +50,7 @@ export function compileHiggsfieldSeedancePrompt(request: GenerationRequest, slot
       request.stylePrompt?.trim() ? `STYLE\n${request.stylePrompt}` : '',
       `NEGATIVE PROMPT\n${request.negativePrompt || 'Unrequested changes to the source shot.'}`,
     ].filter(Boolean).join('\n\n')
-    return compileProviderPrompt({ ...selected, providerPromptOverride: body, providerPromptOwnership: 'compiled' }, { family: 'seedance' })
+    return compileProviderPrompt({ ...selected, providerPromptOverride: body, providerPromptOwnership: 'compiled' }, { family })
   }
-  return compileProviderPrompt(selected, { family: 'seedance', ...(map ? { legend: { heading: 'CONNECTED INPUTS', body: map } } : {}) })
+  return compileProviderPrompt(selected, { family, ...(map ? { legend: { heading: 'CONNECTED INPUTS', body: map } } : {}) })
 }

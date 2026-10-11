@@ -1,3 +1,5 @@
+import { HIGGSFIELD_TEXT_VIDEO_MODELS, higgsfieldTextVideoSchema } from './higgsfieldTextVideo'
+import { HIGGSFIELD_REFERENCE_VIDEO_MODELS, higgsfieldReferenceVideoSchema } from './higgsfieldReferenceVideo'
 import { describe, expect, it } from 'vitest'
 import { HIGGSFIELD_SEEDANCE25_ROUTES, higgsfieldSeedanceSchema } from './higgsfieldSeedanceInput'
 import { describeHiggsfieldInputContract, higgsfieldControlDefaults, higgsfieldInputFingerprintMaterial } from './higgsfieldInputContract'
@@ -63,5 +65,15 @@ describe('independent Higgsfield current input projection', () => {
     const before = higgsfieldInputFingerprintMaterial(endpoint, schema)
     schema.properties!.duration.maximum = 12
     expect(higgsfieldInputFingerprintMaterial(endpoint, schema)).not.toBe(before)
+  })
+})
+
+describe('reviewed primary native route UI contracts', () => {
+  it.each([...HIGGSFIELD_TEXT_VIDEO_MODELS, ...HIGGSFIELD_REFERENCE_VIDEO_MODELS])('projects $id with its exact published schema', model => {
+    const schema = model.kind === 'text-video' ? higgsfieldTextVideoSchema(model.id) : higgsfieldReferenceVideoSchema(model.id)
+    const contract = describeHiggsfieldInputContract(model.id, schema, 'owned-current')
+    expect(contract.unsupportedInputs).toEqual([])
+    const changed = structuredClone(schema); changed.additionalProperties = true
+    expect(describeHiggsfieldInputContract(model.id, changed, 'changed').unsupportedInputs).toContainEqual({ key: '$', reason: expect.stringContaining('reviewed') })
   })
 })

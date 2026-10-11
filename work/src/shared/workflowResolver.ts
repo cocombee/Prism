@@ -1,7 +1,8 @@
+import { normalizedNativeVideoMotionCadence } from './nativeVideoFooterControls'
 import { requiresGeneratedDialogueAudio } from './videoDialogueAudio'
 import { higgsfieldModel, planHiggsfieldInput, planHiggsfieldNativeInput, type HiggsfieldMediaSource } from './higgsfieldNative'
 import { describeHiggsfieldInputContract, type HiggsfieldMediaBinding } from './higgsfieldInputContract'
-import { higgsfieldSeedanceSchema } from './higgsfieldSeedanceInput'
+import { higgsfieldInputSchema, higgsfieldPromptFamily } from './higgsfieldNative'
 import { compileHiggsfieldSeedancePrompt, type HiggsfieldPromptSlot } from './higgsfieldSeedancePrompt'
 import { higgsfieldStoryboardTimingFailures } from './higgsfieldVideoTiming'
 import { assertStoryboardPhysicalCast } from './storyboardPhysicalCast'
@@ -16,7 +17,8 @@ import { nodeInputPorts } from './nodePorts'
 import { connectedInputRule, resolveAutoConnectedInputRule, workflowTag } from './inputRules'
 import type { InputFidelity } from './inputRules'
 import { normalizedElevenV3LanguageCode } from './voiceLanguages'
-import { shotRecipe, shotRecipeDetails } from './shotRecipes'
+import { selectedLensInstruction, timedCameraRecipe, shotRecipe, shotRecipeDetails } from './shotRecipes'
+import { storyboardTimecodes } from './storyboardTimecodes'
 import { resolveBuiltInStylePreset } from './stylePresets'
 import { activeGeneratedResult, activeMediaName } from './generatedMedia'
 import { groupStoryboardSequence, normalizedStoryboardTransition, storyboardTransitionConflicts, STORYBOARD_OUTGOING_CONTINUATION } from './storyboardSequence'
@@ -34,6 +36,17 @@ import { compileNativeProviderPrompt, type PromptFamily } from './referenceInstr
 import { providerVisibleReferences, sameBodyAuthorityReadinessFailures } from './sameBodyAuthority'
 import { propScaleReadinessFailures } from './propScaleAuthority'
 
+/** Bind the established Motion FPS control to compiled prompt intent only. */
+function nativeVideoMotionRequest(data: StudioNode['data'], manual: boolean): Pick<GenerationRequest, 'motionCadence'> {
+  if (data.kind !== 'video-generator' || manual) return {}
+  const state = data.falNative || data.higgsfieldNative
+  if (!state) return {}
+  const selectedFps = state.values.fps
+  const numericFps = typeof selectedFps === 'number' ? selectedFps : typeof selectedFps === 'string' && selectedFps.trim() ? Number(selectedFps) : NaN
+  const fps = Number.isFinite(numericFps) && numericFps > 0 ? numericFps : undefined
+  return { motionCadence: normalizedNativeVideoMotionCadence(state.endpointId, fps, data.motionCadence) }
+}
+
 // Only existing verified video adapters define duration in seconds. New endpoints
 // keep their typed provider value without guessing its unit or coercing its payload.
 function nativeVideoSeconds(data: StudioNode['data']): number | undefined {
@@ -45,6 +58,7 @@ export interface ResolvedStoryboardShot {
   prompt: string
   duration: number
   shotSize: string
+  lensMm?: number
   camera: string
   audioCue?: string
   transitionToNext?: StoryboardPanel['transitionToNext']
@@ -133,6 +147,7 @@ function formattedStoryboard(panels: StoryboardPanel[], duration: number): { pre
     prompt: panel.prompt.trim(),
     duration: Number(panel.duration),
     shotSize: panel.shotSize || 'auto',
+    lensMm: panel.lensMm,
     camera: panel.camera || 'auto',
     audioCue: panel.audioCue?.trim() || undefined,
     transitionToNext: normalizedStoryboardTransition(panel.transitionToNext, index, activePanels.length),
@@ -151,7 +166,7 @@ function formattedStoryboard(panels: StoryboardPanel[], duration: number): { pre
   }})
   const grouped = groupStoryboardSequence(shots)
   const preamble = `Storyboard plan: ${activePanels.length} panels grouped into ${grouped.shots.length} shot${grouped.shots.length === 1 ? '' : 's'} by authored Cut/Continue boundaries, target duration ${duration}s. Preserve character, wardrobe, location, prop, lighting, screen-direction, and action continuity within every continuous shot.`
-  const rawPrompt = [preamble, ...shots.map((shot, index) => `Shot ${index + 1} — Duration: ${shot.duration}s; Shot Size: ${shot.shotSize}; Camera Movement: ${shot.camera}${shot.audioCue ? `; Audio Cue: ${shot.audioCue}` : ''}.${shot.prompt ? ` ${shot.prompt}` : ` [STORYBOARD PANEL ${shot.panelNumber} INCOMPLETE — no action authored.]`}`), ...(shots.at(-1)?.transitionToNext === 'continue' ? [STORYBOARD_OUTGOING_CONTINUATION] : [])].join('\n')
+  const rawPrompt = [preamble, ...shots.map((shot, index) => `Shot ${index + 1} — Duration: ${shot.duration}s; Shot Size: ${shot.shotSize}; Camera Movement: ${shot.camera}${shot.audioCue ? `; Audio Cue: ${shot.audioCue}` : ''}.${shot.lensMm !== undefined ? ` ${selectedLensInstruction(shot.lensMm)}` : ''}${shot.prompt ? ` ${shot.prompt}` : ` [STORYBOARD PANEL ${shot.panelNumber} INCOMPLETE — no action authored.]`}`), ...(shots.at(-1)?.transitionToNext === 'continue' ? [STORYBOARD_OUTGOING_CONTINUATION] : [])].join('\n')
   return { preamble, rawPrompt, shots, incompletePanels }
 }
 
@@ -174,26 +189,31 @@ function withoutStyleBlocks(prompt: string | undefined, stylePrompt: string | un
 function compiledStoryboardPrompt(preamble: string | undefined, shots: ResolvedStoryboardShot[] | undefined, family: string): string | undefined {
   if (!preamble || !shots) return undefined
   const sequence = groupStoryboardSequence(shots)
+  const timecodes = storyboardTimecodes(shots.flatMap(shot => [shot.duration, shot.startSeconds, shot.endSeconds, shot.incomingBridge?.reservedSeconds || 0, shot.incomingBridge?.reactionReserveSeconds || 0]))
   const lines: string[] = [preamble]
   sequence.shots.forEach((group, shotIndex) => {
     const groupStart = group.beats[0].startSeconds
     const groupEnd = group.beats[group.beats.length - 1].endSeconds
-    lines.push(`SHOT ${shotIndex + 1} · ${groupStart.toFixed(1)}–${groupEnd.toFixed(1)}s`)
+    lines.push(`SHOT ${shotIndex + 1} · ${timecodes.format(groupStart)}–${timecodes.format(groupEnd)}s`)
     group.beats.forEach((beat, beatIndex) => {
-      const label = group.beats.length > 1 ? `BEAT ${beatIndex + 1} · ${beat.startSeconds.toFixed(1)}–${beat.endSeconds.toFixed(1)}s` : `ACTION · ${beat.startSeconds.toFixed(1)}–${beat.endSeconds.toFixed(1)}s`
+      const label = group.beats.length > 1 ? `BEAT ${beatIndex + 1} · ${timecodes.format(beat.startSeconds)}–${timecodes.format(beat.endSeconds)}s` : `ACTION · ${timecodes.format(beat.startSeconds)}–${timecodes.format(beat.endSeconds)}s`
       const bridge = beat.incomingBridge
-      if (bridge?.reservedSeconds && bridge.bridgeText) {
+      if (bridge?.concurrent && bridge.bridgeText) {
+        lines.push(`${label}: ${beat.prompt || `[STORYBOARD PANEL ${beat.panelNumber} INCOMPLETE — no action authored.]`}`)
+        lines.push(`CAMERA THROUGH SAME INTERVAL: ${bridge.bridgeText}`)
+      } else if (bridge?.reservedSeconds && bridge.bridgeText) {
         const bridgeEnd = beat.startSeconds + bridge.reservedSeconds
         const reactionStart = beat.endSeconds - bridge.reactionReserveSeconds
         lines.push(label)
-        lines.push(`CAMERA BRIDGE · ${beat.startSeconds.toFixed(1)}–${bridgeEnd.toFixed(1)}s: ${bridge.bridgeText}`)
-        lines.push(`MAIN ACTION · ${bridgeEnd.toFixed(1)}–${reactionStart.toFixed(1)}s: ${beat.prompt || `[STORYBOARD PANEL ${beat.panelNumber} INCOMPLETE — no action authored.]`}`)
-        lines.push(`REACTION / SETTLE · ${reactionStart.toFixed(1)}–${beat.endSeconds.toFixed(1)}s`)
+        lines.push(`CAMERA BRIDGE · ${timecodes.format(beat.startSeconds)}–${timecodes.format(bridgeEnd)}s: ${bridge.bridgeText}`)
+        lines.push(`MAIN ACTION · ${timecodes.format(bridgeEnd)}–${timecodes.format(reactionStart)}s: ${beat.prompt || `[STORYBOARD PANEL ${beat.panelNumber} INCOMPLETE — no action authored.]`}`)
+        lines.push(`REACTION / SETTLE · ${timecodes.format(reactionStart)}–${timecodes.format(beat.endSeconds)}s`)
       } else {
         lines.push(`${label}: ${beat.prompt || `[STORYBOARD PANEL ${beat.panelNumber} INCOMPLETE — no action authored.]`}`)
       }
       lines.push(`FRAMING: ${shotRecipe('shot-size', beat.shotSize, family)}.`)
-      lines.push(`CAMERA: ${shotRecipe('camera', beat.camera, family)}${beat.audioCue ? `; Audio Cue: ${beat.audioCue}` : ''}.`)
+      if (beat.lensMm !== undefined) lines.push(selectedLensInstruction(beat.lensMm))
+      lines.push(`CAMERA: ${timedCameraRecipe(beat.camera, beat.duration, beat.prompt, family).replace(/[.]+$/, '')}${beat.audioCue ? `; Audio Cue: ${beat.audioCue}` : ''}.`)
     })
     if (shotIndex < sequence.shots.length - 1) lines.push('HARD CUT.')
   })
@@ -556,12 +576,12 @@ function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges
   const family: PromptFamily = findVideoModel(state.endpointId)?.family || 'generic'
   const joinAuthored = (...parts: Array<string | undefined>) => parts.filter((part): part is string => Boolean(part?.trim())).join('\n\n') || undefined
   const raw = joinAuthored(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, family), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
-  const request: GenerationRequest = { nodeId: node.id, kind: node.data.kind, prompt: raw, authoredPrompt: joinAuthored(local, upstream.authoredPrompt), stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
+  const request: GenerationRequest = { ...nativeVideoMotionRequest(node.data, manual), nodeId: node.id, kind: node.data.kind, prompt: raw, authoredPrompt: joinAuthored(local, upstream.authoredPrompt), stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
     videoEngine: node.data.kind === 'video-generator' ? state.endpointId : undefined,
     imageProvider: ['image-generator', 'image-editor'].includes(node.data.kind) ? 'fal' : undefined,
     imageModelId: ['image-generator', 'image-editor'].includes(node.data.kind) ? state.endpointId : undefined,
     storyboardShots: upstream.storyboardShots, storyboardShotCount: upstream.storyboardShots?.length, storyboardIncompletePanels: upstream.storyboardIncompletePanels,
-    duration: upstream.storyboardDuration ?? nativeVideoSeconds(node.data), aspectRatio: typeof state.values.aspect_ratio === 'string' ? state.values.aspect_ratio : undefined, resolution: typeof state.values.resolution === 'string' ? state.values.resolution as GenerationRequest['resolution'] : undefined, generateAudio: typeof state.values.generate_audio === 'boolean' ? state.values.generate_audio : undefined, directionLayer: node.data.directionLayer, shotLocks: node.data.shotLocks,
+    duration: upstream.storyboardDuration ?? nativeVideoSeconds(node.data), aspectRatio: typeof state.values.aspect_ratio === 'string' ? state.values.aspect_ratio : undefined, resolution: typeof state.values.resolution === 'string' ? state.values.resolution as GenerationRequest['resolution'] : undefined, generateAudio: typeof state.values.generate_audio === 'boolean' ? state.values.generate_audio : state.values.sound==='on'?true:state.values.sound==='off'?false:undefined, directionLayer: node.data.directionLayer, shotLocks: node.data.shotLocks,
     inputPath: upstream.inputPath, inputUrl: upstream.inputUrl, inputTag: upstream.inputTag, inputRole: upstream.inputRole,
     references: upstream.references, connectionRules: upstream.connectionRules, offlineSemanticSources: upstream.offlineSemanticSources }
   const physical = providerVisibleReferences(request).filter(reference => (reference.path || reference.url) && !(reference.path?.toLowerCase().endsWith('.prismstyle')))
@@ -613,7 +633,7 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   const state = node.data.higgsfieldNative!
   if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON input edits before generating.')
   if (state.repairs?.length) throw new Error(state.repairs.join(' '))
-  const contract = describeHiggsfieldInputContract(state.endpointId, higgsfieldSeedanceSchema(state.endpointId), '')
+  const contract = describeHiggsfieldInputContract(state.endpointId, higgsfieldInputSchema(state.endpointId), '')
   const bindings: Array<HiggsfieldMediaBinding & { retired?: boolean }> = state.media || contract.media
   const byId = new Map(nodes.map(source => [source.id, source])), visiting = new Set<string>(), visited = new Set<string>()
   const verifyGraph = (id: string) => {
@@ -636,9 +656,9 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
     upstream.builtInStylePrompts = [...new Set([...(upstream.builtInStylePrompts || []), ...(nested.builtInStylePrompts || [])])]
   }
   const local = manual ? node.data.manualPromptDraft ?? node.data.prompt ?? '' : node.data.prompt
-  const raw = manual ? local : joinPrompt(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, 'seedance'), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
+  const raw = manual ? local : joinPrompt(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, higgsfieldPromptFamily(state.endpointId)), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
   const request: GenerationRequest = {
-    nodeId: node.id, kind: 'video-generator', videoEngine: state.endpointId, prompt: raw,
+    ...nativeVideoMotionRequest(node.data, manual), nodeId: node.id, kind: 'video-generator', videoEngine: state.endpointId, prompt: raw,
     authoredPrompt: manual ? local : joinSpeech(local, upstream.authoredPrompt),
     stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
     storyboardShots: upstream.storyboardShots, storyboardShotCount: upstream.storyboardShots?.length, storyboardIncompletePanels: upstream.storyboardIncompletePanels,
@@ -646,7 +666,7 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
     duration: typeof state.values.duration === 'number' ? state.values.duration : undefined,
     aspectRatio: typeof state.values.aspect_ratio === 'string' ? state.values.aspect_ratio : undefined,
     resolution: typeof state.values.resolution === 'string' ? state.values.resolution as GenerationRequest['resolution'] : undefined,
-    generateAudio: typeof state.values.generate_audio === 'boolean' ? state.values.generate_audio : undefined,
+    generateAudio: typeof state.values.generate_audio === 'boolean' ? state.values.generate_audio : state.values.sound==='on'?true:state.values.sound==='off'?false:undefined,
     directionLayer: node.data.directionLayer, shotLocks: node.data.shotLocks,
     references: [], connectionRules: upstream.connectionRules, offlineSemanticSources: upstream.offlineSemanticSources,
   }
@@ -689,7 +709,7 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   let finalPrompt: string
   if (manual) finalPrompt = local ?? ''
   else {
-    const compiled = compileHiggsfieldSeedancePrompt(request, slots)
+    const compiled = compileHiggsfieldSeedancePrompt(request, slots, higgsfieldPromptFamily(state.endpointId))
     if (compiled.promptBudgetDiagnostic?.blocking) throw new Error(compiled.promptBudgetDiagnostic.blockingReason)
     finalPrompt = compiled.text
   }
@@ -706,7 +726,7 @@ function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edge
   const state = node.data.higgsfieldNative!
   if (node.data.kind !== 'video-generator' || node.data.falNative) throw new Error('Choose one Higgsfield video binding.')
   const model = higgsfieldModel(state.endpointId)
-  if(model.kind==='seedance')return buildHiggsfieldSeedanceGraphRequest(node,nodes,edges)
+  if(model.kind!=='genjutsu')return buildHiggsfieldSeedanceGraphRequest(node,nodes,edges)
   const references: NonNullable<GenerationRequest['references']> = []
   const offline: NonNullable<GenerationRequest['offlineSemanticSources']> = []
   const videos: HiggsfieldMediaSource[] = [], images: HiggsfieldMediaSource[] = []

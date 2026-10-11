@@ -1,0 +1,777 @@
+{
+  "capturedAt": "2026-10-11",
+  "source": "https://api.fal.ai/v1/models?status=active&limit=100",
+  "scope": "Public metadata only; no credentials or media; exact routes retained",
+  "models": [
+    {
+      "endpoint_id": "fal-ai/veo3.1/fast/image-to-video",
+      "metadata": {
+        "display_name": "Veo 3.1 Fast",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Image to Video (Fast)"
+        },
+        "date": "2025-10-08T17:04:11.604Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/image-to-video",
+      "metadata": {
+        "display_name": "Veo 3.1",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Image to Video"
+        },
+        "date": "2025-10-08T17:02:47.996Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/v1.1/image-to-video",
+      "metadata": {
+        "display_name": "Gemini Omni Flash 1.1 Image to Video",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-11",
+          "label": "Image to Video"
+        },
+        "date": "2026-08-25T23:13:54.630Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/lite/image-to-video",
+      "metadata": {
+        "display_name": "Veo3.1 Lite Image to Video",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Image to Video (Lite)"
+        },
+        "date": "2026-03-31T18:35:02.766Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/fast",
+      "metadata": {
+        "display_name": "Veo 3.1 Fast",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Text to Video (Fast)"
+        },
+        "date": "2025-10-08T17:05:11.177Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/v1.1/reference-to-video",
+      "metadata": {
+        "display_name": "Gemini Omni Flash 1.1 Reference to Video",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-11",
+          "label": "Reference to Video"
+        },
+        "date": "2026-08-25T23:16:50.754Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1",
+      "metadata": {
+        "display_name": "Veo 3.1",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Text to Video"
+        },
+        "date": "2025-10-08T17:01:21.561Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/fast/first-last-frame-to-video",
+      "metadata": {
+        "display_name": "Veo 3.1 Fast",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "First/Last Frame to Video (Fast)"
+        },
+        "date": "2025-10-08T17:10:43.612Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/first-last-frame-to-video",
+      "metadata": {
+        "display_name": "Veo 3.1",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "First/Last Frame to Video"
+        },
+        "date": "2025-10-08T17:09:32.703Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/image-to-video",
+      "metadata": {
+        "display_name": "Gemini Omni Flash",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-flash",
+          "label": "Image to Video"
+        },
+        "date": "2026-06-30T16:37:17.885Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/lite",
+      "metadata": {
+        "display_name": "Veo3.1 Lite Text to Video",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Text to Video (Lite)"
+        },
+        "date": "2026-03-31T18:33:44.437Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/v1.1/text-to-video",
+      "metadata": {
+        "display_name": "Gemini Omni Flash 1.1 Text to Video",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-11",
+          "label": "Text to Video"
+        },
+        "date": "2026-08-25T23:11:57.494Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/v1.1/edit",
+      "metadata": {
+        "display_name": "Gemini Omni Flash 1.1 Edit",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-11",
+          "label": "Edit Video"
+        },
+        "date": "2026-08-25T23:18:17.931Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/lite/first-last-frame-to-video",
+      "metadata": {
+        "display_name": "Veo3.1 Lite FLF",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "First/Last Frame to Video (Lite)"
+        },
+        "date": "2026-03-31T18:36:21.180Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/reference-to-video",
+      "metadata": {
+        "display_name": "Veo 3.1",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Reference to Video"
+        },
+        "date": "2025-10-08T17:07:06.022Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash",
+      "metadata": {
+        "display_name": "Gemini Omni Flash",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-flash",
+          "label": "Text to Video"
+        },
+        "date": "2026-06-30T16:35:19.139Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/reference-to-video",
+      "metadata": {
+        "display_name": "Gemini Omni Flash",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-flash",
+          "label": "Reference to Video"
+        },
+        "date": "2026-06-30T16:38:47.365Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/fast/reference-to-video",
+      "metadata": {
+        "display_name": "Veo 3.1 Fast",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Reference to Video (Fast)"
+        },
+        "date": "2025-10-08T17:08:17.756Z"
+      }
+    },
+    {
+      "endpoint_id": "lightricks/ltx-2.5/image-to-video/fast",
+      "metadata": {
+        "display_name": "LTX 2.5 Image to Video Fast",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.5-api",
+          "label": "Image to Video (Fast)"
+        },
+        "date": "2026-08-11T14:32:49.093Z"
+      }
+    },
+    {
+      "endpoint_id": "lightricks/ltx-2.5/image-to-video/pro",
+      "metadata": {
+        "display_name": "LTX 2.5 Image to Video Pro",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.5-api",
+          "label": "Image to Video (Pro)"
+        },
+        "date": "2026-08-11T14:36:55.563Z"
+      }
+    },
+    {
+      "endpoint_id": "google/gemini-omni-flash/edit",
+      "metadata": {
+        "display_name": "Gemini Omni Flash",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "gemini-omni-flash",
+          "label": "Video Edit"
+        },
+        "date": "2026-06-30T16:36:25.323Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/extend-video",
+      "metadata": {
+        "display_name": "Veo 3.1",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Extend Video"
+        },
+        "date": "2025-12-15T22:50:52.774Z"
+      }
+    },
+    {
+      "endpoint_id": "lightricks/ltx-2.5/text-to-video/fast",
+      "metadata": {
+        "display_name": "Ltx 2.5 Text to Video Fast",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.5-api",
+          "label": "Text to Video (Fast)"
+        },
+        "date": "2026-08-11T14:35:56.314Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/veo3.1/fast/extend-video",
+      "metadata": {
+        "display_name": "Veo 3.1 Fast",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "veo3.1",
+          "label": "Extend Video (Fast)"
+        },
+        "date": "2025-12-15T22:55:47.939Z"
+      }
+    },
+    {
+      "endpoint_id": "lightricks/ltx-2.5/audio-to-video/pro",
+      "metadata": {
+        "display_name": "Ltx 2.5 Audio to Video Pro",
+        "category": "audio-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.5-api",
+          "label": "Audio to Video (Pro)"
+        },
+        "date": "2026-08-11T14:40:23.860Z"
+      }
+    },
+    {
+      "endpoint_id": "lightricks/ltx-2.5/text-to-video/pro",
+      "metadata": {
+        "display_name": "Ltx 2.5 Text to Video Fast",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.5-api",
+          "label": "Text to Video (Pro)"
+        },
+        "date": "2026-08-11T14:24:06.314Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/render-to-real",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "3d render to real"
+        },
+        "date": "2026-06-26T14:41:13.532Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/outpaint",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Outpaint"
+        },
+        "date": "2026-06-17T17:40:41.755Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/reference-video-to-video",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Video to Video"
+        },
+        "date": "2026-06-01T21:55:32.430Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/inpaint",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Inpaint"
+        },
+        "date": "2026-06-18T01:40:20.729Z"
+      }
+    },
+    {
+      "endpoint_id": "lightricks/ltx-2.5/audio-to-video/fast",
+      "metadata": {
+        "display_name": "Ltx 2.5 Audio to Video Fast",
+        "category": "audio-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.5-api",
+          "label": "Audio to Video (Fast)"
+        },
+        "date": "2026-08-11T14:39:15.854Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/image-to-video",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Image to Video"
+        },
+        "date": "2026-06-01T20:50:00.769Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/audio-to-video",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "audio-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Audio to Video"
+        },
+        "date": "2026-06-01T21:21:38.139Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/extend-video",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Extend Video"
+        },
+        "date": "2026-07-07T05:44:17.686Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/clean-plate",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Clean Plate"
+        },
+        "date": "2026-07-24T20:23:25.982Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/text-to-video",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Text to Video"
+        },
+        "date": "2026-06-01T20:24:08.222Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/ingredient",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Ingredient"
+        },
+        "date": "2026-06-18T23:41:35.508Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/text-to-audio",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "text-to-audio",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Text to Audio"
+        },
+        "date": "2026-06-17T17:41:32.913Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/hdr",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Video To HDR"
+        },
+        "date": "2026-06-01T22:17:12.287Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/colorization",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Colorization"
+        },
+        "date": "2026-06-24T23:24:54.401Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/reference-video-to-video/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Video to Video with LoRA"
+        },
+        "date": "2026-06-01T22:06:55.596Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/image-to-video/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "image-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Image to Video with LoRA"
+        },
+        "date": "2026-06-01T20:59:12.797Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/text-to-video/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "text-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Text to Video with LoRA"
+        },
+        "date": "2026-06-01T20:41:42.875Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/deblur",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Deblur"
+        },
+        "date": "2026-06-24T23:26:43.533Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/decompression",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Decompression"
+        },
+        "date": "2026-06-25T01:18:30.958Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/day-to-night",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Day to Night"
+        },
+        "date": "2026-06-25T01:57:08.686Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/extend-video/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Extend Video with Lora"
+        },
+        "date": "2026-07-07T05:56:07.062Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/inpaint/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Inpaint with LoRa"
+        },
+        "date": "2026-06-18T01:40:34.974Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/outpaint/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Outpaint with LoRa"
+        },
+        "date": "2026-06-17T17:41:18.303Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/audio-to-video/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "audio-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Audio to Video with LoRA"
+        },
+        "date": "2026-06-01T21:39:40.623Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/water-simulation",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Water Simulation"
+        },
+        "date": "2026-06-25T01:37:22.219Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/cross-eyed",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Cross Eyes"
+        },
+        "date": "2026-06-25T02:04:42.628Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/instant-shave",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Instant Shave"
+        },
+        "date": "2026-06-25T01:27:46.951Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/text-to-audio/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "text-to-audio",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Text to Audio with LoRa"
+        },
+        "date": "2026-06-17T17:41:47.568Z"
+      }
+    },
+    {
+      "endpoint_id": "fal-ai/ltx-2.3-quality/hdr/lora",
+      "metadata": {
+        "display_name": "Ltx 2.3 Quality",
+        "category": "video-to-video",
+        "status": "active",
+        "kind": "inference",
+        "group": {
+          "key": "ltx-2.3-quality",
+          "label": "Video To HDR with LoRa"
+        },
+        "date": "2026-06-01T22:32:00.742Z"
+      }
+    }
+  ]
+}

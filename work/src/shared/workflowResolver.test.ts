@@ -299,8 +299,8 @@ describe('combined graph prompt X-ray', () => {
       expect.objectContaining({ tag: '@cinematic-naturalism', label: 'Style' }),
     ]))
     expect(request.prompt).toContain('SHOT 1 · 0.0–4.0s')
-    expect(request.prompt).toContain('FRAMING: Wide — establish subject, environment, and spatial relationships.')
-    expect(request.prompt).toContain('CAMERA: Jib Down — swing downward on a jib and settle into the subject or action')
+    expect(request.prompt).toContain('FRAMING: Wide Shot')
+    expect(request.prompt).toContain('CAMERA: Descend on a coherent jib arc')
     expect(request.prompt).toContain('SHOT 4 · 11.0–15.0s')
     expect(request.prompt).not.toMatch(/HARD CUT\.\s*$/)
     expect(request.multiPrompt).toHaveLength(4)
@@ -363,9 +363,11 @@ describe('combined graph prompt X-ray', () => {
     const video = node('roko-video', 'video-generator', { videoEngine: 'bytedance/seedance-2.5/reference-to-video', duration: 15 })
     const request = buildGenerationRequest(video, [storyboard, video], [edge(storyboard.id, video.id, 'storyboard-in')])
     expect(request.storyboardShots?.map((shot) => [shot.startSeconds, shot.endSeconds])).toEqual([[0, 4], [4, 9], [9, 15]])
-    expect(request.storyboardShots?.[1].incomingBridge).toMatchObject({ kind: 'merged', source: { fovDegrees: 63 }, target: { fovDegrees: 47 } })
-    expect(request.prompt).toContain('CAMERA BRIDGE')
-    expect(request.prompt).toContain('4.0–4.7s')
+    expect(request.storyboardShots?.[1].incomingBridge).toMatchObject({ kind: 'merged', concurrent: true, reservedSeconds: 0, source: { framingRank: 1 }, target: { framingRank: 2 } })
+    expect(request.prompt).toContain('BEAT 2 · 4.0–9.0s')
+    expect(request.prompt).toContain('CAMERA THROUGH SAME INTERVAL:')
+    expect(request.prompt).not.toContain('4.0–4.7s')
+    expect(request.storyboardShots?.[1].incomingBridge?.bridgeText).toContain('once')
     expect(request.prompt).not.toContain('Continue the established action')
   })
 
@@ -451,7 +453,7 @@ describe('combined graph prompt X-ray', () => {
       storyboardMode: 'single', storyboardDuration: 9,
       storyboardPanels: [
         { id: 'one', prompt: 'Follow Oli toward the ambulance.', duration: 2, shotSize: 'wide', camera: 'handheld', transitionToNext: 'continue' },
-        { id: 'two', prompt: 'Pan with Oli and settle on the reporter.', duration: 3, shotSize: 'medium', camera: 'pan-right', transitionToNext: 'hard-cut' },
+        { id: 'two', prompt: 'Pan with Oli and settle on the reporter.', duration: 3, shotSize: 'wide', camera: 'pan-right', transitionToNext: 'hard-cut' },
         { id: 'three', prompt: 'Hold on the reporter sign-off.', duration: 4, shotSize: 'close-up', camera: 'static', transitionToNext: 'continue' },
       ],
     })

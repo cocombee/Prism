@@ -16,7 +16,7 @@ describe('Storyboard 2–20 panel collection', () => {
     const before = panels(count)
     const result = appendStoryboardPanel(before, () => `p${count + 1}`)
     expect(result.panels.slice(0, count).map((panel) => panel.id)).toEqual(before.map((panel) => panel.id))
-    expect(result.panels.at(-1)).toEqual({ id: `p${count + 1}`, prompt: '', duration: 1, shotSize: 'wide', camera: 'static', audioCue: '', locked: false })
+    expect(result.panels.at(-1)).toEqual({ id: `p${count + 1}`, prompt: '', duration: 5, shotSize: 'close-up', lensMm: 50, camera: 'static', audioCue: '', locked: false })
     expect(result.focusPanelId).toBe(`p${count + 1}`)
     expect(result.added).toBe(true)
   })

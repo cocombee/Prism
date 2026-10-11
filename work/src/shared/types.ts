@@ -159,7 +159,9 @@ export interface StoryboardPanel extends StoryboardTypedContinuity {
   selectedPromptVersion?: 'original' | 'revamped'
   prompt: string
   duration: number | 'auto'
-  shotSize?: 'auto' | 'wide' | 'medium' | 'close-up' | 'detail'
+  shotSize?: 'auto' | 'extreme-wide' | 'wide' | 'medium' | 'close-up' | 'extreme-close-up' | 'detail'
+  /** Independent selected focal length; missing on older projects means unspecified. */
+  lensMm?: number
   camera?: string
   audioCue?: string
   locked?: boolean
@@ -478,7 +480,7 @@ export interface GenerationRequest {
   providerPromptOwnership?: 'authored' | 'compiled'
   /** Ephemeral output owner, so creation inputs are not mistaken for layers of an existing Character. */
   semanticAssetCreation?: { kind: 'character' | 'wardrobe' | 'location' | 'element'; tag: string }
-  storyboardShots?: Array<({ panelId?: string; prompt: string; duration: number; shotSize: string; camera: string; audioCue?: string; transitionToNext?: StoryboardTransition; boundaryState?: StoryboardBoundaryState; startSeconds?: number; endSeconds?: number; incomingBridge?: StoryboardCameraBridgePlan; panelNumber?: number } & StoryboardTypedContinuity)>
+  storyboardShots?: Array<({ panelId?: string; prompt: string; duration: number; shotSize: string; lensMm?: number; camera: string; audioCue?: string; transitionToNext?: StoryboardTransition; boundaryState?: StoryboardBoundaryState; startSeconds?: number; endSeconds?: number; incomingBridge?: StoryboardCameraBridgePlan; panelNumber?: number } & StoryboardTypedContinuity)>
   /** One-based authored Storyboard panels that are still missing action prose. */
   storyboardIncompletePanels?: number[]
   storyboardMode?: 'single' | 'separate'
@@ -855,6 +857,7 @@ export interface PrismAPI {
     save: (provider: ServiceProvider, key: string) => Promise<void>
     remove: (provider: ServiceProvider) => Promise<void>
     models: (provider: ServiceProvider) => Promise<ServiceModelAvailability>
+    modelSnapshot: (provider: ServiceProvider) => Promise<ServiceModelAvailability | undefined>
     higgsfieldPresets: (refresh?: boolean) => Promise<HiggsfieldPreset[]>
     higgsfieldSchema: (endpointId: string) => Promise<import('./higgsfieldInputContract').HiggsfieldInputContract>
     falSchema: (endpointId: string) => Promise<FalSchemaContract>

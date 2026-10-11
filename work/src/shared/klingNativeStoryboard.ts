@@ -1,7 +1,7 @@
 import type { GenerationRequest } from './types'
 import { findVideoModel } from './videoModels'
 import { groupStoryboardSequence, storyboardTransitionConflicts, STORYBOARD_OUTGOING_CONTINUATION } from './storyboardSequence'
-import { shotRecipe } from './shotRecipes'
+import { shotRecipe, selectedLensInstruction, timedCameraRecipe } from './shotRecipes'
 
 type Beat = NonNullable<GenerationRequest['storyboardShots']>[number]
 
@@ -56,7 +56,7 @@ export function buildKlingNativeMultiPrompt(shots: Beat[], cadenceInstruction?: 
     const beats = group.beats.map((beat, index) => {
       const start = elapsed
       elapsed += beat.duration
-      return `${group.beats.length > 1 ? `BEAT ${index + 1} · ${start}–${elapsed}s\n` : ''}Shot Size: ${shotRecipe('shot-size', beat.shotSize, 'kling')}; Camera Movement: ${shotRecipe('camera', beat.camera, 'kling')}${beat.audioCue ? `; Audio Cue: ${beat.audioCue}` : ''}. ${beat.prompt}`
+      return `${group.beats.length > 1 ? `BEAT ${index + 1} · ${start}–${elapsed}s\n` : ''}Shot Size: ${shotRecipe('shot-size', beat.shotSize, 'kling')}; Camera Movement: ${shotRecipe('camera', beat.camera, 'kling')}${beat.audioCue ? `; Audio Cue: ${beat.audioCue}` : ''}. ${beat.prompt}\n${selectedLensInstruction(beat.lensMm)}${beat.lensMm === undefined ? '' : '\n'}${timedCameraRecipe(beat.camera, beat.duration, beat.prompt, 'kling')}`
     })
     return {
       duration: String(group.duration),

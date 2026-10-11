@@ -1,0 +1,638 @@
+{
+  "kling-video/v3.0/std/text-to-video": {
+    "label": "Kling 3.0 Standard",
+    "company": "Kling AI",
+    "release": "Kling 3.0",
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/std/text-to-video/llms.txt",
+    "documentSha256": "563365f729bf5299eb99d10f183163e5b376d0ddcad0fa7f78f4e3a8ac4d7f6b",
+    "schemaSha256": "338833f42421bebd324b261b2d8d5572c9a11b10ae89a80159a3a1a095597237",
+    "inputSchema": {
+      "type": "object",
+      "title": "Kling 3.0 Playground",
+      "properties": {
+        "sound": {
+          "enum": [
+            "on",
+            "off"
+          ],
+          "type": "string",
+          "title": "Generate sound",
+          "default": "on"
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "type": "integer",
+          "title": "Duration",
+          "default": 5,
+          "maximum": 15,
+          "minimum": 3
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cfg_scale": {
+          "type": "number",
+          "title": "CFG Scale",
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "multipleOf": 0.01
+        },
+        "multi_shots": {
+          "type": "boolean",
+          "default": false
+        },
+        "aspect_ratio": {
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ],
+          "type": "string",
+          "title": "Aspect ratio",
+          "default": "16:9"
+        },
+        "multi_prompt": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "duration": {
+                "type": "integer",
+                "maximum": 15,
+                "minimum": 1
+              }
+            }
+          },
+          "maxItems": 6,
+          "minItems": 1
+        }
+      }
+    },
+    "omittedControls": [
+      "elements",
+      "multi_prompt"
+    ],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/v2.6/pro/text-to-video": {
+    "label": "Kling 2.6 Pro",
+    "company": "Kling AI",
+    "release": "Kling 2.6",
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v2.6/pro/text-to-video/llms.txt",
+    "documentSha256": "f703bfe0cec134111a4f6c29c3e5ab67fb7cd5315aa8ecc8e7327526c288c8ac",
+    "schemaSha256": "4fceff1269e7405e5c8015959bbcbda68b78df56915cbb2d2228d8011912ef13",
+    "inputSchema": {
+      "type": "object",
+      "title": "Kling 2.6 Playground",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "sound": {
+          "enum": [
+            "on",
+            "off"
+          ],
+          "type": "string",
+          "title": "Generate sound",
+          "default": "on"
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "enum": [
+            5,
+            10
+          ],
+          "type": "integer",
+          "title": "Duration",
+          "default": 5
+        },
+        "cfg_scale": {
+          "type": "number",
+          "title": "CFG Scale",
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "multipleOf": 0.01
+        },
+        "aspect_ratio": {
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ],
+          "type": "string",
+          "title": "Aspect ratio",
+          "default": "16:9"
+        }
+      }
+    },
+    "omittedControls": [],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/wan-3.0/text-to-video": {
+    "label": "Wan 3.0",
+    "company": "Alibaba",
+    "release": "Wan 3.0",
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0/text-to-video/llms.txt",
+    "documentSha256": "7d316320d7d303e428f22169fc111569992e3551a1a285384a9a089eae0b0002",
+    "schemaSha256": "f08319519839a21230cd7b0079002d0a10ba27413ee5c7ce470abd1a762875b5",
+    "inputSchema": {
+      "type": "object",
+      "title": "Wan 3.0 Text to Video",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "title": "Seed",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "type": "integer",
+          "title": "Duration (sec)",
+          "default": 5,
+          "maximum": 30,
+          "minimum": 2,
+          "description": "2-30 seconds."
+        },
+        "resolution": {
+          "enum": [
+            "480p",
+            "720p",
+            "1080p"
+          ],
+          "type": "string",
+          "title": "Resolution",
+          "default": "1080p"
+        },
+        "aspect_ratio": {
+          "enum": [
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16",
+            "adaptive"
+          ],
+          "type": "string",
+          "title": "Aspect Ratio",
+          "default": "adaptive"
+        },
+        "generate_audio": {
+          "type": "boolean",
+          "title": "Sound",
+          "default": true
+        },
+        "enable_thinking": {
+          "type": "boolean",
+          "title": "Deep Thinking",
+          "default": false
+        }
+      }
+    },
+    "omittedControls": [],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "minimax/h3/text-to-video": {
+    "label": "MiniMax H3",
+    "company": "MiniMax",
+    "release": "H3",
+    "sourceUrl": "https://dash.higgsfield.ai/models/minimax/h3/text-to-video/llms.txt",
+    "documentSha256": "332bf48c7fa7672e0c1fd1840b9fd2394c06d278f708be517c490cb48f1fe3ec",
+    "schemaSha256": "8dbfba2c599200f7f39e7104b4e45e8fefc6a2b829c908fa6dcd11dad273b094",
+    "inputSchema": {
+      "type": "object",
+      "title": "MiniMax H3 Text to Video Playground",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "minLength": 1,
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "type": "integer",
+          "title": "Duration",
+          "default": 5,
+          "maximum": 15,
+          "minimum": 5
+        },
+        "resolution": {
+          "enum": [
+            "2K"
+          ],
+          "type": "string",
+          "title": "Resolution",
+          "default": "2K"
+        },
+        "aspect_ratio": {
+          "enum": [
+            "auto",
+            "adaptive",
+            "21:9",
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16"
+          ],
+          "type": "string",
+          "title": "Aspect ratio",
+          "default": "auto"
+        },
+        "aigc_watermark": {
+          "type": "boolean",
+          "title": "AIGC watermark",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "omittedControls": [],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "minimax/hailuo-2.3/standard/text-to-video": {
+    "label": "Hailuo 2.3 Standard",
+    "company": "MiniMax",
+    "release": "Hailuo 2.3",
+    "sourceUrl": "https://dash.higgsfield.ai/models/minimax/hailuo-2.3/standard/text-to-video/llms.txt",
+    "documentSha256": "eb24db4eef3a11b5ec47f2aef2c441e2f8d0ebe722a046ddfecd4ee2b246409d",
+    "schemaSha256": "f4a23dfda58195bdb66c89d261d4daab4994a459ef21be20cb0b11084f279e03",
+    "inputSchema": {
+      "type": "object",
+      "title": "Minimax Hailuo 2.3 Playground",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "enum": [
+            6,
+            10
+          ],
+          "type": "integer",
+          "title": "Duration",
+          "default": 6
+        },
+        "prompt_optimizer": {
+          "type": "boolean",
+          "title": "Prompt optimizer",
+          "default": true
+        }
+      }
+    },
+    "omittedControls": [],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "lightricks/ltx-2.5/text-to-video/pro": {
+    "label": "LTX 2.5 Pro",
+    "company": "Lightricks",
+    "release": "LTX 2.5",
+    "sourceUrl": "https://dash.higgsfield.ai/models/lightricks/ltx-2.5/text-to-video/pro/llms.txt",
+    "documentSha256": "18e3ec66e126988efb4984555e0289404633e3405bdc0c17bae62bb8059d9484",
+    "schemaSha256": "27ef0613e9ef57e780b06452b444f5e80946d53ce325158bb92a8f449f3e671f",
+    "inputSchema": {
+      "type": "object",
+      "title": "LTX-2.5 Pro Text to Video Playground",
+      "required": [
+        "prompt",
+        "duration"
+      ],
+      "properties": {
+        "fps": {
+          "enum": [
+            24,
+            25,
+            50
+          ],
+          "type": "integer",
+          "title": "Frames per second",
+          "default": 25
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "maxLength": 5000,
+          "minLength": 2,
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "enum": [
+            6,
+            8,
+            10
+          ],
+          "type": "integer",
+          "title": "Duration",
+          "default": 6
+        },
+        "resolution": {
+          "enum": [
+            "720p",
+            "1080p"
+          ],
+          "type": "string",
+          "title": "Resolution",
+          "default": "720p"
+        },
+        "aspect_ratio": {
+          "enum": [
+            "16:9",
+            "9:16"
+          ],
+          "type": "string",
+          "title": "Aspect ratio",
+          "default": "16:9"
+        },
+        "generate_audio": {
+          "type": "boolean",
+          "title": "Generate audio",
+          "default": true
+        },
+        "camera_movement": {
+          "enum": [
+            "dolly_in",
+            "dolly_out",
+            "dolly_left",
+            "dolly_right",
+            "jib_up",
+            "jib_down",
+            "static",
+            "focus_shift"
+          ],
+          "type": "string",
+          "title": "Camera movement"
+        }
+      },
+      "additionalProperties": false
+    },
+    "omittedControls": [],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "pixverse/v6/text-to-video": {
+    "label": "PixVerse V6",
+    "company": "PixVerse",
+    "release": "V6",
+    "sourceUrl": "https://dash.higgsfield.ai/models/pixverse/v6/text-to-video/llms.txt",
+    "documentSha256": "fd6f6967e018ec21120cfd3a6f32bca09c870d91a2c40cf23937d89df6ac898b",
+    "schemaSha256": "691a46ad9fc30d791daa62ca4ca3bf67ae6e428880b29c925f7cad412e6fc964",
+    "inputSchema": {
+      "type": "object",
+      "title": "PixVerse V6 Text to Video Playground",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "title": "Seed",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "maxLength": 5000,
+          "minLength": 1,
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "type": "number",
+          "title": "Duration",
+          "default": 5,
+          "maximum": 15,
+          "minimum": 1
+        },
+        "resolution": {
+          "enum": [
+            "360p",
+            "540p",
+            "720p",
+            "1080p"
+          ],
+          "type": "string",
+          "title": "Resolution",
+          "default": "720p"
+        },
+        "aspect_ratio": {
+          "enum": [
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16"
+          ],
+          "type": "string",
+          "title": "Aspect ratio",
+          "default": "16:9"
+        },
+        "generate_audio": {
+          "type": "boolean",
+          "title": "Generate audio",
+          "default": true
+        },
+        "negative_prompt": {
+          "type": "string",
+          "title": "Negative prompt",
+          "maxLength": 2048,
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "omittedControls": [],
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "wan/v2.7/text-to-video": {
+    "label": "Wan 2.7",
+    "company": "Alibaba",
+    "release": "Wan 2.7",
+    "sourceUrl": "https://dash.higgsfield.ai/models/wan/v2.7/text-to-video/llms.txt",
+    "documentSha256": "f7511e66be73affd62ca33f53067c1253267dea8115876a1eb0aa67c1b091bcb",
+    "schemaSha256": "31135bd2b73d9ad5fb8c123ad975e6947fa7999f9ddd22dd553f70d03af59968",
+    "omittedControls": [
+      "audio_url"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "title": "Wan 2.6 Playground",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "maximum": 2147483646,
+          "minimum": 1
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Prompt",
+          "description": "Write your prompt here"
+        },
+        "duration": {
+          "type": "integer",
+          "title": "Duration",
+          "default": 5,
+          "maximum": 15,
+          "minimum": 2
+        },
+        "audio_url": {
+          "type": "string",
+          "title": "Audio URL",
+          "format": "uri"
+        },
+        "resolution": {
+          "enum": [
+            "720p",
+            "1080p"
+          ],
+          "type": "string",
+          "default": "720p"
+        },
+        "aspect_ratio": {
+          "enum": [
+            "16:9",
+            "9:16",
+            "1:1",
+            "4:3",
+            "3:4"
+          ],
+          "type": "string",
+          "title": "Aspect Ratio",
+          "default": "16:9"
+        },
+        "prompt_extend": {
+          "type": "boolean",
+          "default": false
+        },
+        "negative_prompt": {
+          "type": "string",
+          "title": "Negative prompt",
+          "default": ""
+        }
+      }
+    },
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  }
+}

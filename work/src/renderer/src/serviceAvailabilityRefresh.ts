@@ -7,6 +7,7 @@ export interface ServiceAvailabilityRefreshOptions {
   publicCatalogs?: ServiceProvider[]
   refreshIntervalMs?: number
   models: (provider: ServiceProvider) => Promise<ServiceModelAvailability>
+  snapshot?: (provider: ServiceProvider) => Promise<ServiceModelAvailability | undefined>
   account: (provider: ServiceProvider) => Promise<ServiceAccountStatus>
   onModels: (provider: ServiceProvider, availability: ServiceModelAvailability) => void
   onAccount: (provider: ServiceProvider, account: ServiceAccountStatus) => void
@@ -18,6 +19,7 @@ export function startServiceAvailabilityRefresh(options: ServiceAvailabilityRefr
   const interval = options.refreshIntervalMs ?? 10 * 60_000
   if (!Number.isFinite(interval) || interval < 30_000) throw new Error('Invalid model refresh interval.')
   let active = true
+  const snapshotReads = new Set<ServiceProvider>()
   const pendingModels = new Set<ServiceProvider>(), pendingAccounts = new Set<ServiceProvider>()
   const refresh = () => {
     if (!active) return
@@ -27,6 +29,16 @@ export function startServiceAvailabilityRefresh(options: ServiceAvailabilityRefr
         const acceptsModels = options.requestGuard?.(provider, 'models') || (() => true)
         void (async () => {
           try {
+            // A retained complete catalog is presentation only. Publish it before
+            // the potentially paginated live read, under the same owner guard.
+            if (options.snapshot && !snapshotReads.has(provider)) {
+              snapshotReads.add(provider)
+              try {
+                const snapshot = await options.snapshot(provider)
+                if (snapshot && active && acceptsModels()) options.onModels(provider, snapshot)
+              } catch { /* A missing/corrupt cache never prevents fresh discovery. */ }
+            }
+            if (!active || !acceptsModels()) return
             const availability = await options.models(provider)
             if (active && acceptsModels()) options.onModels(provider, availability)
           } catch (error) {

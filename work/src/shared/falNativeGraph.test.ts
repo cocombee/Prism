@@ -21,6 +21,20 @@ function dependencies(contract: FalSchemaContract) {
  return deps
 }
 describe('actual graph to owned native executor', () => {
+ it('wires native Motion FPS into compiled intent while preserving Manual bytes and native fields', () => {
+  const contract = model(), end = target(contract)
+  end.data.promptMode = 'auto'; end.data.prompt = 'A dancer turns in place.'; end.data.motionCadence = 16
+  const auto = buildGenerationRequest(end, [end], [])
+  expect(auto.motionCadence).toBe(16)
+  expect(auto.prompt).toMatch(/16fps/)
+  expect(auto.falNative!.values).not.toHaveProperty('fps')
+  expect(auto.falNative!.values).not.toHaveProperty('motionCadence')
+  end.data.promptMode = 'manual'
+  const manual = buildGenerationRequest(end, [end], [])
+  expect(manual.motionCadence).toBeUndefined()
+  expect(manual.prompt).toBe(end.data.manualPromptDraft)
+  expect(manual.falNative!.values.prompt).toBe(end.data.manualPromptDraft)
+ })
  it.each([20, 50])('preserves manual bytes and sends %i references through the captured route', async count => {
   const contract = model(), end = target(contract), images = refs(count === 50 ? 30 : count, 'image'), videos = refs(count === 50 ? 10 : 0, 'video'), audio = refs(count === 50 ? 10 : 0, 'audio'), sources = [...images, ...videos, ...audio]
   const edges = [...images.map(source => connect(source, 'reference-in')), ...videos.map(source => connect(source, 'video-reference-in')), ...audio.map(source => connect(source, 'audio-reference-in'))]

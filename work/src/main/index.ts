@@ -11,6 +11,8 @@ import type { HiggsfieldJobObserver } from './higgsfieldApi'
 import { projectServiceProfileSelection } from '../shared/serviceProfiles'
 import { inspectHiggsfieldImage } from './higgsfieldImageInspection'
 import { executeHiggsfieldSeedanceGeneration } from './higgsfieldSeedanceGeneration'
+import { executeHiggsfieldTextVideoGeneration } from './higgsfieldTextVideoGeneration'
+import { executeHiggsfieldReferenceVideoGeneration } from './higgsfieldReferenceVideoGeneration'
 import { higgsfieldSeedanceManagedMedia } from './higgsfieldSeedanceManagedMedia'
 import { executeHiggsfieldGeneration } from './higgsfieldGeneration'
 import { HiggsfieldApi, HiggsfieldRemoteJobError } from './higgsfieldApi'
@@ -31,8 +33,10 @@ import { generateFishAudio } from './fishAudioApi'
 import { persistFishAudio } from './fishAudioPersistence'
 import { ScopedCatalogCache } from './scopedCatalogCache'
 import { readFalModelCatalog } from './falCatalogDiscovery'
+import { readFalCatalogSnapshot, writeFalCatalogSnapshot } from './falCatalogSnapshot'
 import { FalModelSchemaCache, readFalModelSchema } from './falSchemaDiscovery'
 import { executeFalNativeGeneration } from './falNativeGeneration'
+import { assertFalMediaFileLimit } from './falMediaFileLimit'
 import type { FalSchemaContract } from '../shared/falSchemaBinding'
 import { falEndpointId } from '../shared/falModelCatalog'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, protocol, safeStorage, session, shell } from 'electron'
@@ -421,7 +425,10 @@ async function listServiceModels(provider: ServiceProvider): Promise<ServiceMode
       return await falCatalogCache.read(scope, async () => {
         const key = await loadServiceCredential(provider)
         const models = await readFalModelCatalog({ request: (url) => fetchProviderModelCatalog(provider, url, { headers: { Authorization: `Key ${key}` } }), assertCurrent })
-        return { provider, verified: true, models, catalogCheckedAt: new Date().toISOString() }
+        const availability: ServiceModelAvailability = { provider, verified: true, models, catalogCheckedAt: new Date().toISOString() }
+        await writeFalCatalogSnapshot(join(app.getPath('userData'), 'fal-public-model-catalog.json'), availability).catch(() => undefined)
+        assertCurrent()
+        return availability
       }, assertCurrent)
     } catch (error) {
       assertCurrent()
@@ -1801,11 +1808,12 @@ async function runNativeFalGeneration(request: GenerationRequest, signal?: Abort
     const result = await executeFalNativeGeneration(native, request.kind, {
       contract: readOwnedFalSchema,
       assertCurrent: () => { runtimeServiceFailures.assertCurrent('fal'); assertGenerationCommit() },
-      prepareSource: async (source, expectedType) => {
-        if (!source.path) return source
+      prepareSource: async (source, expectedType, maximumBytes) => {
+        if (!source.path) { await assertFalMediaFileLimit(undefined, maximumBytes); return source }
         const path = await assertManagedMediaPath(source.path)
         if (!mimeFor(path).startsWith(`${expectedType}/`)) throw new Error(`The connected file must be ${expectedType} media.`)
         await stat(path)
+        await assertFalMediaFileLimit(path, maximumBytes)
         return { ...source, path }
       },
       client: async () => createOwnedFalClient(await loadCredential(), falElectronFetch, () => runtimeServiceFailures.assertCurrent('fal')),
@@ -1949,10 +1957,11 @@ async function runNativeHiggsfieldGeneration(request: GenerationRequest, signal?
   const schemaInput = inputPlan.preview
   const currentInputSchema = current.schema
   const validateSemanticControls=(schema:typeof currentInputSchema,input:unknown)=>{
-    if(inputPlan.kind!=='seedance')return
+    if(inputPlan.kind==='genjutsu')return
     if(requiresGeneratedDialogueAudio(request)) {
-      const audio=schema.properties?.generate_audio,value=(input as Record<string,unknown>).generate_audio ?? audio?.default
-      if(!audio||audio.type!=='boolean'||value!==true)throw new VideoDialogueAudioConflictError()
+      const controls=input as Record<string,unknown>,audio=schema.properties?.generate_audio,sound=schema.properties?.sound
+      const enabled=audio?.type==='boolean'&&(controls.generate_audio ?? audio.default)===true || sound?.type==='string'&&sound.enum?.includes('on')&&(controls.sound ?? sound.default)==='on'
+      if(!enabled)throw new VideoDialogueAudioConflictError()
     }
   }
   assertCurrentContract();validateSemanticControls(currentInputSchema,schemaInput)
@@ -1965,7 +1974,7 @@ async function runNativeHiggsfieldGeneration(request: GenerationRequest, signal?
   const lifecycle = await beginHiggsfieldJob(higgsfieldJobStore(), scope, profileId, native, value => {
     if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure recovery storage is unavailable; generation was not submitted.')
     return safeStorage.encryptString(value)
-  }, native.fingerprint !== undefined && inputPlan.kind === 'seedance' ? currentInputSchema : undefined)
+  }, native.fingerprint !== undefined && inputPlan.kind !== 'genjutsu' ? currentInputSchema : undefined)
   try {
     const generationDependencies = {
       assertCurrent: () => { runtimeServiceFailures.assertCurrent('higgsfield'); assertGenerationCommit() },
@@ -1982,7 +1991,11 @@ async function runNativeHiggsfieldGeneration(request: GenerationRequest, signal?
     }
     const result = inputPlan.kind==='seedance'
       ? await executeHiggsfieldSeedanceGeneration(higgsfieldSeedanceRequest(native),{...generationDependencies,...higgsfieldSeedanceManagedMedia({assertCurrent:assertCurrentContract,assertManagedPath:assertManagedMediaPath,mimeFor}),...(native.fingerprint!==undefined?{inputSchema:currentInputSchema}:{})},signal)
-      : await executeHiggsfieldGeneration(native,generationDependencies,signal)
+      : inputPlan.kind==='text-video'
+        ? await executeHiggsfieldTextVideoGeneration(native,{...generationDependencies,inputSchema:currentInputSchema},signal)
+        : inputPlan.kind==='reference-video'
+          ? await executeHiggsfieldReferenceVideoGeneration(native,{...generationDependencies,...higgsfieldSeedanceManagedMedia({assertCurrent:assertCurrentContract,assertManagedPath:assertManagedMediaPath,mimeFor}),inputSchema:currentInputSchema},signal)
+          : await executeHiggsfieldGeneration(native,generationDependencies,signal)
     runtimeServiceFailures.delete('higgsfield');return result
   } catch (error) {
     try { await lifecycle.failed(error) } catch {
@@ -2409,6 +2422,16 @@ function registerIpc(): void {
   ipcMain.handle('services:higgsfield-presets', (_event, refresh?: boolean) => {
     if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid Higgsfield preset refresh request.')
     return withProviderRequest('higgsfield', () => readCurrentHiggsfieldPresets(refresh))
+  })
+  ipcMain.handle('services:model-snapshot', async (_event, provider: unknown) => {
+    if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
+    if (provider !== 'fal') return undefined
+    return withProviderRequest('fal', async () => {
+      if (!await serviceConnected('fal')) return undefined
+      const snapshot = await readFalCatalogSnapshot(join(app.getPath('userData'), 'fal-public-model-catalog.json'))
+      runtimeServiceFailures.assertCurrent('fal')
+      return snapshot
+    })
   })
   ipcMain.handle('services:models', async (_event, provider: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')

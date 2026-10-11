@@ -22,9 +22,13 @@ export function canAppendStoryboardPanel(panels: StoryboardPanel[], remainingDur
     && (!Number.isFinite(remainingDuration) || Number(remainingDuration) >= STORYBOARD_MIN_PANEL_DURATION)
 }
 
+export function createStoryboardPanel(id: string, duration = 5): StoryboardPanel {
+  return { id, prompt: '', duration, shotSize: 'close-up', lensMm: 50, camera: 'static', audioCue: '', locked: false }
+}
+
 export function appendStoryboardPanel(panels: StoryboardPanel[], createId: () => string = () => crypto.randomUUID()): StoryboardPanelMutation {
   if (panels.length >= STORYBOARD_MAX_PANELS) return { panels, added: false }
-  const panel: StoryboardPanel = { id: createId(), prompt: '', duration: 1, shotSize: 'wide', camera: 'static', audioCue: '', locked: false }
+  const panel = createStoryboardPanel(createId())
   return { panels: [...panels, panel], focusPanelId: panel.id, added: true }
 }
 

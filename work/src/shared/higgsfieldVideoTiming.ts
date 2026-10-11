@@ -11,8 +11,8 @@ export function higgsfieldStoryboardTimingFailures(request:GenerationRequest):st
   if(hasExactAuthoredProviderBody(request)||ownsExactSeedanceMaster(request))return []
   try{
     const plan=planHiggsfieldNativeInput(request.higgsfieldNative)
-    if(plan.kind!=='seedance')return []
-    if(request.multiPrompt?.length)return ['The selected native Seedance route takes one final prompt, not a provider multi_prompt array. Preserve and compile the authored Storyboard before generating.']
+    if(plan.kind==='genjutsu')return []
+    if(request.multiPrompt?.length)return ['The selected native video route takes one final prompt, not a provider multi_prompt array. Preserve and compile the authored Storyboard before generating.']
     const total=authoredTimelineSeconds(request)
     if(total===undefined)return []
     const actual=plan.values.duration

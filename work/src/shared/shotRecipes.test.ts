@@ -1,20 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { quantifiedCameraRecipe, shotRecipeDetails, shotFov, shotFovDegrees } from './shotRecipes'
 
-describe('shot FOV executable metadata', () => {
-  it('exposes exact numeric FOV while preserving display strings', () => {
-    expect(shotFovDegrees('establishing')).toBe(84)
-    expect(shotFovDegrees('wide')).toBe(63)
-    expect(shotFovDegrees('medium')).toBe(47)
-    expect(shotFovDegrees('close-up')).toBe(29)
-    expect(shotFovDegrees('detail')).toBe(8)
-    expect(shotFovDegrees('future-size')).toBeUndefined()
-    expect(shotFov('wide')).toBe('63° wide')
-    expect(shotFov('close-up')).toBe('29° portrait compression')
+describe('framing never invents a measured lens angle', () => {
+  it('leaves degrees unspecified for every framing choice and retains semantic occupancy', () => {
+    for (const value of ['establishing', 'wide', 'medium', 'close-up', 'detail', 'extreme-wide', 'extreme-close-up', 'future-size']) expect(shotFovDegrees(value)).toBeUndefined()
+    expect(shotFov('wide')).toBe('Full performer visible within meaningful surroundings')
+    expect(shotFov('close-up')).toBe('Face dominates the frame, approximately head and shoulders')
   })
-
 })
-
 
 describe('physical camera mechanisms from inspected multi-shot prompt patterns', () => {
   it('distinguishes fixed-station horizontal pan from translating orbit', () => {

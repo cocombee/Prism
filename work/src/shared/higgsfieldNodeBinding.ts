@@ -45,7 +45,7 @@ export function higgsfieldPresetReadinessFailures(state: HiggsfieldNodeState, vi
 }
 
 export function higgsfieldInputReadinessFailures(state: HiggsfieldNodeState, view: HiggsfieldContractView): string[] {
-  try { if (higgsfieldModel(state.endpointId).kind !== 'seedance') return [] }
+  try { if (higgsfieldModel(state.endpointId).kind === 'genjutsu') return [] }
   catch { return ['the saved Higgsfield route has no verified adapter; its values and connections are preserved'] }
   if (view.error) return [view.error]
   if (view.loading || !view.contract) return ['load current Higgsfield model inputs']

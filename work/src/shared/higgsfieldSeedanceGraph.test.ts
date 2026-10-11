@@ -44,6 +44,17 @@ function fixture(mode: string, manual = true) {
 const panels = (count: number, duration = 1): StoryboardPanel[] => Array.from({length:count},(_,i)=>({id:`panel-${i}`,prompt:`Action beat ${i+1}: the performer continues the authored task.`,duration,shotSize:i%2?'wide':'close-up',camera:'static',transitionToNext:'hard-cut'}))
 
 describe('actual Higgsfield Seedance graph, compiler and native request composition',()=>{
+  it('binds the native footer Motion FPS as compiled intent without altering Manual or API fields',()=>{
+    const x=fixture('text-to-video',false);x.end.data.motionCadence=16
+    const auto=buildGenerationRequest(x.end,x.nodes,x.edges)
+    expect(auto.motionCadence).toBe(16);expect(auto.prompt).toMatch(/16fps/)
+    expect(auto.higgsfieldNative!.values).not.toHaveProperty('fps')
+    expect(auto.higgsfieldNative!.values).not.toHaveProperty('motionCadence')
+    x.end.data.promptMode='manual'
+    const manual=buildGenerationRequest(x.end,x.nodes,x.edges)
+    expect(manual.motionCadence).toBeUndefined();expect(manual.prompt).toBe(x.end.data.manualPromptDraft)
+    expect(manual.higgsfieldNative!.values.prompt).toBe(x.end.data.manualPromptDraft)
+  })
   it('carries actual current controls/digest and increased reference capacity from graph to main',async()=>{
     const end=generator('reference-to-video'),schema=higgsfieldSeedanceSchema(end.data.higgsfieldNative!.endpointId)
     schema.properties!.duration.maximum=40;schema.properties!.image_urls.maxItems=40;schema.properties!.seed={type:'integer',default:12}

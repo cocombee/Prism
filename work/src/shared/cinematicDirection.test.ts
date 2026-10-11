@@ -16,7 +16,8 @@ describe('cinematic direction layer', () => {
     const authored = cinematicDirection({ ...base, storyboardShotCount: 1, storyboardMode: 'single', storyboardShots: [{ prompt: 'Cross the market.', duration: 4, shotSize: 'wide', camera: 'dolly-in' }] })
     expect(authored).toContain('FORMAT MODE')
     expect(authored).toContain('CUT 1')
-    expect(authored).toContain('63° wide')
+    expect(authored).toContain('Full performer visible within meaningful surroundings')
+    expect(authored).not.toContain('63°')
     expect(authored).not.toContain('BEAT 1')
     // Per-shot splitting drops multiPrompt, so the count must survive on its own.
     expect(directionInputsFor({ ...base, storyboardShotCount: 4, multiPrompt: undefined }).hasAuthoredShotPlan).toBe(true)

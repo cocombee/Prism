@@ -18,7 +18,7 @@ export function higgsfieldJobSnapshot(request: HiggsfieldNativeRequest, inputSch
   if(request.fingerprint!==undefined&&!inputSchema)throw new Error('The current Higgsfield schema must be owned by main before creating a new job snapshot.')
   const plan=planHiggsfieldNativeInput(request,inputSchema)
   const source = (item: import('../shared/higgsfieldNative').HiggsfieldMediaSource) => ({ ...(item.path ? { path: item.path } : { url: item.url! }), mediaType: item.mediaType })
-  if(plan.kind==='seedance'){
+  if(plan.kind!=='genjutsu'){
     const media:HiggsfieldNativeRequest['media']={}
     for(const slot of plan.slots)(media[slot.field]||=([])).push(source(slot.source))
     return {endpointId:plan.endpointId,contractRevision:request.contractRevision,...(request.fingerprint!==undefined?{fingerprint:request.fingerprint}:{}),values:structuredClone(plan.values),media}
@@ -40,7 +40,7 @@ function submissionMatches(snapshot:HiggsfieldNativeRequest,value:HiggsfieldSubm
  const submission=validateHiggsfieldSubmission(value),body=JSON.parse(submission.body),plan=planHiggsfieldNativeInput(snapshot,inputSchema)
  if(submission.endpointId!==snapshot.endpointId)throw new Error('The Higgsfield submission no longer matches its original request.')
  if(!inputSchema)validateHiggsfieldWireInput(submission.endpointId,body)
- const slots=plan.kind==='seedance'?plan.slots:[{field:'video_url',index:0,source:plan.video},...plan.images.map((source,index)=>({field:'image_urls',index,source}))]
+ const slots=plan.kind!=='genjutsu'?plan.slots:[{field:'video_url',index:0,source:plan.video},...plan.images.map((source,index)=>({field:'image_urls',index,source}))]
  const urls=slots.map(slot=>Array.isArray(body[slot.field])?body[slot.field][slot.index]:body[slot.field])
  const expected=materializeHiggsfieldNativeInput(plan,urls)
  if(canonical(body)!==canonical(expected)||slots.some((slot,index)=>slot.source.url&&slot.source.url!==urls[index]))throw new Error('The Higgsfield submission no longer matches its original request.')

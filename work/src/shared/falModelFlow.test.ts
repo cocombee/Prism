@@ -10,6 +10,29 @@ const models = captured.models.map(falCatalogModel)
 const availability: ServiceModelAvailability = { provider: 'fal', verified: true, models }
 
 describe('live fal production flow menus', () => {
+  it('distinguishes repeated LTX display names without deleting or substituting endpoint routes', () => {
+    const entries = ['text-to-video', 'image-to-video', 'image-to-video/lora', 'clean-plate', 'render-to-real'].map(path => falCatalogModel({
+      endpoint_id: `fal-ai/ltx-2.3-quality/${path}`,
+      metadata: { display_name: 'Ltx 2.3 Quality', status: 'active', category: path.startsWith('text') ? 'text-to-video' : path.startsWith('image') ? 'image-to-video' : 'video-to-video' },
+    })!)
+    const catalog: ServiceModelAvailability = { provider: 'fal', verified: true, models: [...entries, entries[0]] }
+    const before = structuredClone(catalog)
+    const options = falFlowMenuOptions('video', catalog)
+    expect(options.map(option => option.value)).toEqual(entries.map(entry => entry.id))
+    expect(new Set(options.map(option => option.label)).size).toBe(entries.length)
+    expect(options[0].label).toBe('LTX 2.3 Quality · Text to Video')
+    expect(options[2].label).toContain('LoRA')
+    expect(options[3].label).toContain('Clean Plate')
+    expect(options[4].label).toContain('Render To Real')
+    expect(catalog).toEqual(before)
+  })
+
+  it('matches the model / tier / input naming while retaining a mode before a tier suffix', () => {
+    const entry = falCatalogModel({ endpoint_id: 'lightricks/ltx-2.5/image-to-video/pro', metadata: { display_name: 'LTX 2.5 Image to Video Pro', category: 'video-to-video', status: 'active' } })!
+    expect(entry.catalog).toMatchObject({ release: 'LTX 2.5 Pro', mode: 'Image to Video' })
+    expect(falFlowMenuOptions('video', { provider: 'fal', verified: true, models: [entry] })[0]).toMatchObject({ value: entry.id, label: 'LTX 2.5 Pro · Image to Video' })
+  })
+
   it('retains exact image/reference video routes despite the provider categorizing both as image-to-video', () => {
     const options = falFlowMenuOptions('video', availability)
     expect(options.map((option) => option.value)).toEqual(models.map((model: { id: string }) => model.id))

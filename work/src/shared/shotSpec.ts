@@ -1,5 +1,5 @@
 import { assertStoryboardPhysicalCast } from './storyboardPhysicalCast'
-import { quantifiedCameraRecipe, shotFov } from './shotRecipes'
+import { quantifiedCameraRecipe, timedCameraRecipe, shotFov, selectedLensInstruction } from './shotRecipes'
 import { semanticAuthorityCompletion } from './semanticAuthorityCompletion'
 import type { GenerationRequest, StoryboardBoundaryState, StoryboardCharacterState, StoryboardDialogueSpan, StoryboardStateAuthority } from './types'
 import { groupStoryboardSequence, storyboardTransitionConflicts, STORYBOARD_OUTGOING_CONTINUATION } from './storyboardSequence'
@@ -568,7 +568,7 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
       const referencesAtPointOfUse = pointOfUseReferences(request, prompt, shot.panelId, typedLedger.shots[labeledBeats.length - 1])
       const typedLines = typedShotLines(typedLedger, labeledBeats.length - 1)
       const bridge = shot.incomingBridge
-      if (beatIndex > 0 && bridge?.reservedSeconds && bridge.bridgeText) {
+      if (beatIndex > 0 && !bridge?.concurrent && bridge?.reservedSeconds && bridge.bridgeText) {
         const bridgeEnd = timecodes.sum(startSeconds, bridge.reservedSeconds)
         const reactionStart = timecodes.sum(elapsedSeconds, -bridge.reactionReserveSeconds)
         const bridgeReferences = !continuousTake && referencesAtPointOfUse.length ? `\nREFERENCES · ${referencesAtPointOfUse.join('; ')}` : ''
@@ -583,7 +583,7 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
       const boundary = !continuousTake && shotIndex < sequence.shots.length - 1 && shotGroup.beats.length === beatIndex + 1
         ? boundaryLine(shotIndex + 1, shot.transitionToNext || 'hard-cut', boundaryState(shot.boundaryState, sequence.shots[shotIndex + 1].beats[0].boundaryState))
         : ''
-      return `${label} · ${timecodes.format(startSeconds)}–${timecodes.format(elapsedSeconds)}s\nPURPOSE / ACTION · ${continuation}${prompt}${referenceLine}${typedLines.length ? `\n${typedLines.join('\n')}` : ''}${dialogueAudioLine}${boundary ? `\n${boundary}` : ''}\nENDPOINT / REACTION · ${outgoingContinue ? 'Preserve the authored endpoint and performance state for the outgoing continuation hook; no unauthored stop or next beat.' : 'Keep the authored consequence and reaction readable within this interval; follow authored motion through its boundary, and settle or hold only where authored.'}`
+      return `${label} · ${timecodes.format(startSeconds)}–${timecodes.format(elapsedSeconds)}s\nPURPOSE / ACTION · ${continuation}${prompt}${referenceLine}${typedLines.length ? `\n${typedLines.join('\n')}` : ''}${dialogueAudioLine}${bridge?.concurrent && bridge.bridgeText ? `\nCAMERA THROUGH SAME INTERVAL: ${bridge.bridgeText}` : ''}${boundary ? `\n${boundary}` : ''}\nENDPOINT / REACTION · ${outgoingContinue ? 'Preserve the authored endpoint and performance state for the outgoing continuation hook; no unauthored stop or next beat.' : 'Keep the authored consequence and reaction readable within this interval; follow authored motion through its boundary, and settle or hold only where authored.'}`
     })
     if (!continuousTake && shotGroup.beats.length > 1) timedShots.push(`SHOT ${shotIndex + 1} · ${timecodes.format(groupStart)}–${timecodes.format(elapsedSeconds)}s`)
     timedShots.push(...beatLines)
@@ -615,7 +615,7 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
           : continued
             ? ' Continue physically from the prior camera endpoint; no reset, teleport, dissolve, morph, or hidden lens jump.'
             : ''
-    return `${label}: ${quantifiedCameraRecipe(shot.camera)}${anchorRule}`
+    return `${label}: ${timedCameraRecipe(shot.camera, shot.duration, shot.prompt)}${anchorRule}`
   }).join('\n') : '', authoredFields.camera, authoredFields.cameraAndLens ? `Authored camera and lens: ${authoredFields.cameraAndLens}` : '', !shots.length && !authoredFields.camera && !authoredFields.cameraAndLens ? unspecifiedCamera : ''].filter(Boolean).join('\n')
   const model = resolveVideoModel(request.videoEngine)
   const outputFps = effectiveOutputFrameRate(model, request.frameRate)
@@ -624,12 +624,14 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
     ? filmicMotionSemantics({ authoredText: authoredSource, captureFps: outputFps, selectedAngle: selectedShutter, motionFps: request.motionCadence, playback: authoredPlaybackTiming([authoredSource, ...shots.map(shot => shot.prompt)].join('\n')) ? { mode: 'authored', deliveryFps: outputFps } : { mode: 'normal' } }) : undefined
   const motionConflict = motion?.diagnostics.find((diagnostic) => diagnostic.severity === 'conflict')
   if (motionConflict) throw new Error(motionConflict.message)
-  const motionSignature = motion?.positive
+  const motionSignature = motion?.positive || (request.higgsfieldNative && request.motionCadence !== undefined
+    ? `Visual Motion FPS intent: ${request.motionCadence}fps, approximately ${request.motionCadence} distinct motion updates per second. Preserve provider-native encoded frame rate, normal playback speed and the authored duration. This is visual cadence intent, not a native output FPS setting.`
+    : undefined)
   const cameraSupportNegative = labeledBeats.reduce(
     (negative, { shot }) => mergeCameraSupportNegatives(negative, shot.camera, shot.prompt),
     [request.negativePrompt, authoredFields.hardAvoid].filter(Boolean).join('\n'),
   )
-  const optics = [shots.length ? labeledBeats.map(({ label, shot }) => `${label}: ${shotFov(shot.shotSize)}.`).join('\n') : '', shots.length ? 'Selected FOV values are framing metadata only, not a lens or focal-length choice.' : '', authoredFields.lensOptics, motionSignature ? `Motion signature: ${motionSignature}` : 'No lens, focal length, shutter, or optical behavior is authored; leave optics unspecified rather than invent values.'].filter(Boolean).join('\n')
+  const optics = [shots.length ? labeledBeats.map(({ label, shot }) => `${label}: ${shotFov(shot.shotSize)}.`).join('\n') : '', shots.length ? labeledBeats.map(({ label, shot }) => { const lens = selectedLensInstruction(shot.lensMm); return lens ? `${label}: ${lens}` : '' }).filter(Boolean).join('\n') : '', authoredFields.lensOptics, 'Shot size describes subject framing independently of focal length and lens projection.', motionSignature ? `Motion signature: ${motionSignature}` : !shots.some(shot => shot.lensMm !== undefined) && !authoredFields.lensOptics ? 'No lens, focal length, shutter, or optical behavior is authored; leave optics unspecified rather than invent values.' : ''].filter(Boolean).join('\n')
   const start = references.find((reference) => reference.slot === 'start')
   const startTag = request.inputRole === 'start-frame' ? request.inputTag || '@start-frame' : start ? referenceTag(start, references.indexOf(start)) : ''
   const duration = request.editControlDuration ? `${request.editControlDuration}s` : request.duration ? `${request.duration}s` : shots.length ? `${shots.reduce((total, shot) => total + Number(shot.duration || 0), 0)}s` : 'provider-selected duration'
@@ -710,7 +712,7 @@ export function productionShotSpecSections(request: GenerationRequest, providerL
     shots.forEach((shot, index) => sections.push({
       id: `cut-${index + 1}`,
       heading: labels[index],
-      text: `${shot.duration}s; ${shotFov(shot.shotSize)}; ${storyboardAction(shot, index + 1)}${index === shots.length - 1 && shot.transitionToNext === 'continue' ? `\n${STORYBOARD_OUTGOING_CONTINUATION}` : ''}`,
+      text: `${shot.duration}s; ${shotFov(shot.shotSize)}; ${selectedLensInstruction(shot.lensMm)} ${storyboardAction(shot, index + 1)}${index === shots.length - 1 && shot.transitionToNext === 'continue' ? `\n${STORYBOARD_OUTGOING_CONTINUATION}` : ''}`,
       priority: 92,
       required: true,
     }))
@@ -723,8 +725,9 @@ export function productionShotSpecSections(request: GenerationRequest, providerL
     if (shots.length) sections.push({
       id: 'camera',
       heading: 'CAMERA',
-      text: shots.map((shot, index) => `${labels[index]}: ${quantifiedCameraRecipe(shot.camera)}`).join('\n'),
+      text: shots.map((shot, index) => `${labels[index]}: ${timedCameraRecipe(shot.camera, shot.duration, shot.prompt)}`).join('\n'),
       priority: 68,
+      required: shots.some(shot => !!shot.camera && shot.camera !== 'auto'),
     })
     const hasCharacter = references.some((reference) => reference.role === 'character') || (request.connectionRules || []).some((rule) => /character/i.test(rule.label))
     const hasElement = references.some((reference) => reference.role === 'element') || (request.connectionRules || []).some((rule) => /element/i.test(rule.label))
