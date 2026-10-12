@@ -1,12 +1,14 @@
+import { referenceDescriptionLines, referenceIntroductionLine } from './assetReferenceDescriptions'
 import { assertStoryboardPhysicalCast } from './storyboardPhysicalCast'
 import { quantifiedCameraRecipe, timedCameraRecipe, shotFov, selectedLensInstruction } from './shotRecipes'
 import { semanticAuthorityCompletion } from './semanticAuthorityCompletion'
 import type { GenerationRequest, StoryboardBoundaryState, StoryboardCharacterState, StoryboardDialogueSpan, StoryboardStateAuthority } from './types'
-import { groupStoryboardSequence, storyboardTransitionConflicts, STORYBOARD_OUTGOING_CONTINUATION } from './storyboardSequence'
+import { groupStoryboardSequence, normalizedStoryboardTransition, storyboardTransitionConflicts, STORYBOARD_OUTGOING_CONTINUATION } from './storyboardSequence'
 import { storyboardDurationReadinessError } from './storyboardDurationBudget'
-import { authoredPlaybackTiming, filmicMotionSemantics } from './filmicMotion'
+import { authoredPlaybackTiming, visualMotionCadenceInstruction, filmicMotionSemantics } from './filmicMotion'
 import { storyboardTimecodes } from './storyboardTimecodes'
 import { effectiveOutputFrameRate, resolveVideoModel } from './videoModels'
+import { nativeVideoOutputFrameRate } from './videoCadenceSelection'
 import { cameraSupportConflict, cameraSupportSemantics, mergeCameraSupportNegatives } from './cameraSupportSemantics'
 import { authoredAppearanceDeltaLine, isReferenceExclusive, soleVisualAuthorityLine } from './referenceVisualAuthority'
 import { appearanceLayerRoleLine, characterBodyAuthorityLine, emittedAppearanceLayers, isTypedAppearanceLayer } from './sameBodyAuthority'
@@ -23,6 +25,17 @@ const LOCAL_SEEDANCE_COMPLETION_IDS = [
   ...SEEDANCE_PROMPT_STRUCTURE_IDS,
   ...SEEDANCE_ATTRIBUTE_BREAKDOWN_IDS.filter((id) => id !== 'SD-AB-025'),
 ] as readonly SeedanceDirectorKnowledgeId[]
+
+/** Native routes must never inherit a display-only registry fallback's capture rate. */
+function requestVideoOutputFrameRate(request: GenerationRequest): number | undefined {
+  if (request.nativeOutputFrameRate !== undefined) {
+    const fps = request.nativeOutputFrameRate
+    return typeof fps === 'number' && Number.isFinite(fps) && fps > 0 ? fps : undefined
+  }
+  const native = request.falNative || request.higgsfieldNative
+  return native ? nativeVideoOutputFrameRate(native.endpointId, native.values.fps)
+    : effectiveOutputFrameRate(resolveVideoModel(request.videoEngine), request.frameRate)
+}
 
 export interface ShotSpecSection {
   id: string
@@ -114,6 +127,7 @@ function referenceTag(reference: Reference, index: number): string {
 }
 
 function referenceScope(reference: Reference, characterOwnsWardrobe = true, nativeVideoGuidance = false): string {
+  if (reference.mediaReferenceMode) return 'Use its stated reference introduction and the timecoded action instructions to determine its exact role; inherit nothing outside that assignment.'
   if (reference.role === 'style') return 'Controls visual language, palette, texture and finish only; depicted subjects not inherited.'
   if (reference.role === 'location') return 'Controls environment, layout, perspective and lighting logic only; reference framing not inherited.'
   if (reference.role === 'character') return characterOwnsWardrobe
@@ -137,7 +151,7 @@ function ruleRole(label: string): Reference['role'] | undefined {
   return undefined
 }
 
-function activeReferenceLines(request: GenerationRequest): string[] {
+function activeReferenceLines(request: GenerationRequest, includeDescriptions = true): string[] {
   const references = request.references || []
   const boundCharacters = new Set(references.filter((reference) => reference.role === 'wardrobe' && reference.boundCharacterTag).map((reference) => reference.boundCharacterTag!))
   const lines: string[] = []
@@ -154,6 +168,10 @@ function activeReferenceLines(request: GenerationRequest): string[] {
     if (knownReferenceRoles.has(referenceRoleKey)) return
     knownReferenceRoles.add(referenceRoleKey)
     knownTags.add(tag)
+    // Selected media roles are introduced once, with edge fidelity in REFERENCE ROLES.
+    if (reference.mediaReferenceMode) return
+    const introduction = referenceIntroductionLine(reference)
+    if (introduction && ['location', 'element'].includes(reference.role)) { if (includeDescriptions) lines.push(introduction); return }
     if (isReferenceExclusive(reference)) {
       const authority = characterBodyAuthorityLine({ ...reference, tag }) || soleVisualAuthorityLine({ ...reference, tag })
       if (authority) lines.push(authority)
@@ -169,7 +187,7 @@ function activeReferenceLines(request: GenerationRequest): string[] {
         ? 'audio reference'
         : reference.role === 'style' ? 'Style authority' : reference.description
     const description = authoredDescription(sourceText) || authoredDescription(reference.view || reference.role)
-    lines.push(`${tag} — ${description}. 100% matches the reference; ${referenceScope(reference, reference.role === 'character' ? !boundCharacters.has(tag) : true, Boolean(request.higgsfieldNative))}`)
+    lines.push(`${tag} — ${description}. ${reference.fidelity === 'guide' ? 'Loose guidance within the assigned domain' : reference.fidelity === 'auto' ? 'Preserve reference intent with balanced fidelity and detail repair' : '100% matches the reference'}; ${referenceScope(reference, reference.role === 'character' ? !boundCharacters.has(tag) : true, Boolean(request.higgsfieldNative))}`)
   })
   if (request.inputTag && !knownTags.has(request.inputTag)) {
     const label = request.inputRole === 'start-frame' ? 'Starting Frame' : request.inputRole === 'source-video' ? 'Video To Extend' : 'Source Image'
@@ -183,7 +201,7 @@ function activeReferenceLines(request: GenerationRequest): string[] {
   }
   for (const rule of request.connectionRules || []) {
     const role = ruleRole(rule.label)
-    if (!role || knownTags.has(rule.tag)) continue
+    if (!role || ['storyboard', 'style'].includes(role) || knownTags.has(rule.tag)) continue
     const pseudo: Reference = { role, tag: rule.tag, slot: 'reference' }
     const roleName = role.charAt(0).toUpperCase() + role.slice(1)
     lines.push(`${rule.tag} — ${roleName} reference. 100% matches the reference; ${referenceScope(pseudo)}`)
@@ -207,7 +225,7 @@ function referenceMap(request: GenerationRequest, providerLegend?: string): stri
     seen.add(request.inputTag)
   }
   for (const rule of request.connectionRules || []) {
-    if (!ruleRole(rule.label) || seen.has(rule.tag)) continue
+    if (!ruleRole(rule.label) || ruleRole(rule.label) === 'storyboard' || seen.has(rule.tag)) continue
     lines.push(`${rule.tag} = ${authoredDescription(rule.label)} authority`)
     seen.add(rule.tag)
   }
@@ -227,7 +245,7 @@ function shotsFor(request: GenerationRequest): NonNullable<GenerationRequest['st
       }
     })
   const durationError = storyboardDurationReadinessError(shots)
-  if (durationError) throw new Error(durationError)
+  if (durationError && !request.promptPreviewOnly) throw new Error(durationError)
   return shots
 }
 
@@ -407,11 +425,12 @@ export function positiveLocks(request: GenerationRequest): string {
     lines.push(`${tag}: Studio sheet background and layout NOT inherited.`)
   }
   const fidelityTags = new Set<string>()
-  references.filter((reference) => reference.role !== 'character').forEach((reference, index) => fidelityTags.add(referenceTag(reference, index)))
-  for (const rule of request.connectionRules || []) if (ruleRole(rule.label) && !characters.has(rule.tag)) fidelityTags.add(rule.tag)
+  references.filter((reference) => reference.role !== 'character' && reference.role !== 'storyboard' && !reference.mediaReferenceMode && reference.fidelity !== 'guide' && reference.fidelity !== 'auto').forEach((reference, index) => fidelityTags.add(referenceTag(reference, index)))
+  for (const rule of request.connectionRules || []) if (ruleRole(rule.label) && ruleRole(rule.label) !== 'storyboard' && !characters.has(rule.tag)) fidelityTags.add(rule.tag)
   for (const tag of fidelityTags) lines.push(`${tag} matches the reference in every appearance.`)
-  if (shotsFor(request).length > 1) lines.push('Same lighting, same wardrobe across all cuts.')
-  lines.push('Cuts only at the specified points.')
+  const shots = shotsFor(request), sequence = groupStoryboardSequence(shots)
+  if (sequence.hardCutCount > 0) lines.push('Same lighting, same wardrobe across all cuts.')
+  lines.push(shots.length && !sequence.hardCutCount ? 'Continue through the authored intervals in the same unbroken shot.' : 'Cuts only at the specified points.')
   if (request.shotLocks?.trim()) lines.push(request.shotLocks.trim())
   return lines.join('\n')
 }
@@ -527,18 +546,24 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
   const authoredSource = request.authoredPrompt ?? (shots.length ? '' : request.prompt || '')
   const authored = compact(authoredSource)
   const authoredFields = seedanceAuthoredFields(authoredSource)
-  const active = activeReferenceLines(request).filter((line) => !providerLegend || ![...semanticTags].some((tag) => line.startsWith(`${tag} —`)))
+  const introductionLines = referenceDescriptionLines(request)
+  const active = activeReferenceLines(request, false).filter((line) => !providerLegend || ![...semanticTags].some((tag) => line.startsWith(`${tag} —`)))
+  const describedVisualAuthority = new Set(references.filter(reference => ['location', 'element'].includes(reference.role) && referenceIntroductionLine(reference)).map(soleVisualAuthorityLine).filter(Boolean))
   const authority = [...new Set([
     providerLegend?.trim(),
     ...active,
-    ...completion.authorityLines,
+    ...completion.authorityLines.filter(line => !describedVisualAuthority.has(line)),
     authoredFields.referenceAuthority ? `Authored authority: ${authoredFields.referenceAuthority}` : '',
   ].filter((line): line is string => Boolean(line)))].join('\n') || (characters.length
     ? `Use ${characters.join(', ')} as stable Character identities. Visible presence and body or appearance authority follow each authored shot below; a reference is not an additional cast member.`
-    : 'No external reference authority is connected.')
+    : introductionLines.length
+      ? 'Apply only the roles explicitly assigned in REFERENCE INTRODUCTIONS. Do not transfer unassigned identity, appearance, movement or audio from those references.'
+      : references.length
+        ? 'Connected media have no completed reference-authority assignment. Do not infer their identity, appearance, movement or audio roles.'
+        : 'No external reference authority is connected.')
   const generalDirection = compact(authoredFields.general.replace(/@[A-Za-z0-9][\w.-]*/g, '').replace(/[,&;+]/g, ''))
   const authoredAction = authoredFields.timeline || (generalDirection ? authoredFields.general : '')
-  const noAction = 'No action or Character performance is inferred from connected references. Performance follows only the authored Video prompt or Storyboard; otherwise it remains unspecified.'
+  const noAction = 'No action or Character performance is inferred from connected references. Performance follows only the written prompt and timecoded action instructions; otherwise it remains unspecified.'
   const countWords = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE']
   const countLabel = (value: number) => countWords[value] || String(value)
   const timecodes = storyboardTimecodes(shots.flatMap(shot => [shot.duration, ...(shot.incomingBridge ? [shot.incomingBridge.reservedSeconds, shot.incomingBridge.reactionReserveSeconds] : [])]))
@@ -594,9 +619,12 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
   const timeline = shots.length
     ? [continuousReferences ? `REFERENCES · ${continuousReferences}` : '', authoredAction ? `Overall action: ${authoredAction}` : '', ...timedShots].filter(Boolean).join('\n')
     : [completion.pointOfUseLine, authoredAction || noAction].filter(Boolean).join('\n')
-  const referenceCamera = [...new Map(references.filter(reference => reference.authority === 'motion-camera' && reference.mediaType === 'video')
+  const editableVideoAssignments = references.some(reference => reference.mediaType === 'video' && reference.mediaReferenceMode)
+  const referenceCamera = [...new Map(references.filter(reference => reference.authority === 'motion-camera' && reference.mediaType === 'video' && !reference.mediaReferenceMode)
     .map((reference,index) => [reference.path || reference.url || reference.tag || String(index), reference.tag || reference.name || `connected motion reference ${index + 1}`])).values()]
-  const unspecifiedCamera = referenceCamera.length > 1
+  const unspecifiedCamera = editableVideoAssignments
+    ? 'Camera behavior follows authored camera instructions and camera assignments explicitly stated in REFERENCE INTRODUCTIONS or REFERENCE AUTHORITY. Where no camera behavior is assigned, leave it unspecified; a connected video or selected mode alone supplies no camera authority.'
+    : referenceCamera.length > 1
     ? 'Multiple motion/camera references are connected. Camera behavior follows the authored reference assignment for each shot; their paths are not combined or averaged. Unassigned reference camera behavior stays unspecified.'
     : referenceCamera.length
     ? `Where no camera behavior is authored, follow ${[...new Set(referenceCamera)].join(', ')} for camera geometry, path and speed curve. Preserve authored camera instructions; do not invent unobserved measurements.`
@@ -617,21 +645,29 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
             : ''
     return `${label}: ${timedCameraRecipe(shot.camera, shot.duration, shot.prompt)}${anchorRule}`
   }).join('\n') : '', authoredFields.camera, authoredFields.cameraAndLens ? `Authored camera and lens: ${authoredFields.cameraAndLens}` : '', !shots.length && !authoredFields.camera && !authoredFields.cameraAndLens ? unspecifiedCamera : ''].filter(Boolean).join('\n')
-  const model = resolveVideoModel(request.videoEngine)
-  const outputFps = effectiveOutputFrameRate(model, request.frameRate)
+  const outputFps = requestVideoOutputFrameRate(request)
   const selectedShutter = typeof request.shutterAngle === 'number' ? request.shutterAngle : 180
-  const motion = !request.higgsfieldNative || request.frameRate !== undefined || request.shutterAngle !== undefined
+  const motion = outputFps !== undefined && (!request.higgsfieldNative || request.frameRate !== undefined || request.shutterAngle !== undefined)
     ? filmicMotionSemantics({ authoredText: authoredSource, captureFps: outputFps, selectedAngle: selectedShutter, motionFps: request.motionCadence, playback: authoredPlaybackTiming([authoredSource, ...shots.map(shot => shot.prompt)].join('\n')) ? { mode: 'authored', deliveryFps: outputFps } : { mode: 'normal' } }) : undefined
   const motionConflict = motion?.diagnostics.find((diagnostic) => diagnostic.severity === 'conflict')
   if (motionConflict) throw new Error(motionConflict.message)
-  const motionSignature = motion?.positive || (request.higgsfieldNative && request.motionCadence !== undefined
-    ? `Visual Motion FPS intent: ${request.motionCadence}fps, approximately ${request.motionCadence} distinct motion updates per second. Preserve provider-native encoded frame rate, normal playback speed and the authored duration. This is visual cadence intent, not a native output FPS setting.`
+  const motionSignature = motion?.positive || (request.motionCadence !== undefined
+    ? visualMotionCadenceInstruction(request.motionCadence)
     : undefined)
   const cameraSupportNegative = labeledBeats.reduce(
     (negative, { shot }) => mergeCameraSupportNegatives(negative, shot.camera, shot.prompt),
     [request.negativePrompt, authoredFields.hardAvoid].filter(Boolean).join('\n'),
   )
-  const optics = [shots.length ? labeledBeats.map(({ label, shot }) => `${label}: ${shotFov(shot.shotSize)}.`).join('\n') : '', shots.length ? labeledBeats.map(({ label, shot }) => { const lens = selectedLensInstruction(shot.lensMm); return lens ? `${label}: ${lens}` : '' }).filter(Boolean).join('\n') : '', authoredFields.lensOptics, 'Shot size describes subject framing independently of focal length and lens projection.', motionSignature ? `Motion signature: ${motionSignature}` : !shots.some(shot => shot.lensMm !== undefined) && !authoredFields.lensOptics ? 'No lens, focal length, shutter, or optical behavior is authored; leave optics unspecified rather than invent values.' : ''].filter(Boolean).join('\n')
+  // Repeated controls share prose, while every exact shot/beat remains explicitly in scope.
+  const scopedOptics = (instruction: (shot: typeof labeledBeats[number]['shot']) => string | undefined) => {
+    const scopes = new Map<string, string[]>()
+    for (const { label, shot } of labeledBeats) {
+      const text = instruction(shot)
+      if (text) scopes.set(text, [...(scopes.get(text) || []), label])
+    }
+    return [...scopes].map(([text, labels]) => `${labels.join(', ')}: ${text}`).join('\n')
+  }
+  const optics = [scopedOptics(shot => `${shotFov(shot.shotSize)}.`), scopedOptics(shot => selectedLensInstruction(shot.lensMm)), authoredFields.lensOptics, 'Shot size describes subject framing independently of focal length and lens projection.', motionSignature ? `Motion signature: ${motionSignature}` : !shots.some(shot => shot.lensMm !== undefined) && !authoredFields.lensOptics ? 'No lens, focal length, shutter, or optical behavior is authored; leave optics unspecified rather than invent values.' : ''].filter(Boolean).join('\n')
   const start = references.find((reference) => reference.slot === 'start')
   const startTag = request.inputRole === 'start-frame' ? request.inputTag || '@start-frame' : start ? referenceTag(start, references.indexOf(start)) : ''
   const duration = request.editControlDuration ? `${request.editControlDuration}s` : request.duration ? `${request.duration}s` : shots.length ? `${shots.reduce((total, shot) => total + Number(shot.duration || 0), 0)}s` : 'provider-selected duration'
@@ -648,6 +684,7 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
   return [
     { id: 'seedance-assistant-task', heading: 'ASSISTANT TASK', text: authoredFields.assistantTask, priority: 120, required: true },
     { id: 'seedance-edit-control', heading: 'EDIT CONTROL', text: authoredFields.editControl, priority: 119, required: true },
+    { id: 'seedance-reference-introductions', heading: 'REFERENCE INTRODUCTIONS', text: introductionLines.join('\n'), priority: 118, required: true },
     { id: 'seedance-reference-authority', heading: 'REFERENCE AUTHORITY', text: authority, priority: 118, required: true },
     { id: 'seedance-variable-registry', heading: 'EDITABLE VARIABLE REGISTRY', text: authoredFields.variableRegistry, priority: 95, required: Boolean(authoredFields.variableRegistry) },
     { id: 'seedance-subject-performance', heading: 'SUBJECT AND PERFORMANCE', text: characterPerformance, priority: 112, required: characters.length > 0 || Boolean(authoredFields.subjectPerformance) },
@@ -661,8 +698,8 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
     { id: 'seedance-identity', heading: 'IDENTITY AND ANATOMY CONTINUITY', text: identity, priority: 114, required: characters.length > 0 || Boolean(authoredFields.identityContinuity) },
     { id: 'seedance-wardrobe', heading: 'WARDROBE, ACCESSORY, AND PROP CONTINUITY', text: wardrobe, priority: 91, required: Boolean(authoredFields.wardrobeContinuity) },
     { id: 'seedance-scene', heading: 'SCENE, VEHICLE, AND ENVIRONMENT CONTINUITY', text: sceneContinuity, priority: 90, required: Boolean(authoredFields.sceneContinuity || authoredFields.stateLedger || request.shotLocks?.trim()) },
-    { id: 'seedance-camera-gate', heading: 'CAMERA, FRAMING, AND OPTICAL HARD GATE', text: [referenceCamera.length > 1 ? 'Execute authored camera instructions and shot-specific reference assignments. Keep reference camera paths distinct; unassigned paths are not combined or averaged. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : referenceCamera.length ? 'Execute authored camera instructions; otherwise use the connected motion/camera reference for camera behavior. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : 'Execute only an authored camera path and framing; when none is authored, do not invent a move or lens change. Preserve coherent geometry and physically valid parallax.', authoredFields.cameraGate].filter(Boolean).join('\n'), priority: 111, required: true },
-    { id: 'seedance-final-gate', heading: 'FINAL-FRAME AND OUTPUT HARD GATE', text: ['Hard cuts occur only at Storyboard boundaries selected Cut. Continue boundaries remain one uninterrupted take whose prior camera endpoint is the next beat’s starting state. Preserve shot order, screen direction, identity, geometry, causal action outcome, timing relationships and accumulated state. Keep the authored final composition without visible prompt text.', shots.at(-1)?.transitionToNext === 'continue' ? 'The final Continue is an outgoing hook only; retain its endpoint and performance state without inventing a following beat or forcing an unauthored stop.' : 'End on a distinct, stable final composition.', authoredFields.finalAcceptance].filter(Boolean).join('\n'), priority: 113, required: true },
+    { id: 'seedance-camera-gate', heading: 'CAMERA, FRAMING, AND OPTICAL HARD GATE', text: [editableVideoAssignments ? 'Execute authored camera instructions and explicitly assigned reference-camera behavior. Do not infer camera authority from a connected video or mode alone. Keep assigned reference paths distinct; unassigned paths are not combined or averaged. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : referenceCamera.length > 1 ? 'Execute authored camera instructions and shot-specific reference assignments. Keep reference camera paths distinct; unassigned paths are not combined or averaged. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : referenceCamera.length ? 'Execute authored camera instructions; otherwise use the connected motion/camera reference for camera behavior. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : 'Execute only an authored camera path and framing; when none is authored, do not invent a move or lens change. Preserve coherent geometry and physically valid parallax.', authoredFields.cameraGate].filter(Boolean).join('\n'), priority: 111, required: true },
+    { id: 'seedance-final-gate', heading: 'FINAL-FRAME AND OUTPUT HARD GATE', text: ['Hard cuts occur only where explicitly marked at the authored timecodes. All other timed action intervals continue within the same uninterrupted take, carrying the prior camera endpoint into the next interval’s starting state. Preserve shot order, screen direction, identity, geometry, causal action outcome, timing relationships and accumulated state. Keep the authored final composition without visible prompt text.', shots.at(-1)?.transitionToNext === 'continue' ? 'The final interval continues beyond the clip boundary; retain its endpoint and performance state without inventing a following action or forcing an unauthored stop.' : 'End on a distinct, stable final composition.', authoredFields.finalAcceptance].filter(Boolean).join('\n'), priority: 113, required: true },
     { id: 'seedance-negative-prompt', heading: 'NEGATIVE PROMPT', text: ['identity blending, face replacement, anatomy or geometry morphing, wardrobe or prop redesign, floating contact, rubbery motion, invented text, logos, subtitles, watermarks, contact sheets, storyboard borders, labels, continuity resets', propScaleNegativeTerms(request).join(', '), motion?.negative, cameraSupportNegative].filter(Boolean).join('\n'), priority: 115, required: true },
   ].filter((section) => section.text.trim()).map((section) => ({
     ...section,
@@ -691,7 +728,7 @@ export function productionShotSpecSections(request: GenerationRequest, providerL
   const sections: ShotSpecSection[] = []
   // An explicitly empty authored source must not re-import the graph's already
   // compiled storyboard. Keep authored layout and dialogue punctuation intact.
-  const scene = (request.authoredPrompt ?? request.prompt ?? '').trim()
+  const scene = (request.authoredPrompt ?? (shots.length ? '' : request.prompt ?? '')).trim()
   if (scene) sections.push({ id: 'scene-context', heading: 'SCENE CONTEXT', text: scene, priority: 100, required: true })
   const active = activeReferenceLines(request)
   if (active.length) sections.push({ id: 'active-references', heading: 'ACTIVE REFERENCES', text: active.join('\n'), priority: 95, required: true })
@@ -709,13 +746,20 @@ export function productionShotSpecSections(request: GenerationRequest, providerL
       sections.push({ id: 'first-frame', heading: 'FIRST FRAME', text: `${tag} is the exact opening composition${description ? `: ${description}` : ''}.`, priority: 85 })
     }
     if (shots.length) sections.push({ id: 'format-mode', heading: 'FORMAT MODE', text: sequence.hardCutCount ? 'authored shot groups separated by hard cuts' : 'one continuous shot', priority: 88 })
-    shots.forEach((shot, index) => sections.push({
-      id: `cut-${index + 1}`,
-      heading: labels[index],
-      text: `${shot.duration}s; ${shotFov(shot.shotSize)}; ${selectedLensInstruction(shot.lensMm)} ${storyboardAction(shot, index + 1)}${index === shots.length - 1 && shot.transitionToNext === 'continue' ? `\n${STORYBOARD_OUTGOING_CONTINUATION}` : ''}`,
-      priority: 92,
-      required: true,
-    }))
+    const timecodes = storyboardTimecodes(shots.map(shot => shot.duration))
+    let elapsed = 0
+    shots.forEach((shot, index) => {
+      const start = elapsed
+      elapsed = timecodes.sum(elapsed, shot.duration)
+      const boundary = normalizedStoryboardTransition(shot.transitionToNext, index, shots.length) === 'hard-cut' && !/\bHARD\s+CUT\b/i.test(shot.prompt) ? '\nHARD CUT.' : ''
+      sections.push({
+        id: `cut-${index + 1}`,
+        heading: labels[index],
+        text: `${timecodes.format(start)}–${timecodes.format(elapsed)}s — ${shotFov(shot.shotSize)}; ${selectedLensInstruction(shot.lensMm)} ${storyboardAction(shot, index + 1)}${boundary}${index === shots.length - 1 && shot.transitionToNext === 'continue' ? `\n${STORYBOARD_OUTGOING_CONTINUATION}` : ''}`,
+        priority: 92,
+        required: true,
+      })
+    })
     if (shots.length) sections.push({
       id: 'optics',
       heading: 'OPTICS',
@@ -768,19 +812,19 @@ export function productionShotSpecSections(request: GenerationRequest, providerL
   sections.push({ id: 'positive-locks', heading: 'POSITIVE LOCKS', text: positiveLocks(request), priority: 110, required: true })
 
   if (request.kind === 'video-generator') {
-    const model = resolveVideoModel(request.videoEngine)
-    const captureFps = effectiveOutputFrameRate(model, request.frameRate)
+    const captureFps = requestVideoOutputFrameRate(request)
     const selectedShutter = typeof request.shutterAngle === 'number' ? request.shutterAngle : 180
     const authoredSource = request.authoredPrompt ?? request.prompt ?? ''
-    const motion = filmicMotionSemantics({ authoredText: authoredSource, captureFps, selectedAngle: selectedShutter, motionFps: request.motionCadence, playback: authoredPlaybackTiming([authoredSource, ...shots.map(shot => shot.prompt)].join('\n')) ? { mode: 'authored', deliveryFps: captureFps } : { mode: 'normal' } })
-    const conflict = motion.diagnostics.find((diagnostic) => diagnostic.severity === 'conflict')
+    const motion = captureFps === undefined ? undefined : filmicMotionSemantics({ authoredText: authoredSource, captureFps, selectedAngle: selectedShutter, motionFps: request.motionCadence, playback: authoredPlaybackTiming([authoredSource, ...shots.map(shot => shot.prompt)].join('\n')) ? { mode: 'authored', deliveryFps: captureFps } : { mode: 'normal' } })
+    const conflict = motion?.diagnostics.find((diagnostic) => diagnostic.severity === 'conflict')
     if (conflict) throw new Error(conflict.message)
-    sections.push({ id: 'filmic-motion', heading: 'FILMIC MOTION RENDERING', text: motion.positive.replace(/^FILMIC MOTION RENDERING\n+/, ''), priority: 69 })
+    const motionText = motion?.positive.replace(/^FILMIC MOTION RENDERING\n+/, '') || (request.motionCadence !== undefined ? visualMotionCadenceInstruction(request.motionCadence) : '')
+    if (motionText) sections.push({ id: 'filmic-motion', heading: 'FILMIC MOTION RENDERING', text: motionText, priority: 69 })
     const cameraSupportNegative = (request.storyboardShots || []).reduce(
       (negative, shot) => mergeCameraSupportNegatives(negative, shot.camera, shot.prompt),
       request.negativePrompt || '',
     )
-    const finalNegative = [motion.negative, cameraSupportNegative].filter(Boolean).join('\n')
+    const finalNegative = [motion?.negative, cameraSupportNegative].filter(Boolean).join('\n')
     if (finalNegative) sections.push({ id: 'filmic-motion-negative', heading: 'NEGATIVE PROMPT', text: finalNegative, priority: 69 })
   }
 

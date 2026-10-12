@@ -106,3 +106,18 @@ describe('node input port contracts', () => {
     expect(nodeInputPorts({ kind: 'music-generator' })).toEqual([])
   })
 })
+
+
+describe('preserved unavailable input labels', () => {
+  it.each(['fal-port', 'fal-binding', 'higgsfield-port'])('decorates %s exactly once across repeated model switches without rewriting saved state', scenario => {
+    const label = 'Unavailable · Unavailable · Image Urls'
+    const state = { endpointId: 'fictional/unavailable', label: 'Saved model', flow: 'video' as const, values: {}, media: [], retiredPorts: [{ id: 'old-image-in', label, signal: 'image' as const }] }
+    const data: import('./types').StudioNodeData = scenario === 'higgsfield-port'
+      ? { kind: 'video-generator', title: 'Video Generator', higgsfieldNative: { ...state, contractRevision: '' } }
+      : { kind: 'video-generator', title: 'Video Generator', falNative: scenario === 'fal-binding' ? { ...state, retiredPorts: [], media: [{ key: 'old_image', portId: 'old-image-in', label, type: 'image', role: 'reference-image', multiple: true, required: false, retired: true }] } : state }
+    const saved = structuredClone(data)
+    const port = nodeInputPorts(data).find(port => port.id === 'old-image-in')
+    expect(port).toMatchObject({ label: 'Unavailable · Image Urls', maxConnections: 0, signal: 'image' })
+    expect(data).toEqual(saved)
+  })
+})

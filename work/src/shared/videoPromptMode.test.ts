@@ -2,13 +2,55 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { Edge } from '@xyflow/react'
 import type { StudioNode } from './types'
-import { activeVideoPromptMode, migrateVideoUserSeed, nextVideoPromptRovingMode, resetManualPrompt, switchVideoPromptMode, videoPromptCompileFingerprint, videoPromptRovingTabIndex } from './videoPromptMode'
+import { activeVideoPromptMode, migrateVideoUserSeed, nextVideoPromptRovingMode, resetManualPrompt, switchVideoPromptMode, videoPromptCompileFingerprint, videoPromptRovingTabIndex, videoPromptInputsConnected } from './videoPromptMode'
+import { buildGenerationPromptPreviewRequest } from './workflowResolver'
+import { visibleProviderPromptBody } from './referenceInstructions'
 
 const video = (data: Partial<StudioNode['data']> = {}): StudioNode => ({ id: 'video', type: 'studio', position: { x: 10, y: 20 }, selected: true, data: { kind: 'video-generator', title: 'Video', prompt: 'legacy manual', ...data } })
 const storyboard = (prompt = 'Beat action.'): StudioNode => ({ id: 'board', type: 'storyboard', position: { x: 0, y: 0 }, data: { kind: 'storyboard', title: 'Board', storyboardMode: 'single', storyboardDuration: 4, storyboardPanels: [{ id: 'p1', prompt, duration: 4, shotSize: 'wide', camera: 'static' }] } })
 const edge: Edge = { id: 'story-edge', source: 'board', target: 'video', targetHandle: 'storyboard-in', data: { inputFidelity: 'auto' } }
 
 describe('Video Auto/Manual prompt mode', () => {
+  it('offers Locked for declared connected media and text without changing legacy User ownership', () => {
+    const target = video({ videoEngine: 'bytedance/seedance-2.5/reference-to-video', prompt: undefined })
+    const image: StudioNode = { id: 'cat', type: 'studio', position: { x: 0, y: 0 }, data: { kind: 'upload', title: 'Fictional Cat', referenceTag: '@cat', outputType: 'image', assetPath: '/fixture/cat.png' } }
+    const audio: StudioNode = { ...image, id: 'speech', data: { kind: 'upload', title: 'Fictional Speech', outputType: 'audio', assetPath: '/fixture/speech.mp3' } }
+    const text: StudioNode = { ...image, id: 'text', data: { kind: 'prompt', title: 'Prompt', prompt: 'A cat speaks.' } }
+    for (const [source, handle] of [[image, 'reference-in'], [audio, 'audio-reference-in'], [text, 'text-in']] as const) {
+      const connection = { id: 'input', source: source.id, target: target.id, targetHandle: handle }
+      expect(videoPromptInputsConnected(target, [target, source], [connection])).toBe(true)
+      expect(videoPromptInputsConnected(target, [target], [connection])).toBe(false)
+      expect(videoPromptInputsConnected(target, [target, source], [{ ...connection, targetHandle: 'undeclared-in' }])).toBe(false)
+      expect(videoPromptInputsConnected(target, [target, source], [{ ...connection, target: 'another-video' }])).toBe(false)
+    }
+    expect(activeVideoPromptMode(target.data, false)).toBe('manual')
+    expect(videoPromptInputsConnected(target, [target], [])).toBe(false)
+  })
+
+  it.each([false, true])('compiles media descriptions in Locked with native=%s and leaves an independent User draft unchanged', native => {
+    const target = video({ prompt: undefined, promptMode: 'manual', manualPromptDraft: '  My unchanged User draft.\r\n', manualPromptSeeded: true, videoEngine: 'bytedance/seedance-2.5/reference-to-video', motionCadenceMode: 'native', duration: 4 })
+    const image: StudioNode = { id: 'cat', type: 'studio', position: { x: 0, y: 0 }, data: { kind: 'upload', title: 'Fictional Cat', referenceTag: '@cat', outputType: 'image', assetPath: '/fixture/cat.png', referenceDescription: '@cat is the sole visible cat and appearance reference.', referenceDescriptionMode: 'authored' } }
+    const audio: StudioNode = { ...image, id: 'speech', data: { kind: 'upload', title: 'Fictional Speech', referenceTag: '@speech', outputType: 'audio', assetPath: '/fixture/speech.mp3', mediaReferenceMode: 'lip-sync', referenceDescription: '@speech supplies the original speech for @cat. Preserve the recorded words, voice and pauses; synchronize the visible mouth to its syllables.', referenceDescriptionMode: 'authored' } }
+    if (native) target.data.falNative = { endpointId: 'bytedance/seedance-2.5/reference-to-video', label: 'Seedance References', flow: 'video', fingerprint: 'a'.repeat(64), promptField: 'prompt', values: { duration: '4', aspect_ratio: '16:9', resolution: '480p', draft: true, generate_audio: true }, timing: { kind: 'seconds', field: 'duration', source: 'provider-declaration' }, media: [
+      { key: 'image_urls', portId: 'reference-in', label: 'Images', type: 'image', role: 'reference-image', multiple: true, required: false, maximum: 30 },
+      { key: 'audio_urls', portId: 'audio-reference-in', label: 'Audio', type: 'audio', role: 'reference-audio', multiple: true, required: false, maximum: 10 },
+    ] }
+    const inputs = [image, audio]
+    const connections: Edge[] = [{ id: 'image', source: image.id, target: target.id, sourceHandle: 'media-out', targetHandle: 'reference-in' }, { id: 'audio', source: audio.id, target: target.id, sourceHandle: 'media-out', targetHandle: 'audio-reference-in' }]
+    const preview = () => {
+      expect(videoPromptInputsConnected(target, [target, ...inputs], connections)).toBe(true)
+      const locked = { ...target, data: { ...target.data, promptMode: 'auto' as const } }
+      return visibleProviderPromptBody(buildGenerationPromptPreviewRequest(locked, [locked, ...inputs], connections))
+    }
+    expect(preview()).toContain(image.data.referenceDescription)
+    expect(preview()).toContain(audio.data.referenceDescription)
+    audio.data.referenceDescription = '@speech supplies the original speech for @cat with a quiet delivery. Preserve its words and timing.'
+    expect(preview()).toContain(audio.data.referenceDescription)
+    expect(preview()).not.toContain('synchronize the visible mouth')
+    expect(target.data.manualPromptDraft).toBe('  My unchanged User draft.\r\n')
+    expect(visibleProviderPromptBody(buildGenerationPromptPreviewRequest(target, [target, ...inputs], connections))).toBe(target.data.manualPromptDraft)
+  })
+
   it('defaults connected legacy to Auto and unconnected legacy to Manual while preserving explicit unconnected Auto', () => {
     expect(activeVideoPromptMode(video().data, true)).toBe('auto')
     expect(activeVideoPromptMode(video().data, false)).toBe('manual')
@@ -88,6 +130,7 @@ describe('Video Auto/Manual prompt mode', () => {
 
   it('fingerprints authoritative compiler inputs and ignores layout/runtime presentation', () => {
     const base = videoPromptCompileFingerprint(video(), [storyboard(), video()], [edge])
+    expect(videoPromptCompileFingerprint(video({motionCadenceMode:'native'}), [storyboard(), video({motionCadenceMode:'native'})], [edge])).not.toBe(base)
     expect(videoPromptCompileFingerprint(video({ runState: 'running', progress: 'Generating' }), [{ ...storyboard(), position: { x: 999, y: 999 }, selected: true }, video()], [edge])).toBe(base)
     expect(videoPromptCompileFingerprint(video(), [storyboard('Changed action.'), video()], [edge])).not.toBe(base)
     expect(videoPromptCompileFingerprint(video(), [storyboard(), video()], [{ ...edge, data: { inputFidelity: 'lock' } }])).not.toBe(base)
@@ -96,5 +139,6 @@ describe('Video Auto/Manual prompt mode', () => {
     const mediaBase = videoPromptCompileFingerprint(video(), [video(), media], [mediaEdge])
     expect(videoPromptCompileFingerprint(video(), [video(), { ...media, data: { ...media.data, generatedResults: [{ path: '/b.png', url: 'b', type: 'image', modelId: 'm', createdAt: 'v2' }] } }], [mediaEdge])).not.toBe(mediaBase)
     expect(videoPromptCompileFingerprint(video(), [video(), { ...media, data: { ...media.data, progress: 'noise', runState: 'running' } }], [mediaEdge])).toBe(mediaBase)
+    expect(videoPromptCompileFingerprint(video(), [video(), { ...media, data: { ...media.data, referenceDescription: 'New reference role.' } }], [mediaEdge])).not.toBe(mediaBase)
   })
 })

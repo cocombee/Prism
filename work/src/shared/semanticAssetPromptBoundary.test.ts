@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StudioNodeData } from './types'
-import { localAssetGenerationPrompt, reusableAssetHydrationPatch, semanticAssetAuthorityText } from './semanticAssetPromptBoundary'
+import { localAssetGenerationPrompt, mediaAssetDescriptionPatch, reusableAssetHydrationPatch, semanticAssetAuthorityText } from './semanticAssetPromptBoundary'
 
 const sentinel = 'ASSET_GENERATION_ONLY_SENTINEL'
 const asset = (patch: Record<string, unknown> = {}) => ({
@@ -13,6 +13,12 @@ function data(kind: StudioNodeData['kind'], patch: Partial<StudioNodeData> = {})
 }
 
 describe('reusable asset generation prompt ownership', () => {
+  it('restores ordinary dropped media descriptions without inventing generation controls or borrowing creation history', () => {
+    const patch = mediaAssetDescriptionPatch(asset({ referenceDescription: '@door is Door A closed.', referenceDescriptionMode: 'authored' }))
+    expect(patch).toEqual({ referenceDescription: '@door is Door A closed.', referenceDescriptionMode: 'authored' })
+    expect(patch).not.toHaveProperty('prompt')
+    expect(patch).not.toHaveProperty('assetGenerationPrompt')
+  })
   it('keeps the local generation instruction available for all reusable kinds', () => {
     for (const kind of ['character', 'wardrobe', 'element', 'location', 'style-reference'] as const) {
       expect(localAssetGenerationPrompt(data(kind)), kind).toBe(sentinel)

@@ -1,4 +1,6 @@
+import { isLockedArtworkReference } from './inputRules'
 import { effectiveVideoEndpoint, hasExactAuthoredProviderBody, providerPromptOwnershipErrors } from './providerPromptOwnership'
+import { completedReferenceAuthorityRequest, referenceDescriptionLines } from './assetReferenceDescriptions'
 import { seedanceFinalSectionErrors } from './seedanceFinalSection'
 import { seedancePromptIntegrityFailures, SeedancePromptIntegrityError } from './seedancePromptIntegrity'
 import { completeStructuredSeedanceMaster, structuredSeedanceCoverage } from './seedanceAuthoredMaster'
@@ -25,7 +27,7 @@ import { assertKlingNativeStoryboard, groupedKlingStoryboard } from './klingNati
 type Reference = NonNullable<GenerationRequest['references']>[number]
 
 export type PromptFamily = 'generic' | 'seedance' | 'kling' | 'veo' | 'wan'
-export type PromptBlockId = 'authored' | 'style' | 'reference-legend' | 'authority' | 'reference-roles' | 'direction' | 'gates' | `shot-spec-${string}`
+export type PromptBlockId = 'authored' | 'style' | 'reference-legend' | 'authority' | 'reference-roles' | 'reference-introductions' | 'direction' | 'gates' | `shot-spec-${string}`
 
 export interface PromptBlock {
   id: PromptBlockId
@@ -94,7 +96,7 @@ function safelyDeduplicateOptionalBlock(block: PromptBlock): PromptBlock {
   return { ...block, text: lines.join('\n') }
 }
 
-export function referenceRoleInstructions(references: NonNullable<GenerationRequest['references']>): string {
+export function referenceRoleInstructions(references: NonNullable<GenerationRequest['references']>, includeDescriptions = true): string {
   const characterReferences = references.filter((reference) => reference.role === 'character')
   const characterGroups = new Map<string, typeof characterReferences>()
   for (const reference of characterReferences) {
@@ -122,6 +124,8 @@ export function referenceRoleInstructions(references: NonNullable<GenerationRequ
     if (reference.slot === 'end') return `${label} is the Ending Frame authority. The generated scene must conclude at this exact visual state, composition, subject placement, camera viewpoint, and action result. Build a coherent transition into it; do not treat it as a loose appearance reference.`
     if (reference.slot === 'start') return `${label} is the Starting Frame authority. The generated scene must begin at this exact visual state, composition, subject placement, camera viewpoint, and action state before motion develops.`
     if (reference.role === 'storyboard' || reference.authority === 'storyboard-map') return `${label} is the Storyboard Map authority. Read its panels in the authored order as an editorial, continuity, composition, and shot-design map—not as one literal frame. Each panel interior defines one separate full-screen shot. Reconstruct clean scene detail from the panel interior; never render the storyboard sheet, borders, gutters, panel numbers, timecodes, captions, or labels. Preserve the intended shot order, subject direction, causal state changes, motivated transitions, and distinct final composition.`
+    if (reference.mediaReferenceMode) return `${label} is a supplied ${reference.mediaType || 'media'} reference. Its stated reference introduction and authored actions define its role. Apply only that authored assignment; other references retain their own assigned domains.`
+    if (reference.fidelity === 'guide') return `${label} provides loose ${reference.authority === 'motion-camera' ? 'motion and camera' : reference.authority === 'audio-timing' ? 'sound and timing' : 'visual'} guidance within its assigned role; interpret that scope without inheriting unrelated identity, appearance or audio.`
     if (reference.authority === 'motion-camera') return `${label} is the Motion and Camera authority only. Preserve its camera geometry, physical path, speed curve, stabilization, performance timing, motion cadence, and temporal rhythm. Do not copy subject identity, wardrobe, location, material, color, or general appearance unless the written prompt explicitly assigns that role.`
     if (reference.authority === 'audio-timing') return `${label} is the Sound and Timing authority only. Preserve its speech, sound event, rhythm, pacing, and synchronization cues. Never derive visual identity, appearance, camera, wardrobe, object design, or location from this audio.`
     if (isTypedAppearanceLayer(reference)) return `${label} is the ${reference.appearanceScope || 'assigned appearance'} authority for ${reference.boundCharacterTag || 'its explicitly assigned character'} only. Preserve the exact selected layer in its assigned scope; never derive another person, separate body, or unassigned appearance from it.`
@@ -131,7 +135,8 @@ export function referenceRoleInstructions(references: NonNullable<GenerationRequ
     if (reference.role === 'style') return `${label} is the style authority; apply its visual language, palette, texture, and finish without copying its depicted subjects.`
     return `${label} is an ordered ${reference.mediaType || 'visual'} reference; preserve its sequence position and assigned ${reference.slot || 'reference'} role.`
   })
-  return [...characterInstructions, ...otherInstructions].join('\n')
+  const descriptions = includeDescriptions ? referenceDescriptionLines({ nodeId: 'reference-roles', kind: 'video-generator', references }) : []
+  return [...characterInstructions, ...otherInstructions, ...descriptions].join('\n')
 }
 
 const VIDEO_OUTPUT_HARD_GATES = `VIDEO OUTPUT HARD GATES:
@@ -146,17 +151,22 @@ HARD AVOID: identity blending, face replacement, anatomy or geometry morphing, w
 function connectedReferenceRoles(request: GenerationRequest): PromptBlock[] {
   if (request.kind !== 'video-generator') return []
   const references = request.references || []
-  const roles = referenceRoleInstructions(references.filter(reference => reference.tag !== request.inputTag || request.inputRole !== 'source-video'))
+  const roles = referenceRoleInstructions(references.filter(reference => reference.tag !== request.inputTag || request.inputRole !== 'source-video'), false)
   const rules = [...new Set((request.connectionRules || []).filter(rule => {
     const reference = references.find(reference => reference.tag === rule.tag)
     if (!reference && rule.tag !== request.inputTag) return false
+    if (reference?.mediaReferenceMode) return false
     if (reference?.authority === 'motion-camera' || reference?.authority === 'audio-timing') return !/^(?:AUTO(?: → [A-Z]+)?|GUIDE|LOCK) RULE/.test(rule.rule) && !/^Image Reference$/.test(rule.label)
     return true
   }).map(rule => `${rule.tag} — ${rule.label}: ${rule.rule}`))]
   const source = request.inputTag && (request.inputRole === 'source-video' || !references.some(reference => reference.tag === request.inputTag))
     ? `${request.inputTag} is the ${request.inputRole === 'source-video' ? 'source video authority; continue from its exact final state without regenerating its beginning' : request.inputRole === 'start-frame' ? 'starting frame authority; begin at its exact composition and physical state' : 'source image authority; preserve its base content and change only what is authored'}.` : ''
+  const descriptions = referenceDescriptionLines(request)
   const text = [roles, source, ...rules].filter(Boolean).join('\n')
-  return text ? [{ id: 'reference-roles', label: 'Reference roles', priority: 119, required: true, text: `REFERENCE ROLES\n${text}` }] : []
+  return [
+    ...(text ? [{ id: 'reference-roles' as const, label: 'Reference roles', priority: 119, required: true, text: `REFERENCE ROLES\n${text}` }] : []),
+    ...(descriptions.length ? [{ id: 'reference-introductions' as const, label: 'Reference introductions', priority: 119, required: true, text: `REFERENCE INTRODUCTIONS\n${descriptions.join('\n')}` }] : []),
+  ]
 }
 
 function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend, continuityContext?: ProductionContinuityContext, family?: PromptFamily): PromptBlock[] {
@@ -177,7 +187,7 @@ function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend,
       ? seedanceShotSpecSections(request, providerLegend)
       : productionShotSpecSections(request, providerLegend, continuityContext)
     return sections.map((section) => ({
-      id: `shot-spec-${section.id}`,
+      id: section.id === 'seedance-reference-introductions' ? 'reference-introductions' : `shot-spec-${section.id}`,
       label: section.heading,
       priority: section.priority,
       required: section.required,
@@ -191,7 +201,7 @@ function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend,
         ? `${request.inputTag || '@source-video'} is the Video To Extend authority. HARD RULE: Continue from its exact final state without regenerating its beginning.`
         : `${request.inputTag || '@source-image'} is the Source Image authority. HARD RULE: Preserve it as the exact base image and change only what the instruction requests.`
     : ''
-  const connectedRules = (request.connectionRules || []).map((item) => `${item.tag} — ${item.label}: ${item.rule}`).join('\n')
+  const connectedRules = (request.connectionRules || []).filter(item => !request.references?.some(reference => reference.tag === item.tag && reference.mediaReferenceMode)).map((item) => `${item.tag} — ${item.label}: ${item.rule}`).join('\n')
   const instructions = [connectedRules, fallbackInputInstruction, referenceRoleInstructions(request.references || [])].filter(Boolean).join('\n')
   const authority = instructions ? `REFERENCE AUTHORITY AND CONTINUITY:\n${instructions}` : ''
   const direction = cinematicDirection(request)
@@ -208,6 +218,8 @@ function semanticPromptBlocks(request: GenerationRequest, legend?: PromptLegend,
 
 export interface PromptCompileOptions {
   family?: PromptFamily
+  /** Native visible projection retains semantic names; only its adapter renders attachment labels. */
+  preserveSemanticTags?: boolean
   legend?: PromptLegend
   ceiling?: number
   ceilingSource?: string
@@ -247,7 +259,7 @@ export function compileProviderPrompt(request: GenerationRequest, options: Promp
   if (ownershipErrors.length) throw new Error(ownershipErrors.join(' '))
   const integrityErrors = seedancePromptIntegrityFailures(request)
   if (integrityErrors.length) throw new SeedancePromptIntegrityError(integrityErrors)
-  const effectiveRequest = { ...request, ...(request.falNative || request.higgsfieldNative ? { videoEngine: effectiveVideoEndpoint(request) } : {}), references: providerVisibleReferences(request) }
+  const effectiveRequest = completedReferenceAuthorityRequest({ ...request, ...(request.falNative || request.higgsfieldNative ? { videoEngine: effectiveVideoEndpoint(request) } : {}), references: providerVisibleReferences(request) })
   const family = options.family || promptFamily(effectiveRequest)
   const ceiling = options.ceiling ?? PROVIDER_PROMPT_CEILINGS[family]
   const authored = effectiveRequest.providerPromptOverride ?? (family === 'seedance' && completeStructuredSeedanceMaster(effectiveRequest.authoredPrompt || '') ? effectiveRequest.authoredPrompt?.trim() : undefined)
@@ -259,10 +271,19 @@ export function compileProviderPrompt(request: GenerationRequest, options: Promp
     const structured = family === 'seedance'
       ? applyStructuredSeedanceCompletion({ family, text: genericBlockRenderer(semantic), blocks: semantic, droppedBlocks: [] }, effectiveRequest).blocks
       : semantic
-    const bound = family === 'seedance'
+    const bound = family === 'seedance' && !options.preserveSemanticTags
       ? translateUnboundSeedanceTags({ family, text: genericBlockRenderer(structured), blocks: structured, droppedBlocks: [] }, effectiveRequest).blocks
       : structured
-    rawBlocks = [...visibleNaturalSkinBlocks(effectiveRequest, bound), ...connectedReferenceRoles(effectiveRequest)]
+    rawBlocks = visibleNaturalSkinBlocks(effectiveRequest, bound)
+    const references = connectedReferenceRoles(effectiveRequest).filter(block => block.id !== 'reference-introductions' || !rawBlocks.some(existing => existing.id === 'reference-introductions'))
+    const negativeIndex = rawBlocks.findIndex(block => block.label === 'NEGATIVE PROMPT')
+    // Reference descriptions are positive authority, not exclusions. Keep the
+    // generated body's existing negative section last; exact authored bodies
+    // remain in the separate byte-preserving branch above.
+    rawBlocks.splice(negativeIndex < 0 ? rawBlocks.length : negativeIndex, 0, ...references)
+    if (family === 'seedance' && !options.preserveSemanticTags) {
+      rawBlocks = translateUnboundSeedanceTags({ family, text: genericBlockRenderer(rawBlocks), blocks: rawBlocks, droppedBlocks: [] }, effectiveRequest).blocks
+    }
   }
   const measuredCharacterCount = FAMILY_RENDERERS[family](rawBlocks).length
   let blocks = rawBlocks
@@ -369,7 +390,7 @@ export function orderedProviderImageReferences(request: GenerationRequest): Refe
  * only blank-carrier geometry so they cannot redraw or semantically substitute it.
  */
 export function providerArtworkCarrierRequest(request: GenerationRequest): GenerationRequest {
-  const locked = (request.references || []).filter((reference) => reference.fidelity === 'lock' && reference.role === 'reference' && reference.path && (!reference.mediaType || reference.mediaType === 'image'))
+  const locked = (request.references || []).filter(isLockedArtworkReference)
   if (!locked.length) return request
   let prompt = request.prompt || ''
   locked.forEach((reference, index) => {
@@ -546,6 +567,7 @@ function seedanceReferenceMeaning(reference: Reference, boundCharacters = new Se
   const semanticTag = reference.tag || '@reference'
   const tag = plainSemanticLabel(semanticTag)
   if (reference.role === 'storyboard' || reference.authority === 'storyboard-map') return `${tag} storyboard map — ordered editorial, continuity, composition, and shot-design authority; use each panel interior as a separate full-screen shot and never render the sheet, borders, gutters, labels, numbers, timecodes, or captions`
+  if (reference.mediaReferenceMode) return `${tag} supplied ${reference.mediaType || 'media'} reference — role follows its reference introduction and authored instructions only`
   if (reference.authority === 'motion-camera') return `${tag} motion reference — camera geometry, physical path, speed curve, stabilization, performance timing, cadence, and temporal-rhythm authority only; do not copy appearance`
   if (reference.authority === 'audio-timing') return `${tag} audio reference — speech, sound-event, rhythm, pacing, and synchronization authority only; never derive visuals`
   if (reference.role === 'character') {
@@ -648,15 +670,15 @@ function applyStructuredSeedanceCompletion(compilation: PromptCompilation, reque
 }
 
 /** The native graph has already fixed each field's order; never select or rank it again. */
-export function compileNativeProviderPrompt(request: GenerationRequest, family: PromptFamily): PromptCompilation {
+export function compileNativeProviderPrompt(request: GenerationRequest, family: PromptFamily, semantic = false): PromptCompilation {
   const authored = request.authoredPrompt || ''
-  const compilation = compileProviderPrompt(request.providerPromptOverride === undefined && family === 'seedance' && completeStructuredSeedanceMaster(authored) ? { ...request, providerPromptOverride: authored, providerPromptOwnership: 'compiled' } : request, { family })
-  if (family !== 'seedance') return compilation
+  const compilation = compileProviderPrompt(request.providerPromptOverride === undefined && family === 'seedance' && completeStructuredSeedanceMaster(authored) ? { ...request, providerPromptOverride: authored, providerPromptOwnership: 'compiled' } : request, { family, preserveSemanticTags: semantic })
+  if (family !== 'seedance' || semantic) return compilation
   const references = request.references || []
   const images = references.filter(reference => (reference.mediaType || 'image') === 'image')
   const videos = references.filter(reference => reference.mediaType === 'video')
   const audios = references.filter(reference => reference.mediaType === 'audio')
-  return translateSeedanceCompilation(compilation, request, seedanceProviderBindings(images, videos, audios, Boolean(request.videoEngine?.includes('seedance-2.5'))))
+  return translateSeedanceCompilation(compilation, request, seedanceProviderBindings(images, videos, audios, Boolean(request.videoEngine?.startsWith('byteplus/') && request.videoEngine.includes('seedance-2.5'))))
 }
 
 export function providerSeedancePayloadCompilation(request: GenerationRequest): PromptCompilation {
@@ -665,7 +687,8 @@ export function providerSeedancePayloadCompilation(request: GenerationRequest): 
   const limits = model.referenceLimits || DEFAULT_SEEDANCE_REFERENCE_LIMITS
   const { images, videos, audios } = selectSeedanceReferences(references, limits)
   const selectedRequest = { ...request, references: [...images, ...videos, ...audios] }
-  const bracketTokens = model.id.includes('seedance-2.5')
+  // Ordinal syntax belongs to the host contract, not just the model version.
+  const bracketTokens = model.provider === 'byteplus' && model.id.includes('seedance-2.5')
   const bindings = seedanceProviderBindings(images, videos, audios, bracketTokens)
   const visibleBody = visibleProviderPromptBody(request)
   return translateSeedanceCompilation({ family: 'seedance', text: visibleBody, blocks: [], droppedBlocks: [], controlDiagnostics: compileProviderPrompt(selectedRequest, { family: 'seedance' }).controlDiagnostics }, selectedRequest, bindings)

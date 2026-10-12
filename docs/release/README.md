@@ -6,6 +6,14 @@ Current packaging builds an ARM64 macOS DMG with hardened runtime. Public signin
 
 Release promotion requires source/version identity, dependency lock, tests, typecheck, production build, security checks, artifact hashes, packaged-app smoke tests, and a verified rollback parent.
 
+## Local signing continuity — 12 October 2026
+
+The current installed Prism Foundry uses the existing Apple Development identity rather than an ad-hoc signature. Its bundle identifier, main/helper entitlements and application payload were preserved. A resource-change check retained the designated requirement, and the installed app reopened without a password prompt. This establishes bounded local development signing; public Developer ID signing, notarization and subsequent-update credential continuity remain separate acceptance checks.
+
+For future local packaging, use the configured existing certificate-backed identity, preserve each executable bundle’s own entitlements, sign nested code before its enclosing app and run strict deep signature verification. Record designated requirements before/after and verify actual credential-backed service use after installation. Do not silently fall back to ad-hoc signing or change Keychain access controls. Keep the sole installed slot and verified rollback archive. Audyt’s `tool/sign_macos_package.sh` demonstrates identity configuration and expanded-entitlement preservation; adapt the procedure to Electron instead of copying Flutter framework paths. See [Apple code signing and Keychain tracking](https://developer.apple.com/library/archive/technotes/tn2206/_index.html).
+
+Runtime receipts: the canonical Codex Apps/Prism task contains `Stable Signing Installed Evidence.json`, `Stable Signing Candidate Verification.json` and `Prism Foundry Stable Signing.zip`. The unchanged installed `app.asar` SHA-256 is `7e12c7efaeb01699adc10d7036127c5d1fe17fd2fa71763881e00be04bf17b7c`.
+
 ## Verified releases
 
 - [Combined Prism production promotion — 2026-08-26](combined-prism-production-promotion-2026-08-26.md)

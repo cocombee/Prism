@@ -59,7 +59,7 @@ describe('Prism Foundry product skill', () => {
 
   it('protects honest global Motion FPS and full Canvas preview dots', () => {
     expect(skill).toContain('Motion FPS is visual movement intent')
-    expect(skill).toContain('exactly `12, 16, 24, 25, 35, 50, 60`')
+    expect(skill).toContain('exactly `12, 16, 24, 35, 50, 60`')
     expect(contract).toContain('Native FPS and Motion FPS are separate concepts')
     expect(contract).toContain('Numeric values use lowercase `fps`')
     expect(contract).toContain('Never show `Provider Native`')

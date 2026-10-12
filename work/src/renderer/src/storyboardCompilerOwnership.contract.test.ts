@@ -19,7 +19,7 @@ describe('active Storyboard Video prompt ownership', () => {
   it('renders exact Auto/Manual radio and read-only contracts without a second prompt surface', () => {
     expect(card).toContain('role="radiogroup" aria-label="Video prompt mode"')
     expect(card).toContain('role="radio"')
-    expect(card).toContain('aria-label="Use Locked Storyboard Prompt"')
+    expect(card).toContain('aria-label="Use Locked Connected Prompt"')
     expect(card).toContain('aria-label="Use User Prompt"')
     expect(card).toContain("videoPrompt?.mode === 'auto' ? 'Locked' : 'Lock'")
     expect(card).toContain('>User</button>')

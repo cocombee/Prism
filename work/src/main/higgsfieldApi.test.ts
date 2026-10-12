@@ -17,7 +17,7 @@ describe('native Higgsfield HTTP ownership and lifecycle',()=>{
  it('validates direct transport calls before the first fetch and never forwards unknown controls',async()=>{
   const fetch=vi.fn(),api=new HiggsfieldApi({fetch,key,assertCurrent:vi.fn()})
   for(const body of [{...input,seed:0},{...input,video_url:'http://localhost/video'},{...input,image_urls:[]},{...input,resolution:720}])await expect(api.generate(model,body)).rejects.toThrow()
-  await expect(api.generate('higgsfield/cinema-studio/4.0',input)).rejects.toThrow(/no verified/);expect(fetch).not.toHaveBeenCalled()
+  await expect(api.generate('higgsfield/unpublished-future/4.0',input)).rejects.toThrow(/no verified/);expect(fetch).not.toHaveBeenCalled()
  })
  it('uploads with all returned storage headers and publishes the public URL only after a successful PUT',async()=>{
   const instructions={public_url:'https://media.example/ready.png',upload_url:'https://storage.example/signed?signature=fixture',content_type:'image/png',upload_headers:{'Content-Type':'image/png','x-amz-tagging':'retention=temporary','x-amz-security-token':'fictional-storage-token'}}

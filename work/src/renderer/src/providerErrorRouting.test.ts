@@ -36,6 +36,6 @@ describe('next renderer generation error provider', () => {
 
   it('uses canonical generation routing for non-prompt errors and preserves prompt assistant routing', () => {
     expect(source).toContain("const errorProvider: ServiceProvider = data.kind === 'prompt' ? enhanceProvider : generationServiceProvider(data)")
-    expect(source).toContain('const displayError = compactProviderError(data.error, errorProvider)')
+    expect(source).toContain('const displayError = compactProviderError(useNodeErrorNotice(data), errorProvider)')
   })
 })

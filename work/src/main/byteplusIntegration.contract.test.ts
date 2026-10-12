@@ -17,7 +17,7 @@ describe('BytePlus completed integration contracts', () => {
 
   it('dispatches explicit BytePlus video routes without changing the fal subscription branch', () => {
     expect(main).toContain("import { compileBytePlusGenerationRequest }")
-    expect(main).toContain("import { runBytePlusTaskAndDownload }")
+    expect(main).toContain("import { runBytePlusTask, runBytePlusTaskAndDownload }")
     expect(main).toContain("if (videoModel.provider === 'byteplus') return runBytePlusGeneration(request, videoModel, signal)")
     expect(main).toContain("loadServiceCredential('byteplus'")
     expect(main).toContain("fetch: (input, init) => { if (init?.method === 'POST') runtimeServiceFailures.assertCurrent('byteplus'); return net.fetch(input, init) }")

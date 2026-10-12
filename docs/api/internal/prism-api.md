@@ -151,3 +151,10 @@ Project activation preserves the existing `withProviderRequest` rejection while 
 ## Retired availability preference bridge —10 October2026
 
 Remove services:preferences and services:set-enabled from the supported IPC/preload contract. services:list returns main-authoritative selected-account connection readiness, waits for project/provider mutation completion and rejects superseded ownership. Generation and rewrite continue to use withProviderRequest, credential/project revision and recovery gates; waiting is limited to read-only service status. Existing account/profile operations remain supported.
+
+
+## BytePlus console asset links — 12 October 2026
+
+`assets.byteplusPortraitContext`, `linkByteplusPortrait` and `revokeByteplusPortrait` use dedicated validated main handlers. Context returns the current selected BytePlus profile metadata and availability, never credentials. Link requires the local managed asset ID, exact current profile ID, existing console Asset ID, explicit Active-in-this-account attestation and optional known expiry. Main reads contained Image/Video bytes, derives SHA-256 and account identity, rechecks account selection after reading, and serializes the mutation under the original project owner. Ordinary metadata edits and sequence-frame intake cannot create or change a binding.
+
+Local state is linked or revoked; it is not live GetAsset approval. Disabling a link is local only. The existing BytePlus media resolver substitutes an eligible `asset://ID` before normal upload preparation. Invalid/revoked/expired/source-edited/account-mismatched/ambiguous bindings block without raw-media fallback. Arbitrary unlinked `asset:` inputs are rejected. Exact attachment ordinals, prompt text, Draft values and other provider adapters are preserved. UI uses existing asset menus, modal fields and selectors, including per-file selection in typed collections.

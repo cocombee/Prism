@@ -1,9 +1,11 @@
 import type { NodeKind, ServiceProvider, StudioNodeData } from './types'
 import { resolveVideoModel } from './videoModels'
 
-type GenerationProviderData = Pick<StudioNodeData, 'kind' | 'videoEngine' | 'imageProvider' | 'imageModelId' | 'voiceEngine' | 'audioProvider'> & { kind: NodeKind; falNative?: { endpointId: string }; higgsfieldNative?: { endpointId: string } }
+type GenerationProviderData = Pick<StudioNodeData, 'kind' | 'videoEngine' | 'imageProvider' | 'imageModelId' | 'voiceEngine' | 'audioProvider'> & { kind: NodeKind; falNative?: { endpointId: string }; higgsfieldNative?: { endpointId: string }; falDraftRecovery?: { endpointId: string; requestId: string }; draftCompletion?: { provider: 'fal' | 'byteplus' } }
 
 export function generationServiceProvider(data: GenerationProviderData): ServiceProvider {
+  if (data.falDraftRecovery) return 'fal'
+  if (data.draftCompletion) return data.draftCompletion.provider
   if (data.higgsfieldNative) return 'higgsfield'
   if (data.falNative) return 'fal'
   if (data.kind === 'voiceover' && data.voiceEngine === 'fish-audio') return 'fish'

@@ -12,7 +12,8 @@ describe('native Higgsfield Seedance admission baseline',()=>{
     const options=groups.find(group=>group.service==='higgsfield')!.options
     expect(options.filter(option=>!option.disabled).map(option=>option.value)).toEqual(known.filter(model=>!model.id.includes('/genjutsu/')).map(model=>'higgsfield-native::'+model.id))
     expect(options.find(option=>option.value.endsWith('future/seedance-3.0/text-to-video'))!.disabled).toBe(true)
-    expect(known.filter(model=>model.id.startsWith('bytedance/')).every(model=>model.catalog.service==='Higgsfield'&&model.catalog.company==='ByteDance'&&model.catalog.release==='Seedance 2.5')).toBe(true)
+    expect(known.filter(model=>model.id.startsWith('bytedance/seedance-2.5/')).every(model=>model.catalog.service==='Higgsfield'&&model.catalog.company==='ByteDance'&&model.catalog.release==='Seedance 2.5')).toBe(true)
+    expect(known.filter(model=>model.id.startsWith('bytedance/seedance-2.0/')).every(model=>model.catalog.service==='Higgsfield'&&model.catalog.company==='ByteDance'&&model.catalog.release==='Seedance 2.0')).toBe(true)
   })
   it('does not admit a schema-only route without an explicit adapter review',async()=>{
     const future='bytedance/seedance-2.5/fixture-only-mode'

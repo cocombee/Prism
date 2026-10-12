@@ -1,0 +1,182 @@
+[
+  {
+    "id": "alibaba/wan-3.0-prime/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0-prime/text-to-video/llms.txt",
+    "documentSha256": "a695e62ac55332db9cfe143183ef671b1db307d687b10a3359db730ee302604e"
+  },
+  {
+    "id": "bytedance/seedance-2.0/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/bytedance/seedance-2.0/text-to-video/llms.txt",
+    "documentSha256": "56f9767705a46767e2b85bddc9b4a423037a871004a20c39c894350ea4b24e4d"
+  },
+  {
+    "id": "higgsfield/cinema-studio/4.0",
+    "documentUrl": "https://dash.higgsfield.ai/models/higgsfield/cinema-studio/4.0/llms.txt",
+    "documentSha256": "6a8c71088de4facfc641e3817d69682fbee12130bff1e5198181d1d9969f7307"
+  },
+  {
+    "id": "lightricks/ltx-2.5/text-to-video/fast",
+    "documentUrl": "https://dash.higgsfield.ai/models/lightricks/ltx-2.5/text-to-video/fast/llms.txt",
+    "documentSha256": "abac21bb5edbb662065783b975e049f8187b8e3b93a5840f328406df4883f035"
+  },
+  {
+    "id": "xai/grok-imagine-video/v1.5/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/xai/grok-imagine-video/v1.5/reference-to-video/llms.txt",
+    "documentSha256": "3d35034d298c4726a1756103d6379ca6a85e069665a43dedab1b2ae658c7eea9"
+  },
+  {
+    "id": "alibaba/happy-horse/v1.1/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/v1.1/text-to-video/llms.txt",
+    "documentSha256": "c083a576985c19ff835d07f8094ec4117e06a7222519e23e1a562e045611c828"
+  },
+  {
+    "id": "alibaba/happy-horse/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/text-to-video/llms.txt",
+    "documentSha256": "f6a267d8949bdb304041d4090fcf293a62ad89e470d223138910ef70f6a199b2"
+  },
+  {
+    "id": "kling-video/o3/first-last-frame",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/o3/first-last-frame/llms.txt",
+    "documentSha256": "4fbe00318cafa640b551e1784d8126640be318f6aa46ca68df8cfb4f86376ee2"
+  },
+  {
+    "id": "kling-video/omni/first-last-frame",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/omni/first-last-frame/llms.txt",
+    "documentSha256": "2f12d29f31634ddd13b735a096bffebfd03f659250263c159b8e91a9161de08c"
+  },
+  {
+    "id": "wan/v2.6/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/wan/v2.6/text-to-video/llms.txt",
+    "documentSha256": "1bef6d428cdffa2b9a9e016c46e2810eff38105c2f1baafa42bca39c664f8904"
+  },
+  {
+    "id": "kling-video/v2.5-turbo/standard/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v2.5-turbo/standard/image-to-video/llms.txt",
+    "documentSha256": "7d399680ae32ce985a5ab030cb44524d6abf5bfbe04689bf0c515bd3bc56d187"
+  },
+  {
+    "id": "alibaba/wan-3.0-prime/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0-prime/image-to-video/llms.txt",
+    "documentSha256": "6b28a90b0c4fe56bdfdb374c001bb9905f12ae6f655fe811e092040f49aa04db"
+  },
+  {
+    "id": "alibaba/wan-3.0-prime/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0-prime/reference-to-video/llms.txt",
+    "documentSha256": "dde02e3999aa0e0867f2194de2e4118c859c1f9e0768c7da9babb0d0ae3a58e3"
+  },
+  {
+    "id": "alibaba/wan-3.0/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0/reference-to-video/llms.txt",
+    "documentSha256": "9d165df3f0943683c2ec397ffa34a50f8eac55987a9d738298914b8a19d2a4f3"
+  },
+  {
+    "id": "wan/v2.7/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/wan/v2.7/image-to-video/llms.txt",
+    "documentSha256": "f9a571858a15722476e3c5a809b0c75df5498367f388a3723eebae8777028265"
+  },
+  {
+    "id": "alibaba/happy-horse/v1.1/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/v1.1/image-to-video/llms.txt",
+    "documentSha256": "6d18bd58b3536225d730639cef1875ac5c600f8aa07d0b05941fabf44bbb87c8"
+  },
+  {
+    "id": "alibaba/happy-horse/v1.1/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/v1.1/reference-to-video/llms.txt",
+    "documentSha256": "91df7bfac46a194831bebc0b49d1c6e531c9f774b1392cc403161415f0b2f188"
+  },
+  {
+    "id": "alibaba/happy-horse/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/image-to-video/llms.txt",
+    "documentSha256": "f1f2d168e1cb21626d2008eea6ba15fa9070ca74247740c564a1d53e88347bea"
+  },
+  {
+    "id": "alibaba/happy-horse/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/reference-to-video/llms.txt",
+    "documentSha256": "ac35680f9cf1517c36e92e68cb7abdb9506a0efe8f04c7dcd765f3eef1a312ac"
+  },
+  {
+    "id": "wan/v2.6/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/wan/v2.6/image-to-video/llms.txt",
+    "documentSha256": "5cbb632530815445340ed209f79922b08b607e115e7cc37dda422460dfa1dcfe"
+  },
+  {
+    "id": "wan/v2.6/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/wan/v2.6/reference-to-video/llms.txt",
+    "documentSha256": "1b55f24c988b6828bb67d7688e4d1d0e56edb4c26a0d981ed582d3f0d594ca0b"
+  },
+  {
+    "id": "bytedance/seedance-2.0/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/bytedance/seedance-2.0/image-to-video/llms.txt",
+    "documentSha256": "c7d4a767c9e18ad7ac4e9a2ed59c82f2ac41df89f05a2c6020cc398dcf2940ef"
+  },
+  {
+    "id": "bytedance/seedance-2.0/reference-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/bytedance/seedance-2.0/reference-to-video/llms.txt",
+    "documentSha256": "89be3b7fff1f8efc7c05bf3df6e77835e4968c4ccc470ac7551de576c653d3a4"
+  },
+  {
+    "id": "lightricks/ltx-2.5/image-to-video/fast",
+    "documentUrl": "https://dash.higgsfield.ai/models/lightricks/ltx-2.5/image-to-video/fast/llms.txt",
+    "documentSha256": "94129368c276edfcec5fe777453a14dc27db9b12861b5cecbad269d08c38025f"
+  },
+  {
+    "id": "kling-video/v3.0/4k/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/4k/text-to-video/llms.txt",
+    "documentSha256": "bd5b39abd08a92cc8a75c72069fe407a1c93720fd576a1bf317275177f71e015"
+  },
+  {
+    "id": "kling-video/v3.0/pro/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/pro/image-to-video/llms.txt",
+    "documentSha256": "90e33066273df50abdd07d877e288cdc5bc189cab05208915d2c3ef3e384d3df"
+  },
+  {
+    "id": "kling-video/v3.0/4k/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/4k/image-to-video/llms.txt",
+    "documentSha256": "69183fd52d8912f2025b292d207feabfc404d2a4b48e6705f855527d5eaa29c5"
+  },
+  {
+    "id": "kling-video/v3.0/pro/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/pro/text-to-video/llms.txt",
+    "documentSha256": "9b6aef89060a98569c2e019b4819f07235144fcecbeafdf4b3515e89308efad6"
+  },
+  {
+    "id": "kling-video/v3.0-turbo/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0-turbo/image-to-video/llms.txt",
+    "documentSha256": "741d119707f82cb8be5582706aa4fe3f963a25db4d603afb3b8086f5f7e42221"
+  },
+  {
+    "id": "kling-video/v3.0-turbo/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0-turbo/text-to-video/llms.txt",
+    "documentSha256": "a7e3a4a48862ae58cb3b0acd257e7914954a3bd8c3bd0229d0234caf673ed0df"
+  },
+  {
+    "id": "kling-video/o3/image-reference",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/o3/image-reference/llms.txt",
+    "documentSha256": "a4ee1185d5d5d881842a1ed364fe2539f9c606c1513ecce8349bf46cbe27a295"
+  },
+  {
+    "id": "kling-video/o3/video-reference",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/o3/video-reference/llms.txt",
+    "documentSha256": "d74c528d43254e2a7d603fecf3339775e7409a6b1a24b996d21713c212a7f351"
+  },
+  {
+    "id": "kling-video/omni/image-reference",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/omni/image-reference/llms.txt",
+    "documentSha256": "e70f8900f5ac30f4ee10dfdd910afedf2ff1174777517d0f9d5b36313fc7d6eb"
+  },
+  {
+    "id": "kling-video/omni/video-reference",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/omni/video-reference/llms.txt",
+    "documentSha256": "b5c13fb11be00b2279910214f02b90a1c2242f21d342c5724394eb7c0cc4779d"
+  },
+  {
+    "id": "kling-video/v2.5-turbo/pro/image-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v2.5-turbo/pro/image-to-video/llms.txt",
+    "documentSha256": "574e35b7f65db8872b5c28c1c57540ff60c7bed4185df2f575615d19a6158729"
+  },
+  {
+    "id": "kling-video/v2.5-turbo/pro/text-to-video",
+    "documentUrl": "https://dash.higgsfield.ai/models/kling-video/v2.5-turbo/pro/text-to-video/llms.txt",
+    "documentSha256": "d0dd7a132652c12cb42a6d412e1deec82d5715c1e397ae51778cd11796a1b126"
+  }
+]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compileProviderPrompt, compileProviderPromptForSubmission, providerPromptPreviewCompilation, providerSeedancePayloadCompilation, visibleProviderPromptBody } from './referenceInstructions'
+import { compileProviderPrompt, compileProviderPromptForSubmission, providerPromptPreviewCompilation, providerSeedancePayloadCompilation, seedanceReferenceLegend, visibleProviderPromptBody } from './referenceInstructions'
 import { buildContinuityLedger, productionShotSpecSections, renderShotSpecSections, seedanceAuthoredFields, seedanceShotSpecSections } from './shotSpec'
 import type { GenerationRequest } from './types'
 
@@ -11,6 +11,121 @@ const base: GenerationRequest = {
 }
 
 describe('production shot specification', () => {
+  it('keeps a text Storyboard temporal, with cumulative half-second windows and no invented media authority', () => {
+    const request: GenerationRequest = { ...base, videoEngine: 'alibaba/wan-3.0/reference-to-video', nativeOutputFrameRate: 30,
+      references: [{ role: 'character', tag: '@hero', path: '/hero.png', mediaType: 'image' }, { role: 'location', tag: '@hall', path: '/hall.png', mediaType: 'image' }],
+      connectionRules: [{ tag: '@storyboard', label: 'Storyboard', rule: 'Follow the authored sequence.' }, { tag: '@hero', label: 'Character Reference', rule: 'Identity.' }],
+      storyboardShots: [{ prompt: '@hero walks through @hall.', duration: 1.5, shotSize: 'wide', camera: 'follow', transitionToNext: 'continue' }, { prompt: '@hero turns without a cut.', duration: 2.5, shotSize: 'wide', camera: 'follow' }],
+    }
+    const before = JSON.stringify(request), text = compileProviderPrompt(request, { family: 'generic' }).text
+    expect(text).not.toContain('@storyboard')
+    expect(text).toContain('@hero = character authority')
+    expect(text).toContain('@hall = location authority')
+    expect(text).toContain('0.0–1.5s —')
+    expect(text).toContain('1.5–4.0s —')
+    expect(text).not.toContain('across all cuts')
+    expect(text).not.toContain('HARD CUT.')
+    expect(JSON.stringify(request)).toBe(before)
+  })
+  it('retains an actual Storyboard image reference without assigning it visual appearance ownership', () => {
+    const sections = productionShotSpecSections({ ...base, references: [{ role: 'storyboard', tag: '@sheet', path: '/sheet.png', mediaType: 'image', authority: 'storyboard-map' }], connectionRules: [{ tag: '@sheet', label: 'Storyboard', rule: 'Shot order.' }] })
+    expect(sections.find(section => section.id === 'reference-map')!.text).toContain('@sheet = storyboard authority')
+    expect(sections.find(section => section.id === 'active-references')!.text).toContain('sheet layout not rendered')
+    expect(sections.find(section => section.id === 'positive-locks')!.text).not.toContain('@sheet matches the reference in every appearance')
+  })
+  it('places one outgoing hard cut between exact generic windows and retains the final Continue hook', () => {
+    const sections = productionShotSpecSections({ ...base, storyboardShots: [
+      { prompt: 'Approach.', duration: 1.5, shotSize: 'wide', camera: 'follow', transitionToNext: 'continue' },
+      { prompt: 'Reach the door.', duration: 2.5, shotSize: 'wide', camera: 'follow', transitionToNext: 'hard-cut' },
+      { prompt: 'Hold beyond the door.', duration: 1, shotSize: 'wide', camera: 'static', transitionToNext: 'continue' },
+    ] })
+    const blocks = sections.filter(section => section.id.startsWith('cut-'))
+    expect(blocks.map(block => block.text.split(' —')[0])).toEqual(['0.0–1.5s', '1.5–4.0s', '4.0–5.0s'])
+    expect(blocks[1].text).toMatch(/\nHARD CUT\.$/)
+    expect(blocks[0].text).not.toContain('HARD CUT.')
+    expect(blocks[2].text).toContain('OUTGOING CONTINUATION HOOK')
+    expect(blocks.map(block => block.text).join('\n').match(/HARD CUT\./g)).toHaveLength(1)
+  })
+
+  it.each(['generic', 'seedance'] as const)('uses schema-native48 before model fallback in %s compilation', family => {
+    const request: GenerationRequest = { ...base, videoEngine: 'bytedance/seedance-2.5/reference-to-video', nativeOutputFrameRate: 48, frameRate: 24, motionCadence: 16 }
+    const text = compileProviderPrompt(request, { family }).text
+    expect(text).toContain('Capture at 48fps and play back at 48fps at normal speed.')
+    expect(text).toContain('uniform 1/16-second intervals')
+    expect(text).not.toContain('Capture at 24fps')
+  })
+  it.each(['generic', 'seedance'] as const)('keeps unknown native FPS unspecified in %s compilation', family => {
+    const text = compileProviderPrompt({ ...base, videoEngine: 'fictional/new-video', nativeOutputFrameRate: null, motionCadence: 16 }, { family }).text
+    expect(text).toContain('uniform 1/16-second intervals')
+    expect(text).not.toMatch(/Capture at \d+fps|Deliver at \d+fps|equivalent to 1\//)
+  })
+
+  it.each(['reference', 'blocking', 'object', 'background'] as const)('honors a sound-only typed video override in %s mode without restoring camera authority', (mediaReferenceMode) => {
+    const description = '@recording supplies bell sound only; it supplies no camera movement, framing or visual identity.'
+    const request: GenerationRequest = { ...base, videoEngine: 'byteplus/seedance-2.5/reference-to-video', references: [{ role: 'reference', tag: '@recording', path: '/recording.mp4', mediaType: 'video', authority: 'motion-camera', mediaReferenceMode, referenceDescription: description }] }
+    const sections = seedanceShotSpecSections(request)
+    const camera = sections.find(section => section.heading === 'CAMERA')!.text
+    const gate = sections.find(section => section.heading === 'CAMERA, FRAMING, AND OPTICAL HARD GATE')!.text
+    expect(camera).not.toContain('follow @recording')
+    expect(gate).not.toContain('otherwise use the connected motion/camera reference')
+    expect(gate).toContain('Do not infer camera authority from a connected video or mode alone.')
+    expect(compileProviderPrompt(request).text).toContain(description)
+    const payload = providerSeedancePayloadCompilation(request).text
+    expect(payload).not.toContain('motion reference — camera geometry')
+    expect(payload).toContain('[Video1] supplies bell sound only')
+    const legend = seedanceReferenceLegend([], request.references!, [], true)
+    expect(legend).not.toContain('motion reference — camera geometry')
+    expect(legend).toContain('role follows its reference introduction and authored instructions only')
+  })
+
+  it('keeps the explicit blocking-camera assignment available without denying it in the camera fallback', () => {
+    const description = '@guide controls the original camera path and framing only.'
+    const request: GenerationRequest = { ...base, videoEngine: 'byteplus/seedance-2.5/reference-to-video', references: [{ role: 'reference', tag: '@guide', path: '/guide.mp4', mediaType: 'video', authority: 'motion-camera', mediaReferenceMode: 'blocking', referenceDescription: description }] }
+    const camera = seedanceShotSpecSections(request).find(section => section.heading === 'CAMERA')!.text
+    expect(camera).toContain('camera assignments explicitly stated in REFERENCE INTRODUCTIONS')
+    expect(camera).not.toContain('No camera movement, framing, or viewing axis is authored')
+    expect(compileProviderPrompt(request).text).toContain(description)
+  })
+
+  it('does not deny connected media authority after completed descriptions replace generic lines', () => {
+    const description = '@guide controls camera travel and spatial placement only.'
+    const request: GenerationRequest = { ...base, videoEngine: 'bytedance/seedance-2.5/reference-to-video', references: [{ role: 'reference', tag: '@guide', path: '/guide.mp4', mediaType: 'video', mediaReferenceMode: 'blocking', referenceDescription: description }] }
+    const text = compileProviderPrompt(request).text
+    expect(text).toContain(description)
+    expect(text.split(description)).toHaveLength(2)
+    expect(text).not.toContain('No external reference authority is connected.')
+    expect(text).toContain('Apply only the roles explicitly assigned in REFERENCE INTRODUCTIONS.')
+  })
+
+  it('distinguishes unassigned connected media from an unconnected request', () => {
+    const request: GenerationRequest = { ...base, videoEngine: 'bytedance/seedance-2.5/reference-to-video', references: [{ role: 'reference', tag: '@guide', path: '/guide.mp4', mediaType: 'video', mediaReferenceMode: 'reference' }] }
+    const text = compileProviderPrompt(request).text
+    expect(text).not.toContain('No external reference authority is connected.')
+    expect(text).toContain('Connected media have no completed reference-authority assignment.')
+    expect(compileProviderPrompt({ ...request, references: [] }).text).toContain('No external reference authority is connected.')
+  })
+
+  it('compiles a textual shot plan as timecoded flow without inventing an attached Storyboard', () => {
+    const request: GenerationRequest = { ...base, videoEngine: 'bytedance/seedance-2.5/reference-to-video', duration: 4, storyboardShots: [{ prompt: 'Walk forward.', duration: 2, shotSize: 'medium', camera: 'static', transitionToNext: 'continue' }, { prompt: 'Keep walking.', duration: 2, shotSize: 'medium', camera: 'static' }], connectionRules: [{ tag: '@plan', label: 'Storyboard', rule: 'Follow the panels.' }] }
+    const text = compileProviderPrompt(request).text
+    expect(text).not.toContain('plan — Storyboard reference')
+    expect(text).not.toContain('Storyboard boundaries selected Cut')
+    expect(text).toContain('0.0–2.0s')
+    expect(text).toContain('2.0–4.0s')
+    const supplied = compileProviderPrompt({ ...request, references: [{ role: 'storyboard', tag: '@sheet', path: '/sheet.png', mediaType: 'image' }] }).text
+    expect(supplied).toContain('@sheet')
+    expect(supplied).toContain('Storyboard Map authority')
+  })
+  it('puts precise completed location states before action without generic or duplicate self labels', () => {
+    const text = compileProviderPrompt({ ...base, videoEngine: 'bytedance/seedance-2.5/reference-to-video', duration: 4, stylePrompt: 'Warm film grain.', references: [{ role: 'location', tag: '@door', path: '/door.png', referenceDescription: '@door is Door A closed; it is the same starting entrance shown open in @open.' }], connectionRules: [{ tag: '@look', label: 'Style', rule: 'Apply warm film grain.' }] }).text
+    const authority = text.slice(text.indexOf('REFERENCE AUTHORITY'), text.indexOf('TIMELINE AND CONTINUOUS ACTION'))
+    expect(text).toContain('is Door A closed')
+    expect(text.indexOf('REFERENCE INTRODUCTIONS')).toBeLessThan(text.indexOf('REFERENCE AUTHORITY'))
+    expect(authority).not.toContain('for the location.')
+    expect(text).not.toContain('@door — @door')
+    expect(text).not.toContain('look — Style reference')
+    expect(text).toContain('Warm film grain.')
+  })
   it('uses the fixed production order and omits sections without data', () => {
     const headings = productionShotSpecSections({
       ...base,
@@ -190,7 +305,7 @@ describe('production shot specification', () => {
     expect(compiled.blocks.filter((block) => block.required).map((block) => block.label)).toEqual([
       'REFERENCE AUTHORITY', 'SUBJECT AND PERFORMANCE', 'CAMERA',
       'TIMELINE AND CONTINUOUS ACTION', 'IDENTITY AND ANATOMY CONTINUITY',
-      'CAMERA, FRAMING, AND OPTICAL HARD GATE', 'FINAL-FRAME AND OUTPUT HARD GATE', 'NEGATIVE PROMPT', 'Reference roles',
+      'CAMERA, FRAMING, AND OPTICAL HARD GATE', 'FINAL-FRAME AND OUTPUT HARD GATE', 'Reference roles', 'NEGATIVE PROMPT',
     ])
     expect(compiled.text.match(/Scar over left brow/g)).toHaveLength(1)
     expect(compiled.text.match(/Use @hero as the Character./g)).toHaveLength(1)
@@ -220,9 +335,32 @@ describe('production shot specification', () => {
     expect(timeline).not.toContain('Overall action: @actor-c')
     expect(compiled.text).toContain('SHOT 1: Locked camera; 0 m/s translation.')
     expect(compiled.text).toContain('SHOT 2: Locked camera; 0 m/s translation.')
-    expect(compiled.text).toContain('SHOT 1: Full performer visible within meaningful surroundings.')
-    expect(compiled.text).toContain('SHOT 2: Full performer visible within meaningful surroundings.')
+    expect(compiled.text).toContain('SHOT 1, SHOT 2: Full performer visible within meaningful surroundings.')
     expect(compiled.text).not.toMatch(/\b(?:Segment|CUT) [12]:/)
+  })
+
+  it('scopes repeated generated optics to every applicable beat without repeating prose or changing authored action', () => {
+    const request: GenerationRequest = {
+      ...base, videoEngine: 'bytedance/seedance-2.5/reference-to-video', duration: 6,
+      storyboardShots: [
+        { prompt: 'Exact opening action.', duration: 2, shotSize: 'wide', lensMm: 35, camera: 'dolly-down', transitionToNext: 'continue' },
+        { prompt: 'Exact middle action.', duration: 2, shotSize: 'medium', lensMm: 50, camera: 'gimbal-orbit', transitionToNext: 'continue' },
+        { prompt: 'Exact ending action.', duration: 2, shotSize: 'wide', lensMm: 35, camera: 'dolly-up' },
+      ],
+    }
+    const before = JSON.stringify(request)
+    const compiled = compileProviderPrompt(request)
+    const optics = compiled.blocks.find(block => block.label === 'LENS AND OPTICS')!.text
+    expect(optics).toContain('BEAT 1, BEAT 3: Full performer visible within meaningful surroundings.')
+    expect(optics).toContain('BEAT 2:')
+    expect(optics.split('Full performer visible within meaningful surroundings.')).toHaveLength(2)
+    expect(optics).toContain('35mm')
+    expect(optics).toContain('50mm')
+    for (const action of request.storyboardShots!) expect(compiled.text).toContain(action.prompt)
+    expect(compiled.text).toContain('BEAT 1 · 0.0–2.0s')
+    expect(compiled.text).toContain('BEAT 2 · 2.0–4.0s')
+    expect(compiled.text).toContain('BEAT 3 · 4.0–6.0s')
+    expect(JSON.stringify(request)).toBe(before)
   })
 
   it('renders deterministic bridge phases from compiler metadata without provider inference', () => {
@@ -467,7 +605,9 @@ describe('production shot specification', () => {
       frameRate: 24,
       motionCadence: 16,
     }).text
-    expect(standard).toContain('Visual Motion FPS intent: 16fps; capture and playback remain 24fps at normal speed.')
+    expect(standard).toContain('uniform 1/16-second intervals')
+    expect(standard).not.toContain('natural directional exposure blur')
+    expect(standard).not.toContain('stop-motion cadence')
     expect(standard).toContain('Capture at 24fps and play back at 24fps at normal speed.')
     expect(standard).toContain('Use a 180-degree shutter angle, equivalent to 1/48-second exposure for every captured frame.')
     expect(standard).not.toContain('1/32-second')
@@ -668,15 +808,15 @@ describe('production shot specification', () => {
     expect(timeline.match(/Your order is ready\./g)).toHaveLength(1)
     expect(timeline).toContain('DIALOGUE CONTINUATION · order-line · audio continues while mouth may be outside crop')
     expect(timeline.match(/^HARD CUT\.$/gm)).toHaveLength(6)
-    expect(compiled.blocks.at(-1)?.label).toBe('Reference roles')
+    expect(compiled.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
     expect(compiled.text).not.toMatch(/@Image\d+|@Video\d+|@Audio\d+|\[(?:Image|Video|Audio)\d+\]/)
     expect(providerPromptPreviewCompilation(request).text).toBe(compiled.text)
     expect(visibleProviderPromptBody(request)).toBe(compiled.text)
     const providerPayload = providerSeedancePayloadCompilation(request).text
     expect(providerPayload).not.toContain('@owner')
     expect(providerPayload).not.toContain('@outsider')
-    expect(providerPayload).toMatch(/\[(?:Image|Video|Audio)\d+\]/)
-    expect(providerPayload.split('\n\n').at(-1)).toMatch(/^REFERENCE ROLES\n/)
+    expect(providerPayload).toMatch(/@(?:Image|Video|Audio)\d+/)
+    expect(providerPayload.split('\n\n').at(-1)).toMatch(/^NEGATIVE PROMPT\n/)
   })
 
   it('projects future-only typed continuity only when its owning shot becomes current', () => {
@@ -732,7 +872,7 @@ describe('production shot specification', () => {
     expect(providerPromptPreviewCompilation(request).text).toBe(compiled.text)
     expect(visibleProviderPromptBody(request)).toBe(compiled.text)
     expect(providerSeedancePayloadCompilation(request).text).toBe(compiled.text
-      .replaceAll('@chef-apron', '[Image2]').replaceAll('@chef', '[Image1]').replaceAll('@cook', '[Image3]').replaceAll('@kitchen', '[Image4]'))
+      .replaceAll('@chef-apron', '@Image2').replaceAll('@chef', '@Image1').replaceAll('@cook', '@Image3').replaceAll('@kitchen', '@Image4'))
   })
 
   it('blocks provider submission when an exact required state has only a known conflicting multi-state authority', () => {
@@ -795,9 +935,20 @@ describe('production shot specification', () => {
 
     const visible = providerPromptPreviewCompilation(request).text
     expect(visible).toContain("@image2, remains beside @image6's handle.")
-    expect(visible).not.toMatch(/\[(?:Image|Video|Audio)\d+\]/)
+    expect(visible).not.toMatch(/@(?:Image|Video|Audio)\d+/)
     const payload = providerSeedancePayloadCompilation(request).text
-    expect(payload).toContain("[Image1], remains beside [Image2]'s handle.")
+    expect(payload).toContain("@Image1, remains beside @Image2's handle.")
     expect(providerPromptPreviewCompilation(request).text).toBe(visible)
   })
 })
+
+ describe('low-rate prompt provider parity', () => {
+  it.each(['bytedance/seedance-2.5/text-to-video', 'wan-controlled', 'fal-ai/kling-video/v3/standard/text-to-video', 'fal-ai/ltx-2.3/text-to-video'])('carries one stepped cadence without contradictory automatic negatives for %s', videoEngine => {
+    const text = compileProviderPrompt({ nodeId: 'cadence', kind: 'video-generator', videoEngine, prompt: 'A toy car moves across the floor.', frameRate: 24, motionCadence: 16 }).text
+    expect(text.match(/uniform 1\/16-second intervals/g)).toHaveLength(1)
+    expect(text).not.toContain('natural directional exposure blur')
+    expect(text).not.toContain('stop-motion cadence')
+    expect(text).not.toContain('frame duplication')
+    expect(text).toContain('cadence jitter')
+  })
+ })

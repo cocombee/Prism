@@ -1,3 +1,7 @@
+import { resolvedAssetReferenceDescription } from './assetReferenceDescriptions'
+import { visualMotionCadenceInstruction } from './filmicMotion'
+import { nativeFalPromptTransport } from './nativeFalPromptTransport'
+import { videoDraftCompletionRequest } from './videoDraft'
 import { directStoryboardStyles } from './storyboardStyleRouting'
 import { normalizedNativeVideoMotionCadence } from './nativeVideoFooterControls'
 import { requiresGeneratedDialogueAudio } from './videoDialogueAudio'
@@ -30,22 +34,27 @@ import { activeVideoPromptMode } from './videoPromptMode'
 import { cameraSupportConflict } from './cameraSupportSemantics'
 import { applyResolvedAssetRequest, semanticModelCapability } from './resolvedAssetRequest'
 import { isSemanticAssetKind, semanticAssetAvailability } from './semanticAssetAvailability'
-import { semanticAssetAuthorityText } from './semanticAssetPromptBoundary'
+import { nativeVideoOutputFrameRate, userPromptWithCadence } from './videoCadenceSelection'
+import { assetReferenceDescription, semanticAssetAuthorityText } from './semanticAssetPromptBoundary'
 import { buildKlingNativeMultiPrompt } from './klingNativeStoryboard'
 import { falNativeFlowForKind, type FalNativeMediaSource } from './falNativeExecution'
 import { compileNativeProviderPrompt, type PromptFamily } from './referenceInstructions'
 import { providerVisibleReferences, sameBodyAuthorityReadinessFailures } from './sameBodyAuthority'
 import { propScaleReadinessFailures } from './propScaleAuthority'
 
-/** Bind the established Motion FPS control to compiled prompt intent only. */
-function nativeVideoMotionRequest(data: StudioNode['data'], manual: boolean): Pick<GenerationRequest, 'motionCadence'> {
-  if (data.kind !== 'video-generator' || manual) return {}
+/** Native capture metadata and optional visual cadence share the footer's FPS authority. */
+function nativeVideoMotionRequest(data: StudioNode['data'], manual: boolean): Pick<GenerationRequest, 'motionCadence' | 'nativeOutputFrameRate'> {
+  if (data.kind !== 'video-generator') return {}
   const state = data.falNative || data.higgsfieldNative
   if (!state) return {}
-  const selectedFps = state.values.fps
-  const numericFps = typeof selectedFps === 'number' ? selectedFps : typeof selectedFps === 'string' && selectedFps.trim() ? Number(selectedFps) : NaN
-  const fps = Number.isFinite(numericFps) && numericFps > 0 ? numericFps : undefined
-  return { motionCadence: normalizedNativeVideoMotionCadence(state.endpointId, fps, data.motionCadence) }
+  // Retired preserved values are not current schema controls.
+  const declaredFps = Object.hasOwn(state.fieldControls || {}, 'fps') ? state.values.fps : undefined
+  const fps = nativeVideoOutputFrameRate(state.endpointId, declaredFps)
+  const capture = { nativeOutputFrameRate: fps ?? null }
+  if (data.motionCadenceMode === 'native' || manual && data.motionCadenceMode !== 'custom') return capture
+  // Retain explicit saved intent for preview/review; readiness needs a known ceiling.
+  if (fps === undefined && data.motionCadenceMode === 'custom') return { ...capture, motionCadence: data.motionCadence }
+  return { ...capture, motionCadence: normalizedNativeVideoMotionCadence(state.endpointId, fps, data.motionCadence) }
 }
 
 // Only existing verified video adapters define duration in seconds. New endpoints
@@ -123,12 +132,12 @@ function mediaTypeFor(node: StudioNode): 'image' | 'video' | 'audio' {
   return activeResult?.type || node.data.outputType || (path.match(/\.(mp4|mov|webm)$/i) ? 'video' : path.match(/\.(mp3|wav|m4a|aac|ogg)$/i) ? 'audio' : 'image')
 }
 
-function formattedStoryboard(panels: StoryboardPanel[], duration: number): { preamble: string; rawPrompt: string; shots: ResolvedStoryboardShot[]; incompletePanels: number[] } {
+function formattedStoryboard(panels: StoryboardPanel[], duration: number, previewOnly = false): { preamble: string; rawPrompt: string; shots: ResolvedStoryboardShot[]; incompletePanels: number[] } {
   const activePanels = panels.map((panel) => ({ ...panel, prompt: selectedStoryboardPrompt(panel) }))
   const transitionErrors = storyboardTransitionConflicts(activePanels)
   if (transitionErrors.length) throw new Error(transitionErrors[0])
   const durationError = storyboardDurationReadinessError(activePanels, duration)
-  if (durationError) throw new Error(durationError)
+  if (durationError && !previewOnly) throw new Error(durationError)
   for (const panel of activePanels) {
     const supportConflict = cameraSupportConflict(panel.camera, panel.prompt)
     if (supportConflict) throw new Error(supportConflict)
@@ -138,7 +147,7 @@ function formattedStoryboard(panels: StoryboardPanel[], duration: number): { pre
   const normalizedPanels = activePanels.map((panel) => ({ ...panel, duration: panel.duration === 'auto' ? automatic : panel.duration }))
   const bridges = planStoryboardCameraBridges(normalizedPanels)
   const bridgeError = storyboardCameraBridgeReadiness(bridges)
-  if (bridgeError) throw new Error(bridgeError)
+  if (bridgeError && !previewOnly) throw new Error(bridgeError)
   let elapsed = 0
   const shots = normalizedPanels.map((panel, index) => {
     const startSeconds = elapsed
@@ -222,7 +231,7 @@ function compiledStoryboardPrompt(preamble: string | undefined, shots: ResolvedS
   return lines.join('\n')
 }
 
-export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges: Edge[], ignoredRootTargetHandles = new Set<string>()): ResolvedWorkflowInput {
+export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges: Edge[], ignoredRootTargetHandles = new Set<string>(), previewOnly = false): ResolvedWorkflowInput {
   edges = directStoryboardStyles(nodes, edges)
   const combinePrompt = preservesSpeech(nodes.find(node => node.id === nodeId)?.data || { kind: 'prompt', title: '' }) ? joinSpeech : joinPrompt
   const byId = new Map(nodes.map((node) => [node.id, node]))
@@ -249,8 +258,8 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         })
         continue
       }
-      const inputFidelity = ((edge.data as { inputFidelity?: InputFidelity } | undefined)?.inputFidelity || 'auto')
-      if (target) result.connectionRules.push(connectedInputRule(source.data, target.data, edge.targetHandle, inputFidelity))
+      const inputFidelity = target && ['image-generator', 'video-generator'].includes(target.data.kind) ? 'auto' : ((edge.data as { inputFidelity?: InputFidelity } | undefined)?.inputFidelity || 'auto')
+      if (target) result.connectionRules.push({ ...connectedInputRule(source.data, target.data, edge.targetHandle, inputFidelity), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, source.data.kind === 'wardrobe' && target.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined) })
 
       if (source.data.kind === 'router') {
         const nested = walk(source.id, path)
@@ -350,12 +359,14 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
                 url: generated.url,
                 mimeType: generated.type === 'image' ? 'image/png' : generated.type === 'video' ? 'video/mp4' : 'audio/mpeg',
                 createdAt: 'workflow',
+                metadata: { referenceDescription: resolvedAssetReferenceDescription(listSource, nodes, edges) },
               },
             })
           }
-          else if (listSource.data.outputPath || listSource.data.assetPath) items.push({
+          else if (listSource.data.outputPath || listSource.data.assetPath || listSource.data.outputUrl || listSource.data.assetUrl) items.push({
             id: listEdge.id,
             type: listSourceType,
+            sourceNodeId: listSource.id,
             asset: {
               id: listEdge.id,
               name: listSource.data.title,
@@ -363,18 +374,25 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
               url: listSource.data.outputUrl || listSource.data.assetUrl,
               mimeType: `${listSourceType}/${listSourceType === 'image' ? 'png' : listSourceType === 'video' ? 'mp4' : 'mpeg'}`,
               createdAt: 'workflow',
+              metadata: { referenceDescription: resolvedAssetReferenceDescription(listSource, nodes, edges) },
             },
           })
         }
-        for (const [index, item] of items.filter((candidate) => candidate.asset).entries()) result.references.push({
-          role: 'reference', path: item.asset?.path, url: item.asset?.url, name: item.asset?.name, tag: `@list-${index + 1}`,
+        for (const [index, item] of items.filter((candidate) => candidate.asset).entries()) {
+          const origin = item.sourceNodeId ? byId.get(item.sourceNodeId) : undefined
+          const selectedOrigin = origin && item.sourceResultIndex !== undefined ? { ...origin, data: { ...origin.data, activeResultIndex: item.sourceResultIndex } } : origin
+          result.references.push({
+          role: 'reference', path: item.asset?.path, url: item.asset?.url, name: item.asset?.name, tag: selectedOrigin ? workflowTag(selectedOrigin.data, 'reference') : `@list-${index + 1}`,
+          referenceDescription: selectedOrigin ? resolvedAssetReferenceDescription(selectedOrigin, nodes, edges) : item.asset?.metadata?.referenceDescription ?? '',
+          mediaReferenceMode: selectedOrigin?.data.mediaReferenceMode || (selectedOrigin && outputSignalFor(selectedOrigin.data) === 'audio' ? selectedOrigin.data.kind === 'voiceover' ? 'lip-sync' : 'sound' : undefined),
           mediaType: item.type as 'image' | 'video' | 'audio', slot: 'reference',
           authority: item.type === 'video' && edge.targetHandle === 'video-reference-in'
             ? 'motion-camera'
             : item.type === 'audio' && edge.targetHandle === 'audio-reference-in'
               ? 'audio-timing'
               : 'appearance',
-        })
+          })
+        }
         continue
       }
 
@@ -393,7 +411,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
           ? Math.max(0.5, target.data.higgsfieldNative ? typeof target.data.higgsfieldNative.values.duration === 'number' ? target.data.higgsfieldNative.values.duration : source.data.storyboardDuration ?? 5 : target.data.falNative ? nativeVideoSeconds(target.data) ?? source.data.storyboardDuration ?? 5 : target.data.duration || 5)
           : Math.max(0.5, source.data.storyboardPanels?.reduce((sum, panel) => sum + (panel.duration === 'auto' ? 1 : Number(panel.duration) || 0), 0) || 15)
         const panels = source.data.storyboardPanels || []
-        const storyboard = formattedStoryboard(panels, duration)
+        const storyboard = formattedStoryboard(panels, duration, previewOnly)
         const nested = walk(source.id, path)
         result.prompt = combinePrompt(result.prompt, storyboard.rawPrompt, nested.prompt)
         result.stylePrompt = combinePrompt(result.stylePrompt, nested.stylePrompt)
@@ -459,6 +477,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
             characterAuthorityMode: source.data.characterAuthorityMode,
             approvedIdentityDescription: singleCharacterFace.metadata?.identityDescription,
             description: sourcePrompt || undefined,
+            referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, source.data.kind === 'wardrobe' && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
             mediaType: 'image',
             slot: 'reference',
           })
@@ -472,13 +491,14 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
             characterAuthorityMode: source.data.characterAuthorityMode,
             approvedIdentityDescription: (source.data.referenceAssets || []).map((asset) => asset.metadata?.identityDescription).find(Boolean),
             description: sourcePrompt || undefined,
+            referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, source.data.kind === 'wardrobe' && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
             sourceViews: characterSheetViews || (source.data.referenceAssets || []).map((asset) => asset.metadata?.characterView).filter((view): view is NonNullable<typeof view> => Boolean(view)),
             mediaType: 'image',
             slot: 'reference',
           })
         } else for (const asset of source.data.referenceAssets || []) result.references.push({
             role, path: asset.path, url: asset.url, name: role === 'character' ? source.data.title : asset.name, tag: source.data.referenceTag,
-            boundCharacterTag: source.data.appearanceOwnerCharacterTag || (['wardrobe', 'element'].includes(role) && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
+            boundCharacterTag: ['wardrobe', 'element'].includes(role) && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : source.data.appearanceOwnerCharacterTag,
             characterAuthorityMode: role === 'character' ? source.data.characterAuthorityMode : undefined,
             approvedIdentityDescription: role === 'character' ? asset.metadata?.identityDescription : undefined,
             appearanceScope: source.data.appearanceScope,
@@ -487,6 +507,7 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
             appearanceShotIds: source.data.appearanceShotIds,
             propScaleAuthority: source.data.propScaleAuthority,
             description: sourcePrompt || undefined,
+            referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, source.data.kind === 'wardrobe' && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
             view: source.data.kind === 'character' ? asset.metadata?.characterView : source.data.kind === 'element' ? asset.metadata?.elementView : undefined,
             mediaType: asset.mimeType.startsWith('video/') ? 'video' : asset.mimeType.startsWith('audio/') ? 'audio' : 'image', slot: 'reference',
           })
@@ -497,7 +518,8 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
       if (activeResult?.path || source.data.outputPath || source.data.assetPath || activeResult?.url || source.data.outputUrl || source.data.assetUrl) {
         const mediaType = mediaTypeFor(source)
         const target = byId.get(targetId)
-        const slot = edge.targetHandle === 'end-image' && inputFidelity !== 'guide'
+        const nativeBinding = (target?.data.falNative || target?.data.higgsfieldNative)?.media?.find(binding => !binding.retired && binding.portId === edge.targetHandle)
+        const slot = nativeBinding?.role === 'start-frame' ? 'start' : nativeBinding?.role === 'end-frame' ? 'end' : edge.targetHandle === 'end-image' && inputFidelity !== 'guide'
           ? 'end'
           : edge.targetHandle === 'element'
             ? 'element'
@@ -510,20 +532,22 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
         const url = activeResult?.url || source.data.outputUrl || source.data.assetUrl
         const selectedName = activeMediaName(source.data)
         const isPrimaryImage = mediaType === 'image'
-          && edge.targetHandle === 'image-in'
-          && (inputFidelity === 'lock' || target?.data.kind === 'upscaler' || target?.data.kind === 'image-editor')
+          && (nativeBinding?.role === 'start-frame' || edge.targetHandle === 'image-in')
+          && (nativeBinding?.role === 'start-frame' || inputFidelity === 'lock' || target?.data.kind === 'video-generator' || target?.data.kind === 'upscaler' || target?.data.kind === 'image-editor')
           && !result.inputPath
-        const isPrimaryVideo = mediaType === 'video' && edge.targetHandle === 'video-in' && (inputFidelity === 'lock' || target?.data.kind === 'upscaler') && !result.inputPath
+        const isPrimaryVideo = mediaType === 'video' && (nativeBinding?.role === 'source-video' || edge.targetHandle === 'video-in') && (nativeBinding?.role === 'source-video' || inputFidelity === 'lock' || target?.data.kind === 'video-generator' || target?.data.kind === 'upscaler') && !result.inputPath
         if (isPrimaryImage || isPrimaryVideo) {
           result.inputPath = path
           result.inputUrl = url
           result.inputName = selectedName
           result.inputTag = workflowTag(source.data, slot === 'start' ? 'start-frame' : isPrimaryVideo ? 'source-video' : 'source-image')
           result.inputRole = slot === 'start' ? 'start-frame' : isPrimaryVideo ? 'source-video' : 'source-image'
-          if (isPrimaryVideo) result.references.push({ role: 'reference', path, url, name: source.data.title, tag: result.inputTag, description: source.data.prompt, mediaType, slot: 'reference' })
+          if (isPrimaryVideo) result.references.push({ role: 'reference', path, url, name: source.data.title, tag: result.inputTag, description: source.data.prompt, referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, source.data.kind === 'wardrobe' && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined), mediaType, slot: 'reference' })
         } else result.references.push({
           role: 'reference', path, url, name: selectedName,
           description: source.data.prompt,
+          mediaReferenceMode: source.data.mediaReferenceMode || (outputSignalFor(source.data) === 'audio' ? source.data.kind === 'voiceover' ? 'lip-sync' : 'sound' : undefined),
+          referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, source.data.kind === 'wardrobe' && target?.data.kind === 'character' ? workflowTag(target.data, 'character') : undefined),
           tag: workflowTag(source.data, edge.targetHandle === 'end-image' ? 'end-frame' : slot === 'start' ? 'start-frame' : `${slot}-${result.references.length + 1}`),
           mediaType, slot, fidelity: inputFidelity,
           authority: mediaType === 'video' && edge.targetHandle === 'video-reference-in'
@@ -554,19 +578,25 @@ export function resolveWorkflowInput(nodeId: string, nodes: StudioNode[], edges:
     return result
   }
 
-  return walk(nodeId, new Set<string>(), ignoredRootTargetHandles)
+  const resolved = walk(nodeId, new Set<string>(), ignoredRootTargetHandles)
+  const consumer = nodes.find(node => node.id === nodeId)
+  if (consumer && ['image-generator', 'video-generator', 'storyboard'].includes(consumer.data.kind)) {
+    resolved.references = resolved.references.map(reference => reference.role === 'reference' && reference.slot === 'reference' && reference.tag !== resolved.inputTag && (reference.mediaType === 'image' || reference.mediaType === 'video' || reference.mediaType === 'audio')
+      ? { ...reference, mediaReferenceMode: reference.mediaReferenceMode || 'reference', fidelity: undefined } : { ...reference, fidelity: undefined })
+  }
+  return resolved
 }
 
-function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[], previewOnly = false): GenerationRequest {
   edges = directStoryboardStyles(nodes, edges)
   const state = node.data.falNative!
   if (falNativeFlowForKind(node.data.kind) !== state.flow || !state.fingerprint) throw new Error('Load the selected model contract before generating.')
   if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON field edits before generating.')
   if (state.repairs?.length) throw new Error(state.repairs.join(' '))
-  const manual = node.data.kind === 'video-generator' && node.data.promptMode === 'manual'
-  const upstream = resolveWorkflowInput(node.id, nodes, edges, manual ? new Set(['storyboard-in']) : new Set())
+  const manual = node.data.kind === 'video-generator' && activeVideoPromptMode(node.data, edges.some(edge => edge.target === node.id && edge.targetHandle === 'storyboard-in')) === 'manual'
+  const upstream = resolveWorkflowInput(node.id, nodes, edges, manual ? new Set(['storyboard-in']) : new Set(), previewOnly)
   if (manual) for (const edge of edges.filter(candidate => candidate.target === node.id && candidate.targetHandle === 'storyboard-in')) {
-    const nested = resolveWorkflowInput(edge.source, nodes, edges)
+    const nested = resolveWorkflowInput(edge.source, nodes, edges, new Set(), previewOnly)
     upstream.references.push(...nested.references)
     upstream.connectionRules.push(...nested.connectionRules.filter(rule => !/^(?:Storyboard|Prompt|Text List)$/i.test(rule.label)))
     upstream.offlineSemanticSources.push(...nested.offlineSemanticSources)
@@ -577,7 +607,7 @@ function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges
   const family: PromptFamily = findVideoModel(state.endpointId)?.family || 'generic'
   const joinAuthored = (...parts: Array<string | undefined>) => parts.filter((part): part is string => Boolean(part?.trim())).join('\n\n') || undefined
   const raw = joinAuthored(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, family), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
-  const request: GenerationRequest = { ...nativeVideoMotionRequest(node.data, manual), nodeId: node.id, kind: node.data.kind, prompt: raw, authoredPrompt: joinAuthored(local, upstream.authoredPrompt), stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
+  const request: GenerationRequest = { ...(previewOnly ? { promptPreviewOnly: true as const } : {}), ...nativeVideoMotionRequest(node.data, manual), nodeId: node.id, kind: node.data.kind, prompt: raw, authoredPrompt: joinAuthored(local, upstream.authoredPrompt), stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
     videoEngine: node.data.kind === 'video-generator' ? state.endpointId : undefined,
     imageProvider: ['image-generator', 'image-editor'].includes(node.data.kind) ? 'fal' : undefined,
     imageModelId: ['image-generator', 'image-editor'].includes(node.data.kind) ? state.endpointId : undefined,
@@ -593,9 +623,9 @@ function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges
   const orderedReferences: NonNullable<GenerationRequest['references']> = []
   for (const field of state.media.filter(binding => !binding.retired)) {
     const fieldEdges = edges.filter(edge => edge.target !== node.id || edge.targetHandle === field.portId)
-    const fieldInput = resolveWorkflowInput(node.id, nodes, fieldEdges)
+    const fieldInput = resolveWorkflowInput(node.id, nodes, fieldEdges, new Set(), previewOnly)
     let references = providerVisibleReferences({ ...request, references: fieldInput.references })
-    if ((fieldInput.inputPath || fieldInput.inputUrl) && !references.some(reference => identity(reference) === identity({ path: fieldInput.inputPath, url: fieldInput.inputUrl, mediaType: field.type }))) references.unshift({ path: fieldInput.inputPath, url: fieldInput.inputUrl, name: fieldInput.inputName, tag: fieldInput.inputTag, mediaType: field.type, role: 'reference', slot: field.role === 'start-frame' ? 'start' : field.role === 'end-frame' ? 'end' : undefined })
+    if ((fieldInput.inputPath || fieldInput.inputUrl) && !references.some(reference => identity(reference) === identity({ path: fieldInput.inputPath, url: fieldInput.inputUrl, mediaType: field.type }))) references.unshift({ path: fieldInput.inputPath, url: fieldInput.inputUrl, name: fieldInput.inputName, tag: fieldInput.inputTag, referenceDescription: fieldInput.connectionRules.find(rule => rule.tag === fieldInput.inputTag)?.referenceDescription, mediaType: field.type, role: 'reference', slot: field.role === 'start-frame' ? 'start' : field.role === 'end-frame' ? 'end' : undefined })
     if (field.role === 'reference-image') references = [...references, ...physical.filter(reference => (reference.mediaType || 'image') === 'image')]
     if (field.role === 'reference-video') references = [...references, ...physical.filter(reference => reference.mediaType === 'video')]
     if (field.role === 'reference-audio') references = [...references, ...physical.filter(reference => reference.mediaType === 'audio')]
@@ -612,13 +642,13 @@ function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges
   if (unbound.length) throw new Error('Connected media are not bound to an input of the selected model. Review the preserved connections.')
   request.references = orderedReferences
   const timelineSeconds = authoredTimelineSeconds(request)
-  assertFalTimelineTiming(state.timing, timelineSeconds, state.values)
+  if (!previewOnly) assertFalTimelineTiming(state.timing, timelineSeconds, state.values)
   let finalPrompt: string | undefined
   if (state.promptField) {
-    if (manual) finalPrompt = local ?? ''
+    if (manual) finalPrompt = userPromptWithCadence(local ?? '', node.data.motionCadenceMode, request.motionCadence)
     else if (['voiceover', 'sound-effects'].includes(node.data.kind)) finalPrompt = local ?? (typeof state.values[state.promptField] === 'string' ? state.values[state.promptField] as string : '')
     else {
-      const compiled = compileNativeProviderPrompt(request, family)
+      const compiled = compileNativeProviderPrompt(request, family, true)
       if (compiled.promptBudgetDiagnostic?.blocking) throw new Error(compiled.promptBudgetDiagnostic.blockingReason)
       finalPrompt = compiled.text
     }
@@ -627,10 +657,11 @@ function buildFalNativeGraphRequest(node: StudioNode, nodes: StudioNode[], edges
   request.providerPromptOverride = finalPrompt
   request.providerPromptOwnership = manual ? 'authored' : 'compiled'
   request.falNative = { promptOwnership: request.providerPromptOwnership, requiresGeneratedSpeech: requiresGeneratedDialogueAudio(request), ...(timelineSeconds !== undefined ? { timelineSeconds } : {}), endpointId: state.endpointId, flow: state.flow, fingerprint: state.fingerprint, promptField: state.promptField || undefined, values: { ...state.values, ...(state.promptField ? { [state.promptField]: finalPrompt! } : {}) }, media }
+  if (state.promptField && finalPrompt !== undefined) request.falNative.values[state.promptField] = nativeFalPromptTransport(request, finalPrompt)
   return request
 }
 
-function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[], previewOnly = false): GenerationRequest {
   edges = directStoryboardStyles(nodes, edges)
   const state = node.data.higgsfieldNative!
   if (Object.keys(state.drafts || {}).length) throw new Error('Complete the preserved numeric or JSON input edits before generating.')
@@ -648,9 +679,9 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   }
   verifyGraph(node.id)
   const manual = activeVideoPromptMode(node.data, edges.some(edge => edge.target === node.id && edge.targetHandle === 'storyboard-in')) === 'manual'
-  const upstream = resolveWorkflowInput(node.id, nodes, edges, manual ? new Set(['storyboard-in']) : new Set())
+  const upstream = resolveWorkflowInput(node.id, nodes, edges, manual ? new Set(['storyboard-in']) : new Set(), previewOnly)
   if (manual) for (const edge of edges.filter(edge => edge.target === node.id && edge.targetHandle === 'storyboard-in')) {
-    const nested = resolveWorkflowInput(edge.source, nodes, edges)
+    const nested = resolveWorkflowInput(edge.source, nodes, edges, new Set(), previewOnly)
     upstream.references.push(...nested.references)
     upstream.connectionRules.push(...nested.connectionRules.filter(rule => !/^(?:Storyboard|Prompt|Text List)$/i.test(rule.label)))
     upstream.offlineSemanticSources.push(...nested.offlineSemanticSources)
@@ -659,7 +690,7 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   }
   const local = manual ? node.data.manualPromptDraft ?? node.data.prompt ?? '' : node.data.prompt
   const raw = manual ? local : joinPrompt(local, compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, higgsfieldPromptFamily(state.endpointId)), withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt))
-  const request: GenerationRequest = {
+  const request: GenerationRequest = { ...(previewOnly ? { promptPreviewOnly: true as const } : {}),
     ...nativeVideoMotionRequest(node.data, manual), nodeId: node.id, kind: 'video-generator', videoEngine: state.endpointId, prompt: raw,
     authoredPrompt: manual ? local : joinSpeech(local, upstream.authoredPrompt),
     stylePrompt: upstream.stylePrompt, builtInStylePrompts: upstream.builtInStylePrompts,
@@ -675,17 +706,16 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   const media: Record<string, HiggsfieldMediaSource[]> = {}, slots: HiggsfieldPromptSlot[] = []
   const referenceAuthorityFailures = [...sameBodyAuthorityReadinessFailures({...request,references:upstream.references}), ...propScaleReadinessFailures({...request,references:upstream.references})]
   if (referenceAuthorityFailures.length) throw new Error(referenceAuthorityFailures.join(' '))
-  const referenceImage = bindings.find(binding => binding.role === 'reference-image' && !binding.retired)
   // Resolve each root edge separately so an intentional duplicate assignment remains a physical input slot.
   for (const edge of edges.filter(edge => edge.target === node.id && edge.targetHandle !== 'text-in')) {
     const direct = bindings.find(binding => !binding.retired && binding.portId === edge.targetHandle)
-    const field = manual && edge.targetHandle === 'storyboard-in' ? resolveWorkflowInput(edge.source,nodes,edges) : resolveWorkflowInput(node.id, nodes, edges.filter(candidate => candidate.target !== node.id || candidate.id === edge.id))
+    const field = manual && edge.targetHandle === 'storyboard-in' ? resolveWorkflowInput(edge.source,nodes,edges,new Set(),previewOnly) : resolveWorkflowInput(node.id, nodes, edges.filter(candidate => candidate.target !== node.id || candidate.id === edge.id), new Set(), previewOnly)
     if (field.offlineSemanticSources.length) continue // Readiness reports exact offline assets; never substitute another input.
     const physical = providerVisibleReferences({ ...request, references: field.references }).filter(reference => (reference.path || reference.url) && !reference.path?.toLowerCase().endsWith('.prismstyle'))
-    if ((field.inputPath || field.inputUrl) && !physical.some(reference => field.inputPath ? reference.path === field.inputPath : reference.url === field.inputUrl)) physical.unshift({ role: 'reference', path: field.inputPath, url: field.inputUrl, tag: field.inputTag, name: field.inputName, mediaType: direct?.type })
+    if ((field.inputPath || field.inputUrl) && !physical.some(reference => field.inputPath ? reference.path === field.inputPath : reference.url === field.inputUrl)) physical.unshift({ role: 'reference', path: field.inputPath, url: field.inputUrl, tag: field.inputTag, name: field.inputName, referenceDescription: field.connectionRules.find(rule => rule.tag === field.inputTag)?.referenceDescription, mediaType: direct?.type })
     if (direct && !physical.length) throw new Error(`The connected ${direct.label} has no available media. Preserve and relink its source.`)
     for (const reference of physical) {
-      const binding = direct || referenceImage
+      const binding = direct || bindings.find(binding => !binding.retired && binding.type === (reference.mediaType || 'image') && binding.role === `reference-${binding.type}`)
       if (!binding) throw new Error('Connected media are not accepted by this Higgsfield mode. Preserve them and choose a compatible input or model.')
       if ((reference.mediaType || 'image') !== binding.type) throw new Error(`${binding.label} accepts ${binding.type} media only.`)
       const entries = media[binding.key] ||= []
@@ -709,7 +739,7 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   if (upstream.offlineSemanticSources.length) throw new Error(upstream.offlineSemanticSources.map(source => `relink ${source.title} (Media Offline)`).join('; '))
   if (!manual) assertStoryboardPhysicalCast(request.storyboardShots || [])
   let finalPrompt: string
-  if (manual) finalPrompt = local ?? ''
+  if (manual) finalPrompt = userPromptWithCadence(local ?? '', node.data.motionCadenceMode, request.motionCadence)
   else {
     const compiled = compileHiggsfieldSeedancePrompt(request, slots, higgsfieldPromptFamily(state.endpointId))
     if (compiled.promptBudgetDiagnostic?.blocking) throw new Error(compiled.promptBudgetDiagnostic.blockingReason)
@@ -719,23 +749,23 @@ function buildHiggsfieldSeedanceGraphRequest(node: StudioNode, nodes: StudioNode
   if (finalPrompt !== '') request.higgsfieldNative.values.prompt = finalPrompt
   else delete request.higgsfieldNative.values.prompt // Optional empty prompt is omitted; required prompts fail their native schema.
   const timing = higgsfieldStoryboardTimingFailures(request)
-  if (timing.length) throw new Error(timing.join(' '))
+  if (timing.length && !previewOnly) throw new Error(timing.join(' '))
   if (!upstream.offlineSemanticSources.length) planHiggsfieldNativeInput(request.higgsfieldNative)
   return request
 }
 
-function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[], previewOnly = false): GenerationRequest {
   edges = directStoryboardStyles(nodes, edges)
   const state = node.data.higgsfieldNative!
   if (node.data.kind !== 'video-generator' || node.data.falNative) throw new Error('Choose one Higgsfield video binding.')
   const model = higgsfieldModel(state.endpointId)
-  if(model.kind!=='genjutsu')return buildHiggsfieldSeedanceGraphRequest(node,nodes,edges)
+  if(model.kind!=='genjutsu')return buildHiggsfieldSeedanceGraphRequest(node,nodes,edges,previewOnly)
   const references: NonNullable<GenerationRequest['references']> = []
   const offline: NonNullable<GenerationRequest['offlineSemanticSources']> = []
   const videos: HiggsfieldMediaSource[] = [], images: HiggsfieldMediaSource[] = []
   // Each graph edge owns its position. Upload deduplication never removes reference slots.
   for (const edge of edges.filter(edge => edge.target === node.id && edge.targetHandle !== 'text-in')) {
-    const field = resolveWorkflowInput(node.id, nodes, edges.filter(candidate => candidate.target !== node.id || candidate.id === edge.id))
+    const field = resolveWorkflowInput(node.id, nodes, edges.filter(candidate => candidate.target !== node.id || candidate.id === edge.id), new Set(), previewOnly)
     offline.push(...field.offlineSemanticSources)
     const selected = [...field.references]
     if ((field.inputPath || field.inputUrl) && !selected.some(reference => field.inputPath ? reference.path === field.inputPath : reference.url === field.inputUrl)) selected.unshift({ role: 'reference', path: field.inputPath, url: field.inputUrl, mediaType: edge.targetHandle === 'video-in' ? 'video' : 'image' })
@@ -762,7 +792,7 @@ function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edge
   const connectedText = edges.filter(edge => edge.target === node.id && edge.targetHandle === 'text-in').flatMap(edge => textFrom(edge.source))
   const local = node.data.promptMode === 'manual' ? node.data.manualPromptDraft ?? node.data.prompt ?? '' : node.data.prompt ?? ''
   const prompt = [local, ...connectedText].filter((value): value is string => value !== undefined && value !== '').join('\n\n')
-  const request: GenerationRequest = { nodeId: node.id, kind: node.data.kind, videoEngine: state.endpointId, prompt, authoredPrompt: prompt, providerPromptOverride: prompt, references, offlineSemanticSources: offline,
+  const request: GenerationRequest = { ...(previewOnly ? { promptPreviewOnly: true as const } : {}), nodeId: node.id, kind: node.data.kind, videoEngine: state.endpointId, prompt, authoredPrompt: prompt, providerPromptOverride: prompt, references, offlineSemanticSources: offline,
     higgsfieldNative: { endpointId: state.endpointId, contractRevision: state.contractRevision, values: { ...state.values, prompt }, media: { video_url: videos, image_urls: images }, allowSourceTrimming: state.allowSourceTrimming } }
   // Provider contract owns aggregate capacity across all sockets and expanded List/Router media.
   if (!offline.length) planHiggsfieldInput(request.higgsfieldNative!)
@@ -771,6 +801,17 @@ function buildHiggsfieldGraphRequest(node: StudioNode, nodes: StudioNode[], edge
 }
 
 export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  return buildGenerationRequestWithPreview(node, nodes, edges, false)
+}
+
+/** Same live compiler, preserving authored timing. A preview cannot be submitted. */
+export function buildGenerationPromptPreviewRequest(node: StudioNode, nodes: StudioNode[], edges: Edge[]): GenerationRequest {
+  if (node.data.kind !== 'video-generator') throw new Error('Video prompt preview needs a Video Generator.')
+  return { ...buildGenerationRequestWithPreview(node, nodes, edges, true), promptPreviewOnly: true }
+}
+
+function buildGenerationRequestWithPreview(node: StudioNode, nodes: StudioNode[], edges: Edge[], previewOnly: boolean): GenerationRequest {
+  if (node.data.draftCompletionPath) return videoDraftCompletionRequest(node.id, node.data)
   edges = directStoryboardStyles(nodes, edges)
   if (!node.data.falNative && !node.data.higgsfieldNative && node.data.kind === 'video-generator' && !findVideoModel(node.data.videoEngine)) {
     throw new Error(`Choose a supported video model; the saved selection “${node.data.videoEngine}” is unavailable.`)
@@ -801,15 +842,15 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     }
   }
   validateUpstream(node.id)
-  if (node.data.higgsfieldNative) return buildHiggsfieldGraphRequest(node, nodes, edges)
-  if (node.data.falNative) return buildFalNativeGraphRequest(node, nodes, edges)
+  if (node.data.higgsfieldNative) return buildHiggsfieldGraphRequest(node, nodes, edges, previewOnly)
+  if (node.data.falNative) return buildFalNativeGraphRequest(node, nodes, edges, previewOnly)
   const storyboardConnected = edges.some((edge) => edge.target === node.id && edge.targetHandle === 'storyboard-in')
   const promptMode = node.data.kind === 'video-generator' ? activeVideoPromptMode(node.data, storyboardConnected) : 'manual'
   if (node.data.kind === 'video-generator' && promptMode === 'manual' && !(node.data.manualPromptDraft ?? node.data.prompt ?? '').trim()) throw new Error('Write a User prompt before running.')
-  const upstream = resolveWorkflowInput(node.id, nodes, edges, promptMode === 'manual' ? new Set(['storyboard-in']) : new Set())
+  const upstream = resolveWorkflowInput(node.id, nodes, edges, promptMode === 'manual' ? new Set(['storyboard-in']) : new Set(), previewOnly)
   if (node.data.kind === 'video-generator' && promptMode === 'manual') {
     for (const storyboardEdge of edges.filter((edge) => edge.target === node.id && edge.targetHandle === 'storyboard-in')) {
-      const nested = resolveWorkflowInput(storyboardEdge.source, nodes, edges)
+      const nested = resolveWorkflowInput(storyboardEdge.source, nodes, edges, new Set(), previewOnly)
       upstream.references.push(...nested.references)
       upstream.connectionRules.push(...nested.connectionRules.filter((rule) => !/^(?:Storyboard|Prompt|Text List)$/i.test(rule.label)))
       upstream.stylePrompt = joinPrompt(upstream.stylePrompt, nested.stylePrompt)
@@ -826,9 +867,9 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     && (requestedVideoModel.mode === 'first-last' || (requestedVideoModel.mode === 'image' && hasEndFrame))
   const effectiveVideoEngine = needsCombinedFrameReferenceRoute ? 'fal-ai/kling-video/o3/standard/reference-to-video' : node.data.videoEngine
   const videoModel = resolveVideoModel(effectiveVideoEngine)
-  const motionCadence = node.data.kind === 'video-generator' ? normalizedMotionCadence(videoModel, node.data.frameRate, node.data.motionCadence) : undefined
+  const motionCadence = node.data.kind === 'video-generator' && node.data.motionCadenceMode !== 'native' ? normalizedMotionCadence(videoModel, node.data.frameRate, node.data.motionCadence) : undefined
   const cadenceInstruction = motionCadence
-    ? `MOTION CADENCE: Depict motion with a deliberate ${motionCadence} fps animation cadence—approximately ${motionCadence} distinct motion updates per second, using held poses or repeated frames as needed. Preserve the provider-native encoded output frame rate and playback duration; do not speed up playback.`
+    ? `MOTION CADENCE: ${visualMotionCadenceInstruction(motionCadence)}`
     : undefined
   const compiledStoryboard = compiledStoryboardPrompt(upstream.storyboardPreamble, upstream.storyboardShots, videoModel.family)
   const upstreamPrompt = withoutStyleBlocks(withoutPromptBlock(upstream.prompt, upstream.storyboardRawPrompt), upstream.stylePrompt)
@@ -848,13 +889,14 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
   const exactArtworkTags = new Set(resolvedConnectionRules
     .filter((rule) => rule.rule.startsWith('LOCK RULE') || rule.rule.startsWith('AUTO → PRESERVE RULE'))
     .map((rule) => rule.tag))
-  const request: GenerationRequest = {
+  const request: GenerationRequest = { ...(previewOnly ? { promptPreviewOnly: true as const } : {}),
+    videoDraft: node.data.videoDraft,
     nodeId: node.id,
     kind: semanticAssetKind ? 'image-generator' : node.data.kind,
     semanticAssetCreation: semanticAssetKind ? { kind: semanticAssetKind, tag: workflowTag(node.data, semanticAssetKind) } : undefined,
     prompt: preservesSpeech(node.data) && !compiledStoryboard?.trim() && !upstreamPrompt?.trim() ? activeLocalPrompt : prompt,
     providerPromptOwnership: node.data.kind === 'video-generator' && node.data.promptMode === 'manual' && node.data.manualPromptSeeded ? 'authored' : undefined,
-    providerPromptOverride: node.data.kind === 'video-generator' && node.data.promptMode === 'manual' && node.data.manualPromptSeeded ? activeLocalPrompt : undefined,
+    providerPromptOverride: node.data.kind === 'video-generator' && node.data.promptMode === 'manual' && node.data.manualPromptSeeded ? userPromptWithCadence(activeLocalPrompt ?? '', node.data.motionCadenceMode, motionCadence) : undefined,
     authoredPrompt,
     stylePrompt: upstream.stylePrompt,
     builtInStylePrompts: upstream.builtInStylePrompts,
@@ -944,7 +986,7 @@ export function buildGenerationRequest(node: StudioNode, nodes: StudioNode[], ed
     voiceSeed: node.data.voiceSeed,
     voiceTimestamps: node.data.voiceTimestamps,
     promptInfluence: node.data.promptInfluence,
-    references: upstream.references.map((reference) => exactArtworkTags.has(reference.tag || '') ? { ...reference, fidelity: 'lock' as const } : reference),
+    references: upstream.references.map((reference) => reference.mediaReferenceMode ? { ...reference, fidelity: undefined } : exactArtworkTags.has(reference.tag || '') ? { ...reference, fidelity: 'lock' as const } : reference),
     offlineSemanticSources: upstream.offlineSemanticSources,
   }
   if (isElevenDialogue(request)) request.prompt = dialoguePromptText(request.elevenDialogueTurns)
@@ -975,7 +1017,6 @@ export interface GenerationRequestInspection {
  */
 export function recursiveUpstreamSemanticTags(nodeId: string, nodes: StudioNode[], edges: Edge[]): string[] {
   const byId = new Map(nodes.map((node) => [node.id, node]))
-  const semanticLabels = /^(?:Character|Wardrobe|Location|Element|Style)/i
   const tags = new Set<string>()
   const visited = new Set<string>()
 
@@ -988,9 +1029,9 @@ export function recursiveUpstreamSemanticTags(nodeId: string, nodes: StudioNode[
     for (const edge of edges.filter((candidate) => candidate.target === targetId)) {
       const source = byId.get(edge.source)
       if (!source) continue
-      const inputFidelity = ((edge.data as { inputFidelity?: InputFidelity } | undefined)?.inputFidelity || 'auto')
+      const inputFidelity = target && ['image-generator', 'video-generator'].includes(target.data.kind) ? 'auto' : ((edge.data as { inputFidelity?: InputFidelity } | undefined)?.inputFidelity || 'auto')
       const rule = connectedInputRule(source.data, target.data, edge.targetHandle, inputFidelity)
-      if (semanticLabels.test(rule.label)) {
+      if (rule.tag && source.data.kind !== 'prompt' && source.data.kind !== 'sticky-note') {
         if (rule.tag) tags.add(rule.tag)
         for (const alias of rule.aliases || []) tags.add(alias)
       }

@@ -21,3 +21,10 @@ Rewrites run in disposable workspaces with native tools/customizations disabled 
 ## Real account acceptance — 11 October 2026
 
 OpenAI's Prism-specific official Codex profile connected to ChatGPT Pro and passed synthetic Shot/All rewrites and an actual installed Storyboard rewrite. Claude was kept free as requested; its official login requires Max/Pro for the Code route, so unavailable subscription access remains selected without an API fallback. Google browser OAuth succeeded, but the Gemini native ACP authenticate call returned -32000; readiness was not fabricated and no Google rewrite was attempted. Account/plan access stays under each official client's ownership. These are bounded acceptance results, not claims that every account or model is available.
+
+
+## BytePlus console asset authorization — 12 October 2026
+
+A local console-asset link never grants identity rights or bypasses provider moderation. The identity owner performs real-person verification/consent in the official workflow; the selected recipient account must have an eligible Active asset. Prism records the user's explicit console attestation without claiming an Asset API check. Asset-library API access requires AK/SK and applicable account rights; this integration uses existing inference credentials and neither enrolls nor purchases access. No AK/SK or consent agreement is introduced.
+
+Links are bound to the immutable selected BytePlus profile, account identifier and exact source bytes. Generation failure never silently switches account/provider or sends raw portrait bytes after a binding error. A new paid BytePlus run remains separate from previous fal spending authorization. Live authorization and output efficacy require legitimate eligible assets and provider acceptance.

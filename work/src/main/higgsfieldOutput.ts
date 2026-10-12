@@ -1,3 +1,4 @@
+import { projectFolderPath } from './projectFolders'
 import { higgsfieldMovieMime, higgsfieldMovieFormat, higgsfieldMovieContainer, higgsfieldMovieHeaderBytes } from './higgsfieldMovieContainer'
 import {createHash} from 'node:crypto'
 import {constants} from 'node:fs'
@@ -23,8 +24,8 @@ async function present(path:string):Promise<boolean>{try{await lstat(path);retur
 async function folder(root:string):Promise<string>{
  const owner=await lstat(root);if(!owner.isDirectory()||owner.isSymbolicLink())throw new Error('Invalid Higgsfield output project folder.')
  const canonicalRoot=await realpath(root);let current=root
- for(const part of ['06. Generated Assets','02. Videos']) {
-   current=join(current,part)
+ for(const destination of [projectFolderPath(root,'Generated Assets'),projectFolderPath(root,'Generated Assets','Videos')]) {
+   current=destination
    try{await mkdir(current)}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error}
    const entry=await lstat(current);if(!entry.isDirectory()||entry.isSymbolicLink()||!(await realpath(current)).startsWith(canonicalRoot+'/'))throw new Error('Higgsfield output folder is not safely inside its project.')
  }

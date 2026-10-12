@@ -21,7 +21,7 @@ describe('Wardrobe Location-parity surface', () => {
     expect(palette).toContain("{ kind: 'wardrobe', label: 'Wardrobe', detail: 'Semantic wardrobe reference'")
     expect(icons).toContain('wardrobe: Shirt')
     expect(icons).toContain("'wardrobe-reference': SEMANTIC_ICONS.wardrobe")
-    expect(main).toContain("projectPath('04. Wardrobes', safeFolderName(collectionName, 'Wardrobe'))")
+    expect(main).toContain("projectFolder('Wardrobes', safeFolderName(collectionName, 'Wardrobe'))")
     expect(main).toContain("category: 'wardrobe'")
   })
 

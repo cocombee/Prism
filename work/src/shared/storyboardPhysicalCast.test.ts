@@ -97,7 +97,7 @@ describe('authored physical cast ownership across provider and rewrite boundarie
     input.authoredPrompt = authored
     const before = JSON.stringify(input)
     expect(providerPromptPreviewCompilation(input).text).toBe(authored)
-    expect(providerSeedancePayloadCompilation(input).text).toContain('[Image1] stays beside the cup.')
+    expect(providerSeedancePayloadCompilation(input).text).toContain('@Image1 stays beside the cup.')
     expect(generationRequirementFailures(input).filter(error => /physical cast/i.test(error))).toEqual([])
     expect(JSON.stringify(input)).toBe(before)
   })

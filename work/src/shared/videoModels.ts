@@ -38,7 +38,7 @@ export function closedVideoModelLabel(model: Pick<VideoModelDefinition, 'shortLa
 }
 
 /** Visual animation cadence choices. These never masquerade as encoded output FPS. */
-export const MOTION_CADENCES = [12, 16, 24, 25, 35, 50, 60] as const
+export const MOTION_CADENCES = [12, 16, 24, 35, 50, 60] as const
 
 export function knownOutputFrameRate(model: VideoModelDefinition, selectedFrameRate?: number): number | undefined {
   if (model.frameRates.length) return selectedFrameRate && model.frameRates.includes(selectedFrameRate) ? selectedFrameRate : model.frameRates[0]
@@ -52,7 +52,7 @@ export function effectiveOutputFrameRate(model: VideoModelDefinition, selectedFr
 
 export function motionCadenceOptions(model: VideoModelDefinition, selectedFrameRate?: number): number[] {
   const outputFrameRate = knownOutputFrameRate(model, selectedFrameRate)
-  return outputFrameRate ? MOTION_CADENCES.filter((cadence) => cadence < outputFrameRate) : [...MOTION_CADENCES]
+  return outputFrameRate ? MOTION_CADENCES.filter((cadence) => cadence <= outputFrameRate) : [...MOTION_CADENCES]
 }
 
 export function normalizedMotionCadence(model: VideoModelDefinition, selectedFrameRate?: number, cadence?: number): number | undefined {
@@ -92,6 +92,7 @@ function seedance(id: string, label: string, mode: VideoModelMode, options: { fa
     durations: version === '2.5' ? SEEDANCE_25_DURATIONS : SEEDANCE_DURATIONS,
     resolutions: compactTier ? ['480p', '720p'] : ['480p', '720p', '1080p', '4k'],
     frameRates: [],
+    fixedFrameRate: version === '2.5' ? 24 : undefined,
     fixedAspectRatioLabel: version === '2.5' && mode === 'image' ? 'From Input' : undefined,
     nativeAudio: true,
     fast: options.fast,

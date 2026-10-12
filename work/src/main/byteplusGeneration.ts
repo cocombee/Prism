@@ -1,3 +1,4 @@
+import { BYTEPLUS_SEEDANCE_DRAFT_MODEL } from '../shared/videoDraft'
 import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
 import { videoDialogueAudioReadinessFailures } from '../shared/videoDialogueAudio'
 import { storyboardPhysicalCastReadinessFailures } from '../shared/storyboardPhysicalCast'
@@ -17,6 +18,7 @@ async function resolvedReference(reference: GenerationReference, resolveMedia: B
 
 export async function compileBytePlusGenerationRequest(request: GenerationRequest, resolveMedia: BytePlusMediaResolver): Promise<BytePlusCreatePayload> {
   const route = resolveVideoModel(request.videoEngine)
+  if (request.videoDraft && route.apiModelId !== BYTEPLUS_SEEDANCE_DRAFT_MODEL) throw new Error('This model has no verified draft mode.')
   if (route.provider !== 'byteplus') throw new Error('The selected video model is not a BytePlus route.')
 
   const castFailures = [...storyboardPhysicalCastReadinessFailures(request), ...videoDialogueAudioReadinessFailures(request)]
@@ -59,7 +61,7 @@ export async function compileBytePlusGenerationRequest(request: GenerationReques
   const resolution = request.resolution && route.resolutions.includes(request.resolution) ? request.resolution : route.resolutions.includes('720p') ? '720p' : route.resolutions[0]
   const prompt = providerSeedancePayloadCompilation(promptRequest).text
 
-  return compileBytePlusSeedancePayload({
+  const payload = compileBytePlusSeedancePayload({
     route,
     prompt,
     media,
@@ -69,4 +71,5 @@ export async function compileBytePlusGenerationRequest(request: GenerationReques
     generateAudio: Boolean(request.generateAudio),
     ...(route.supportsSeed && Number.isSafeInteger(request.seed) ? { seed: request.seed } : {}),
   })
+  return request.videoDraft ? { ...payload, draft: true, resolution: '480p' } : payload
 }

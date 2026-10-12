@@ -1,4 +1,5 @@
 export const NODE_TRANSIENT_NOTICE_MS = 5200
+export const NODE_ERROR_NOTICE_MS = 10000
 
 export type NodeNotificationCategory = 'running' | 'transient' | 'error' | 'readiness' | 'helper' | 'none'
 
@@ -25,9 +26,13 @@ export function nodeLifecycleTransition<T extends NodeNotificationState & { noti
   const nextRunState = patch.runState ?? current.runState
   if (patch.error) {
     next.progress = undefined
-    if (!patch.runState || patch.runState === 'complete') next.runState = 'error' as T['runState']
-  } else if (patch.progress && nextRunState !== 'queued' && nextRunState !== 'running') {
     next.notificationVersion = ((current.notificationVersion || 0) + 1) as T['notificationVersion']
+    if (!patch.runState || patch.runState === 'complete') next.runState = 'error' as T['runState']
+  } else {
+    if (patch.runState === 'complete') next.error = undefined
+    if (patch.progress && nextRunState !== 'queued' && nextRunState !== 'running') {
+      next.notificationVersion = ((current.notificationVersion || 0) + 1) as T['notificationVersion']
+    }
   }
   return next
 }
@@ -59,4 +64,15 @@ export function scheduleNodeProgressExpiry(
     clear(nodeId, progress, version)
   }, NODE_TRANSIENT_NOTICE_MS)
   timers.set(nodeId, { progress, version, handle })
+}
+
+export function nodeErrorNoticeKey(state: NodeNotificationState & { notificationVersion?: number; runStartedAt?: string }): string | undefined {
+  if (!state.error || ['queued', 'running', 'complete'].includes(state.runState || '')) return undefined
+  return JSON.stringify([state.error, state.notificationVersion || 0, state.runStartedAt || ''])
+}
+
+/** Expiry affects feedback only; failed state and recovery evidence remain owned by the node. */
+export function scheduleNodeErrorNoticeExpiry(key: string, readCurrentKey: () => string | undefined, expire: () => void): () => void {
+  const handle = setTimeout(() => { if (readCurrentKey() === key) expire() }, NODE_ERROR_NOTICE_MS)
+  return () => clearTimeout(handle)
 }

@@ -12,7 +12,7 @@ export interface FalNativeGenerationDependencies<Client> {
   client(): Promise<Client>
   upload(client: Client, path: string): Promise<string>
   submit(client: Client, endpointId: string, input: Record<string, unknown>, signal?: AbortSignal): Promise<{ requestId: string; data: unknown }>
-  persist(output: FalNativeOutput, endpointId: string, signal?: AbortSignal): Promise<{ path: string; url: string }>
+  persist(output: FalNativeOutput, endpointId: string, signal?: AbortSignal, data?: unknown): Promise<{ path: string; url: string }>
 }
 export interface FalNativeGenerationResult {
   requestId: string
@@ -93,7 +93,7 @@ export async function executeFalNativeGeneration<Client>(request: FalNativeReque
   const outputs = extractFalNativeOutputs(plan, result.data)
   const saved: FalNativeGenerationResult['outputs'] = []
   for (const output of outputs) {
-    const persisted = await dependencies.persist(output, plan.endpointId, signal)
+    const persisted = await dependencies.persist(output, plan.endpointId, signal, result.data)
     assertCurrent()
     saved.push({ ...persisted, type: output.type })
   }

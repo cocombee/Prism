@@ -79,11 +79,13 @@ describe('successor renderer asset and reference surfaces', () => {
     expect(stylesNext).not.toContain('.reusable-large-preview-media.is-character-preview.is-single-character')
     expect(nodeCardNext).not.toContain('is-single-character-footer')
     expect(stylesNext).not.toContain('.character-completion-footer.is-single-character-footer')
-    expect(stylesNext).toMatch(/\.compact-generator-footer\s*\{[^}]*min-height:\s*44px;[^}]*padding:\s*6px 8px;/)
+    expect(stylesNext).toMatch(/\.compact-generator-footer\s*\{[^}]*min-height:\s*44px;[^}]*padding:\s*var\(--node-footer-inset\);/)
   })
 
   it('splits Character prompt and Play behavior while sharing one footer layout', () => {
-    expect(nodeCardNext).toContain("data.kind === 'character' && characterCreateOpen || ['element', 'location', 'wardrobe'].includes(data.kind)")
+    expect(nodeCardNext).toContain('showPrompt={semanticEditorActive}')
+    expect(nodeCardNext).toContain("const semanticEditorActive = data.kind === 'style-reference' && styleCreateOpen")
+    expect(nodeCardNext).toContain("|| data.kind === 'character' && characterCreateOpen")
     expect(nodeCardNext).not.toContain("characterInputMode === 'multi' && <GroupedMenuSelect className=\"character-ai-provider\"")
     expect(nodeCardNext).not.toContain("characterInputMode === 'multi' && <PlayTooltip")
     expect(nodeCardNext).toContain("characterInputMode === 'single' ? 'Generate Complete Character Sheet' : 'Complete Missing Character Views'")

@@ -27,7 +27,7 @@ function setup(provider: 'openai' | 'google') {
   bindings.runOpenAIImage = actualFunction('runOpenAIImage', bindings); bindings.runGeminiImage = actualFunction('runGeminiImage', bindings)
   return { run: actualFunction('runGeneration', bindings), bindings, post }
 }
-const request = (provider: 'openai' | 'google'): GenerationRequest => ({ nodeId: 'fixture', kind: 'image-generator', imageProvider: provider, imageModelId: provider === 'openai' ? 'gpt-image-2' : 'gemini-3.1-flash-image', prompt: 'Place @url left of @local.', inputUrl: 'https://images.example/primary.png', references: [{ role: 'reference', tag: '@local', path: '/managed/local.png' }, { role: 'reference', tag: '@url', url: 'https://images.example/opaque?token=keep' }], aspectRatio: '16:9', imageResolution: '1K', outputFormat: 'png', seed: 99, guidanceScale: 2 })
+const request = (provider: 'openai' | 'google'): GenerationRequest => ({ nodeId: 'fixture', kind: 'image-generator', imageProvider: provider, imageModelId: provider === 'openai' ? 'gpt-image-2' : 'gemini-3.1-flash-image', prompt: 'Place @url left of @local.', inputUrl: 'https://images.example/primary.png', references: [{ referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@local', path: '/managed/local.png' }, { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@url', url: 'https://images.example/opaque?token=keep' }], aspectRatio: '16:9', imageResolution: '1K', outputFormat: 'png', seed: 99, guidanceScale: 2 })
 describe('actual native image dispatcher and transport composition', () => {
   it.each(['openai', 'google'] as const)('preserves mixed %s physical input order and prompt ordinals with one POST', async provider => {
     const { run, post, bindings } = setup(provider), authored = request(provider); await run(authored)
@@ -41,7 +41,7 @@ describe('actual native image dispatcher and transport composition', () => {
     expect(controls).toEqual(providerEffectiveRequestControls(authored)); expect(controls).not.toHaveProperty('seed'); expect(controls).not.toHaveProperty('guidanceScale'); expect(bindings.loadServiceCredential.mock.calls).toEqual([[provider]])
   })
   it('retains image[] multipart for every local OpenAI source in exact order', async () => {
-    const { run, post } = setup('openai'), authored = request('openai'); authored.inputUrl = undefined; authored.references = [{ role: 'reference', tag: '@local', path: '/managed/local.png' }, { role: 'reference', tag: '@url', path: '/managed/url.png' }]
+    const { run, post } = setup('openai'), authored = request('openai'); authored.inputUrl = undefined; authored.references = [{ referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@local', path: '/managed/local.png' }, { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@url', path: '/managed/url.png' }]
     await run(authored); const options = (post.mock.calls[0] as any)[1], form = options.body as FormData
     expect(form.getAll('image[]').map((file: any) => file.name)).toEqual(['url.png', 'local.png']); expect(form.has('image')).toBe(false); expect(form.get('size')).toBe('1536x1024'); expect(form.get('n')).toBe('1'); expect(options.headers['Content-Type']).toBeUndefined()
   })
@@ -56,7 +56,7 @@ describe('actual native image dispatcher and transport composition', () => {
       const { run, post, bindings } = setup(provider), authored = request(provider), controller = new AbortController()
       if (scenario === 'uri') authored.inputUrl = 'file:///private/secret.png'
       if (scenario === 'path') bindings.assertManagedMediaPath.mockRejectedValue(new Error('Relink input'))
-      if (scenario === 'overload') { authored.references = Array.from({ length: 101 }, (_, i) => ({ role: 'reference' as const, path: `/managed/${i}.png` })) }
+      if (scenario === 'overload') { authored.references = Array.from({ length: 101 }, (_, i) => ({ referenceDescription: 'Authored fixture reference purpose.', role: 'reference' as const, path: `/managed/${i}.png` })) }
       if (scenario === 'cancel') controller.abort()
       if (scenario === 'owner') bindings.runtimeServiceFailures.assertCurrent.mockImplementation(() => { throw new Error('Owner changed') })
       await expect(run(authored, controller.signal)).rejects.toThrow({ uri: /HTTPS/, path: /Relink/, overload: /maximum|up to/, cancel: /cancelled/, owner: /Owner changed/ }[scenario]); expect(post).not.toHaveBeenCalled(); expect(bindings.loadServiceCredential).not.toHaveBeenCalled(); expect(bindings.finishDirectImage).not.toHaveBeenCalled()

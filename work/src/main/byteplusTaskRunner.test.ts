@@ -17,7 +17,7 @@ describe('runBytePlusTask', () => {
       .mockResolvedValueOnce(response({ id: 'task-managed', status: 'succeeded', content: { video_url: 'https://output/video.mp4' } }))
     const download = vi.fn().mockResolvedValue('/project/06. Generated Assets/02. Videos/generated.mp4')
     const result = await runBytePlusTaskAndDownload({ fetch, apiKey: 'safe-placeholder', payload, pollIntervalMs: 0, download })
-    expect(download).toHaveBeenCalledWith('https://output/video.mp4')
+    expect(download).toHaveBeenCalledWith('https://output/video.mp4', { taskId: 'task-managed', status: 'succeeded', terminal: true, outputUrl: 'https://output/video.mp4' })
     expect(result).toMatchObject({ taskId: 'task-managed', outputPath: '/project/06. Generated Assets/02. Videos/generated.mp4' })
   })
 

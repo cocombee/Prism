@@ -35,3 +35,8 @@ export const FISH_LATENCY_OPTIONS = [
   { value: 'normal', label: 'Normal' },
   { value: 'balanced', label: 'Balanced' },
 ] as const
+
+/** Fal's built-in wire names stay distinct from ElevenLabs' descriptive display titles. */
+export function falBuiltInVoiceName(label: string): string {
+  return ELEVEN_V3_BUILT_IN_VOICES.find(name => label === name || label.startsWith(`${name} - `)) || label
+}

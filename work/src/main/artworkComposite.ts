@@ -1,3 +1,4 @@
+import { isLockedArtworkReference } from '../shared/inputRules'
 import { dirname, extname, join } from 'node:path'
 import { rename, unlink } from 'node:fs/promises'
 import sharp, { type OverlayOptions } from 'sharp'
@@ -209,7 +210,7 @@ export async function detectRoundCarrier(rgb: Buffer, width: number, height: num
 
 export async function compositeLockedArtwork(request: GenerationRequest, outputPath: string): Promise<{ applied: boolean; placements: number; confidence: number }> {
   const prompt = request.prompt || ''
-  const artwork = (request.references || []).filter((reference) => reference.fidelity === 'lock' && reference.role === 'reference' && reference.path && (!reference.mediaType || reference.mediaType === 'image'))
+  const artwork = (request.references || []).filter(isLockedArtworkReference)
   if (!artwork.length) return { applied: false, placements: 0, confidence: 1 }
   const analysisWidth = 512
   const analysis = await sharp(outputPath).rotate().resize({ width: analysisWidth, withoutEnlargement: true }).removeAlpha().raw().toBuffer({ resolveWithObject: true })

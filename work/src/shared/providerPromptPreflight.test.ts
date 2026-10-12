@@ -6,7 +6,7 @@ import {compileBytePlusGenerationRequest} from '../main/byteplusGeneration'
 import {executeFalNativeGeneration} from '../main/falNativeGeneration'
 import type {GenerationRequest} from './types'
 const master = ['FORMAT MODE','one shot','SHOT 1','@maya holds the cup.','SCENE CONTEXT','Kitchen','ACTIVE REFERENCES','@maya','CAMERA','Static','LIGHTING','Window','STYLE','Natural','CONTINUITY','Same cup','CHARACTER ACTING','Quiet','PHYSICS','Grounded','AUDIO','Room tone','QUALITY','Clean','NEGATIVE PROMPT','identity drift'].join('\n')
-const request=(extra:Partial<GenerationRequest>={}):GenerationRequest=>({nodeId:'boundary-qa',kind:'video-generator',videoEngine:'bytedance/seedance-2.5/reference-to-video',prompt:master,authoredPrompt:master,duration:5,references:[{role:'character',tag:'@maya',path:'/fictional/maya.png',characterAuthorityMode:'complete-dressed-body'}],...extra})
+const request=(extra:Partial<GenerationRequest>={}):GenerationRequest=>({nodeId:'boundary-qa',kind:'video-generator',videoEngine:'bytedance/seedance-2.5/reference-to-video',prompt:master,authoredPrompt:master,duration:5,references:[{referenceDescription: 'Authored fixture reference purpose.', role: 'character',tag:'@maya',path:'/fictional/maya.png',characterAuthorityMode:'complete-dressed-body'}],...extra})
 describe('final-body integrity before service work',()=>{
  it.each(['AUDIO\nnew speech','QUALITY\nnew target','SHOT 2\nnew scene','**CAMERA**\nnew move','NEGATIVE PROMPT\nduplicate'])('rejects appended %s across visible, submission and native compilers without rewriting',tail=>{
   const input=request({prompt:master+'\n'+tail,authoredPrompt:master+'\n'+tail}),before=JSON.stringify(input)
@@ -41,7 +41,7 @@ describe('final-body integrity before service work',()=>{
   const input=request(),before=JSON.stringify(input)
   expect(()=>assertVideoProviderPromptPreflight(input)).not.toThrow()
   expect(providerPromptPreviewCompilation(input).text).toBe(master)
-  expect(compileNativeProviderPrompt(input,'seedance').text).toBe(master.replaceAll('@maya','[Image1]'))
+  expect(compileNativeProviderPrompt(input,'seedance').text).toBe(master.replaceAll('@maya','@Image1'))
   expect(JSON.stringify(input)).toBe(before)
  })
 })
@@ -67,7 +67,7 @@ describe('effective native ownership, route and visible binding',()=>{
   if(mode==='missing')delete input.falNative!.promptField
   if(mode==='empty')input.falNative!.promptField=''
   if(mode==='nonstring')input.falNative!.values.prompt=123
-  if(mode==='mismatch')input.falNative!.values.prompt='Other exact body'
+  if(mode==='mismatch')input.falNative!.values.prompt='NEGATIVE PROMPT\nOther exact body'
   const before=JSON.stringify(input)
   expect(()=>assertVideoProviderPromptPreflight(input)).toThrow(/prompt.*field|prompt.*binding|match.*visible/i)
   expect(JSON.stringify(input)).toBe(before);expect(input.providerPromptOverride).toBe(beforeBody)
@@ -80,7 +80,7 @@ describe('effective native ownership, route and visible binding',()=>{
   input.falNative!.values.prompt='different';expect(()=>assertVideoProviderPromptPreflight(input)).toThrow(/match.*visible/i)
  })
  it('uses actual native routing for complete-master unused metadata exemptions in both directions',()=>{
-  const input=request({videoEngine:'fal-ai/kling-video/v3/pro/text-to-video',falNative:{endpointId:'bytedance/seedance-2.5/text-to-video',fingerprint:'a'.repeat(64),flow:'video',promptOwnership:'compiled',promptField:'prompt',values:{prompt:master},media:{}},storyboardShots:[{prompt:'unused',camera:'static',shotSize:'wide',duration:5,dialogueSpans:[null] as never}]})
+  const input=request({references:[],videoEngine:'fal-ai/kling-video/v3/pro/text-to-video',falNative:{endpointId:'bytedance/seedance-2.5/text-to-video',fingerprint:'a'.repeat(64),flow:'video',promptOwnership:'compiled',promptField:'prompt',values:{prompt:master},media:{}},storyboardShots:[{prompt:'unused',camera:'static',shotSize:'wide',duration:5,dialogueSpans:[null] as never}]})
   expect(()=>assertVideoProviderPromptPreflight(input)).not.toThrow()
   input.videoEngine='bytedance/seedance-2.5/text-to-video';input.falNative!.endpointId='fal-ai/kling-video/v3/pro/text-to-video'
   expect(()=>assertVideoProviderPromptPreflight(input)).toThrow(/malformed/i)

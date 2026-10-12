@@ -1,3 +1,4 @@
+import { falBuiltInVoiceName } from '../shared/providerOptions'
 import { isElevenDialogue, type ElevenVoiceSegment } from '../shared/elevenDialogue'
 import { elevenVoicePreviewUrl } from '../shared/elevenVoicePreview'
 import type { GenerationRequest, ServiceModelAvailability } from '../shared/types'
@@ -48,18 +49,18 @@ async function boundedBody(response: Response, maximum: number, signal?: AbortSi
   finally { reader.releaseLock() }
 }
 
-async function boundedJson(response: Response, maximum: number, signal?: AbortSignal): Promise<unknown> {
+export async function boundedJson(response: Response, maximum: number, signal?: AbortSignal): Promise<unknown> {
   return JSON.parse((await boundedBody(response, maximum, signal)).toString('utf8')) as unknown
 }
 
-async function checkedResponse(options: ElevenApiOptions, url: string, init: RequestInit = {}, timeout = 10000): Promise<Response> {
+export async function checkedResponse(options: ElevenApiOptions, url: string, init: RequestInit = {}, timeout = 10000): Promise<Response> {
   options.signal?.throwIfAborted()
-  if (init.method === 'POST') options.assertSubmission?.()
-  const response = await options.fetch(url, { ...init, redirect: 'error', headers: { ...init.headers, 'xi-api-key': options.key }, signal: deadline(options.signal, timeout) })
+  if (init.method === 'POST' || init.method === 'DELETE') options.assertSubmission?.()
+  const response = await options.fetch(url, { ...init, redirect: 'error', headers: { ...init.headers, ...(options.key ? { 'xi-api-key': options.key } : {}) }, signal: deadline(options.signal, timeout) })
   if (!response.ok) {
     const body = await boundedJson(response, 8192, options.signal).catch(() => ({})) as { detail?: { message?: string } | string; error?: { message?: string } }
     const detail = typeof body.detail === 'string' ? body.detail : body.detail?.message || body.error?.message
-    const safe = typeof detail === 'string' ? detail.replaceAll(options.key, '[redacted]').slice(0, 400) : ''
+    const safe = typeof detail === 'string' ? (options.key ? detail.replaceAll(options.key, '[redacted]') : detail).slice(0, 400) : ''
     const error = new Error(`ElevenLabs request failed (${response.status})${safe ? `: ${safe}` : ''}`)
     Object.assign(error, { status: response.status })
     throw error
@@ -182,4 +183,20 @@ export async function generateElevenAudio(options: ElevenApiOptions, request: Ge
     ...(response.headers.get('request-id') ? { requestId: response.headers.get('request-id')! } : {}),
     ...(segments ? { voiceSegments: segments } : {}),
     ...(original ? { alignment: original } : {}), ...(normalized ? { normalizedAlignment: normalized } : {}) }
+}
+
+/** Public built-in previews for fal voice names. No service credential is sent. */
+export async function readPublicElevenVoices(fetch: typeof globalThis.fetch): Promise<NonNullable<ServiceModelAvailability['voices']>> {
+  const signal = AbortSignal.timeout(10000)
+  const response = await fetch(`${ELEVENLABS_API}/v1/voices`, { credentials: 'omit', redirect: 'error', signal })
+  if (!response.ok) throw new Error('Public voice previews are unavailable.')
+  const body = await boundedJson(response, 2 * 1024 * 1024, signal) as { voices?: Array<{ voice_id?: unknown; name?: unknown; preview_url?: unknown }> }
+  if (!body || !Array.isArray(body.voices) || body.voices.length > 1000) throw new Error('Public voice preview catalog is invalid.')
+  const voices = new Map<string, NonNullable<ServiceModelAvailability['voices']>[number]>()
+  for (const voice of body.voices) {
+    if (!voice || typeof voice.voice_id !== 'string' || !voice.voice_id.trim() || voice.voice_id.length > 256 || typeof voice.name !== 'string' || voice.name.length > 256) throw new Error('Public voice preview catalog is invalid.')
+    const previewUrl = elevenVoicePreviewUrl(voice.preview_url)
+    if (!voices.has(voice.voice_id)) voices.set(voice.voice_id, { id: voice.voice_id, label: falBuiltInVoiceName(voice.name), ...(previewUrl ? { previewUrl } : {}) })
+  }
+  return [...voices.values()]
 }

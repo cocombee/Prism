@@ -1,7 +1,9 @@
+import { createVideoDraftReceipt, supportsFalSeedanceDraft } from '../shared/videoDraft'
 import { requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError } from '../shared/videoDialogueAudio'
 import { SeedancePromptIntegrityError } from '../shared/seedancePromptIntegrity'
 import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
 import { effectiveProviderPromptOwnership } from '../shared/providerPromptOwnership'
+import { nativeFalPromptTransport } from '../shared/nativeFalPromptTransport'
 import { authoredTimelineSeconds } from '../shared/videoTiming'
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -23,19 +25,20 @@ function actualFunction(name: string, bindings: Record<string, unknown>) {
   return new Function(...Object.keys(bindings), `${text}\nreturn ${name};`)(...Object.values(bindings)) as (request: GenerationRequest, signal?: AbortSignal) => Promise<unknown>
 }
 const fixtures = JSON.parse(readFileSync(new URL('../shared/falSchemaMedia.fixtures.json', import.meta.url), 'utf8'))
-function setup() {
-  const captured = fixtures.models[1]
-  const compiled = { ...compileFalSchemaContract(captured.endpoint_id, captured.openapi), category: captured.metadata.category }
+function setup(draft = false) {
+  const captured = draft ? JSON.parse(readFileSync(new URL('../shared/videoDraftSchema.fixture.json', import.meta.url), 'utf8'))[0] : fixtures.models[1]
+  const compiled = { ...compileFalSchemaContract(captured.endpoint_id, captured.openapi), category: captured.metadata?.category || 'video' }
   const runtime = describeFalRuntimeInputs(compiled)
   const contract = { ...compiled, runtime: { ...runtime, fingerprint: createHash('sha256').update(falRuntimeFingerprintMaterial(compiled, runtime)).digest('hex') } }
   const request: GenerationRequest = { nodeId: 'fixture-video', kind: 'video-generator', videoEngine: 'fixture/new-model',
     prompt: 'Raw editable prompt', providerPromptOverride: '  Visible final prompt.\n\nSHOT 2 — Hold.  ',
-    references: [{ path: '/fixture/image.png', mediaType: 'image', role: 'reference' }],
+    references: [{ referenceDescription: 'Source image reference for this video.', path: '/fixture/image.png', mediaType: 'image', role: 'reference' }],
     falNative: { endpointId: contract.endpointId, fingerprint: contract.runtime.fingerprint, flow: 'video', promptField: 'prompt', values: { prompt: '  Visible final prompt.\n\nSHOT 2 — Hold.  ' }, media: { image_urls: [{ path: '/fixture/image.png', mediaType: 'image' }] } },
   }
   const client = { owned: true }
-  const bindings = { assertVideoProviderPromptPreflight, effectiveProviderPromptOwnership, requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError, SeedancePromptIntegrityError,
-    executeFalNativeGeneration, authoredTimelineSeconds, assertFalMediaFileLimit,
+  const bindings = { assertVideoProviderPromptPreflight, effectiveProviderPromptOwnership,nativeFalPromptTransport, requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError, SeedancePromptIntegrityError,
+    executeFalNativeGeneration, authoredTimelineSeconds, assertFalMediaFileLimit, supportsFalSeedanceDraft, createVideoDraftReceipt,
+    loadServiceCredential: vi.fn(async () => 'fictional-credential'), videoDraftAccountFingerprint: () => 'a'.repeat(64),
     readOwnedFalSchema: vi.fn(async () => contract),
     runtimeServiceFailures: { assertCurrent: vi.fn(), delete: vi.fn() }, assertGenerationCommit: vi.fn(),
     assertManagedMediaPath: vi.fn(async path => path), mimeFor: vi.fn(() => 'image/png'), stat: vi.fn(async () => ({ size: 1 })),
@@ -53,12 +56,23 @@ function setup() {
     downloadResult: vi.fn(async (_url, _contentType, _metadata, _signal, expected) => { expect(expected).toBe('video'); return '/fixture/result.mp4' }),
     enforceLockedArtwork: vi.fn(), localAssetUrl: (path: string) => `prism://${path}`, appendHistory: vi.fn(async () => undefined), randomUUID: () => 'fixture-history', rememberServiceFailure: vi.fn(),
   }
+  if (draft) { request.references = []; request.falNative!.media = {}; request.falNative!.values = { prompt: request.providerPromptOverride!, draft: true, resolution: '720p', duration: '4', aspect_ratio: '16:9', generate_audio: false } }
   const native = actualFunction('runNativeFalGeneration', bindings)
   const run = actualFunction('runGeneration', { assertGenerationRequirements, assertVideoProviderPromptPreflight, currentProject: { rootPath: '/fixture' }, runNativeFalGeneration: native })
   return { request, bindings, run, client }
 }
 
 describe('actual main native fal dispatch composition', () => {
+  it('rejects an empty reference Description before reading credentials, creating clients, uploads or paid submission', async () => {
+    const { request, bindings, run } = setup()
+    request.references![0].referenceDescription = ''
+    await expect(run(request)).rejects.toThrow(/Fill the Description/)
+    expect(bindings.loadServiceCredential).not.toHaveBeenCalled()
+    expect(bindings.loadCredential).not.toHaveBeenCalled()
+    expect(bindings.createOwnedFalClient).not.toHaveBeenCalled()
+    expect(bindings.uploadLocalAsset).not.toHaveBeenCalled()
+    expect(bindings.subscribeOwnedFalClient).not.toHaveBeenCalled()
+  })
   it('dispatches the exact schema before the static model fallback with the original owned client and visible prompt', async () => {
     const { request, bindings, run } = setup(), signal = new AbortController().signal
     const result = await run(request, signal)
@@ -72,7 +86,7 @@ describe('actual main native fal dispatch composition', () => {
     const { request, bindings, run } = setup()
     if (defect === 'prompt') request.falNative!.values.prompt = 'Hidden different text'
     else request.falNative!.media.image_urls = [{ path: '/fixture/different.png', mediaType: 'image' }]
-    await expect(run(request)).rejects.toThrow(defect === 'prompt' ? 'visible final prompt' : 'connected reference')
+    await expect(run(request)).rejects.toThrow(defect === 'prompt' ? 'visible final prompt' : 'reference order')
     expect(bindings.readOwnedFalSchema).not.toHaveBeenCalled(); expect(bindings.uploadLocalAsset).not.toHaveBeenCalled(); expect(bindings.subscribeOwnedFalClient).not.toHaveBeenCalled()
   })
   it('checks the actual managed media type before creating the owned client', async () => {
@@ -100,3 +114,16 @@ it('actual main submits exact authored duration and excludes local timing intent
   const input = bindings.subscribeOwnedFalClient.mock.calls[0][2].input
   expect(input.duration).toBe('14'); expect(input).not.toHaveProperty('timelineSeconds'); expect(input.prompt).toBe(request.providerPromptOverride)
 })
+
+ it.each([true, false])('actual main keeps completed draft media when its completion token is usable: %s', async valid => {
+   const { request, run, bindings } = setup(true)
+   bindings.subscribeOwnedFalClient.mockImplementation(async (_client, _endpoint, options) => {
+     expect(options.input).toMatchObject({ draft: true, resolution: '480p', duration: '4', aspect_ratio: '16:9', generate_audio: false })
+     return { requestId: 'fixture-request', data: { seed: 0, video: { url: 'https://files.example/result.mp4', content_type: 'video/mp4' }, draft_id: valid ? 'draft_' + 'a'.repeat(484) : null } }
+   })
+   const result = await run(request) as any
+   expect(result.outputPath).toBe('/fixture/result.mp4')
+   expect(bindings.downloadResult).toHaveBeenCalledOnce()
+   if (valid) { expect(result.videoDraft.draftId).toHaveLength(490); expect(bindings.downloadResult.mock.calls[0][2]).toMatchObject({ resolution: '480p', videoDraft: result.videoDraft }) }
+   else { expect(result.videoDraft).toBeUndefined(); expect(result.videoDraftWarning).toContain('Draft video saved') }
+ })

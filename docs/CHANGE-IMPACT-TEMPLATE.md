@@ -1,3 +1,7 @@
+# Lip Sync Audio Binding — completed bounded impact map, 13 October 2026
+
+Architecture plan, parent679-input inventory, three production owners, protected persistence/host syntax/media/signing boundaries, RED12→GREEN250, full3433, types/build/install/readback and rollback: Codex Apps/Prism/Lip Sync Audio Binding Architecture Plan.md; Source Rollback.zip; Source Promotion.json. Native reopen and generated audio acceptance remain distinct pending gates. No user data migration, paid run or Git action.
+
 # Prism Change Impact — Seedance Current Contract Prism-Only Pass (2026-08-28)
 
 > **Status:** Prism-only implementation, package, and exact-path launch complete; full Vitest retains documented unrelated failures and startup catalog networking was observed despite no user action.

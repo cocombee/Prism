@@ -16,6 +16,36 @@ function dependencies() {
 }
 
 describe('main-owned Higgsfield Seedance media preparation', () => {
+  it('requires a main audio preparer, bounds derivative peak, and converts repeated or multiple MP3s without an artificial count cap',async()=>{
+    const deps=dependencies()
+    deps.inspect.mockImplementation(async source=>({source,byteLength:3,contentType:'audio/mpeg'}))
+    const prepareAudio=vi.fn(async()=>({bytes:new Uint8Array([4,5,6,7]),contentType:'audio/wav' as const}))
+    const sources=[local('audio'),local('audio')]
+    const prepared=await prepareHiggsfieldSeedanceMedia(request('reference-to-video',{audio_urls:sources}),{...deps,prepareAudio})
+    expect(prepareAudio).toHaveBeenCalledOnce();expect(prepared.media[0]).toBe(prepared.media[1])
+    expect(prepared.media[0]).toMatchObject({source:local('audio'),contentType:'audio/wav',bytes:new Uint8Array([4,5,6,7])})
+    await expect(prepareHiggsfieldSeedanceMedia(request('reference-to-video',{audio_urls:Array.from({length:10},(_,i)=>local('audio',i))}),{...deps,prepareAudio})).resolves.toMatchObject({media:expect.any(Array)})
+    expect(prepareAudio).toHaveBeenCalledTimes(11)
+    const crowded=dependencies();crowded.inspect.mockImplementation(async source=>({source,byteLength:(source.mediaType==='video'?200:source.mediaType==='image'?64:48)*1024*1024,contentType:source.mediaType==='video'?'video/mp4':source.mediaType==='image'?'image/png':'audio/mpeg'}))
+    await expect(prepareHiggsfieldSeedanceMedia(request('reference-to-video',{video_urls:[local('video',0),local('video',1)],image_urls:[local('image')],audio_urls:[local('audio')]}),{...crowded,prepareAudio})).rejects.toThrow(/aggregate local/)
+    expect(crowded.read).not.toHaveBeenCalled();expect(crowded.validate).not.toHaveBeenCalled()
+  })
+  it('rejects malformed derivative, conversion failure, canceled or stale ownership before validation',async()=>{
+    for(const derivative of [{bytes:new Uint8Array(),contentType:'audio/wav'},{bytes:new Uint8Array([4]),contentType:'audio/mpeg'},{bytes:new Uint8Array(65*1024*1024),contentType:'audio/wav'}]){
+      const deps=dependencies();deps.inspect.mockImplementation(async source=>({source,byteLength:3,contentType:'audio/mpeg'}))
+      await expect(prepareHiggsfieldSeedanceMedia(request('reference-to-video',{audio_urls:[local('audio')]}),{...deps,prepareAudio:async()=>derivative as any})).rejects.toThrow(/bounded actual WAV/)
+      expect(deps.validate).not.toHaveBeenCalled()
+    }
+    const deps=dependencies();deps.inspect.mockImplementation(async source=>({source,byteLength:3,contentType:'audio/mpeg'}))
+    await expect(prepareHiggsfieldSeedanceMedia(request('reference-to-video',{audio_urls:[local('audio')]}),{...deps,prepareAudio:async()=>{throw Error('Decoder failed')}})).rejects.toThrow(/Decoder failed/)
+    expect(deps.validate).not.toHaveBeenCalled()
+    const controller=new AbortController()
+    await expect(prepareHiggsfieldSeedanceMedia(request('reference-to-video',{audio_urls:[local('audio')]}),{...deps,prepareAudio:async()=>{controller.abort(Error('Canceled conversion'));return {bytes:new Uint8Array([4]),contentType:'audio/wav'}}},controller.signal)).rejects.toThrow(/Canceled conversion/)
+    expect(deps.validate).not.toHaveBeenCalled()
+    let current=true
+    await expect(prepareHiggsfieldSeedanceMedia(request('reference-to-video',{audio_urls:[local('audio')]}),{...deps,assertCurrent:()=>{if(!current)throw Error('Owner changed')},prepareAudio:async()=>{current=false;return {bytes:new Uint8Array([4]),contentType:'audio/wav'}}})).rejects.toThrow(/Owner changed/)
+    expect(deps.validate).not.toHaveBeenCalled()
+  })
   it('inspects the complete unique local set before reading; preserves all50 ordered assignments and duplicate slots', async () => {
     const deps = dependencies()
     const prepared = await prepareHiggsfieldSeedanceMedia(request('reference-to-video', {

@@ -1,3 +1,13 @@
+# Reference-mode ownership — 12 October 2026
+
+Image and Video Generators no longer display or apply the former per-edge Guide/Auto/Lock controls. Existing edge data is retained for persistence compatibility but cannot choose a frame/source role, change media-reference fidelity, or trigger artwork-carrier placement in those generators. Actual native start/end frames and source video remain schema-owned inputs. Character, Wardrobe, Location, Element and Style are fixed authorities within their assigned domains.
+
+Connected bare Image/Video Media uses Reference/Composition-or-Blocking/Object/Background above its mandatory, editable Description. Changing mode resets that Description; typing overrides the template. Mode controls require a real reference connection, while Description also requires placed/generated media and a live generator path. A disconnect hides the section without deleting text. Completed descriptions serialize once into REFERENCE INTRODUCTIONS, retaining semantic tags until adapter translation. Incomplete descriptions and unresolved replacement targets never become provider authority and block generation. A textual Storyboard becomes cumulative timecoded action, not a fictitious attached sheet.
+
+Control prose follows the current Codex Seedance skill and Higgsfield worked reference/edit prompts. Earlier OpenArt attempts are not locking evidence. The actual OpenArt Haji Blender sequence supplies the assets and acceptance target. Precise camera/spatial blocking and proxy-to-character mapping do not assign mannequin limbs or rendered appearance to finished people. Native editing operation support remains a separate provider contract; a mode template alone does not select a paid editing task.
+
+Executable owners: work/src/shared/inputRules.ts, mediaReferenceModes.ts, assetReferenceDescriptions.ts, workflowResolver.ts, referenceInstructions.ts, shotSpec.ts; work/src/renderer/src/NodeCardNext.tsx and legacy NodeCard.tsx. Verification receipts remain in Codex Apps/Prism.
+
 # Prompt Pipeline And Shot Continuity
 
 > **Status:** Required contract baseline — mixed Current/Proposed/Historical. Confirm each clause against executable source and tests before implementation.
@@ -47,3 +57,7 @@ Only typed timelines are inspected; Manual prose remains byte-exact. Provider-au
 Source-tested subset of Codex Seedance1.1.22 timed-block rules. Final Continue is preserved as an outgoing hook across existing graph, Seedance, generic, native Kling and rewrite owners without inventing subsequent content. Final hook state is required inside its existing timeline/last-shot block, so optional-budget removal cannot silently discard it. Final endpoint prose avoids an unauthored stop; existing explicit authored holds and dialogue remain unchanged.
 
 Unsupported saved transition types block processing with original values retained. Internal missing legacy boundaries keep their existing Cut default. Manual masters retain exact bytes and skip unused compiler-ledger construction. Flash/occlusion interval contracts, generated-dialogue audio intent, complete tableau/crop/spatial parity and provider-auto timing remain separate work. Machine1.1.14 provenance is unchanged.
+
+## Lip-sync default completeness — 13 October 2026
+
+The editable audio Lip-sync template includes the full recording, introductory/lead-in words and original word/phrase spacing. Retain original voice, pitch, tempo, pauses and silent remainder without retuning, stretching, repeating or truncating. Experimental exact duration remains user-authored text/Storyboard data. Existing authored Descriptions are never overwritten. This default is implemented but generated fidelity remains unaccepted; see CURRENT-STATE.md and the Lip Sync Progress change impact. Executable owner: work/src/shared/mediaReferenceModes.ts; regression: mediaReferenceModes.test.ts plus resolver/compiler/native-adapter tests.

@@ -18,6 +18,21 @@ function contract(properties: FalSchemaContract['input']['properties'], id = 'fi
 const secondsContract = (key = 'clip_length') => contract({ [key]: { type: 'number', title: 'Duration', description: 'Duration of the generated video in seconds.', minimum: 1, maximum: 50 } })
 const boundRequest = (model: ReturnType<typeof contract>, values: Record<string, FalJson>, timelineSeconds = 14): FalNativeRequest => ({ endpointId: model.endpointId, flow: 'video' as const, fingerprint: model.runtime.fingerprint, promptField: 'prompt', timelineSeconds, values: { prompt: 'Exact authored master.', ...values }, media: {} })
 describe('provider timing and authored timeline fidelity', () => {
+  it('recognizes explicitly declared output seconds on an owned video route, retaining strict timeline and null checks', () => {
+    const model = contract({ duration: { anyOf: [{ type: 'integer', minimum: 2, maximum: 30 }, { type: 'null' }], description: 'Output duration in seconds. Set to null for smart duration.', default: 5, minimum: 2, maximum: 30 } }, 'alibaba/wan-3.0/reference-to-video')
+    expect(model.runtime.timing).toEqual({ kind: 'seconds', field: 'duration', source: 'provider-declaration' })
+    expect(planFalNativeExecution(model, boundRequest(model, { duration: 5 }, 5), 'video-generator').preflightInput.duration).toBe(5)
+    expect(() => planFalNativeExecution(model, boundRequest(model, { duration: 5 }, 4), 'video-generator')).toThrow(/must match/)
+    expect(() => planFalNativeExecution(model, boundRequest(model, { duration: null }, 5), 'video-generator')).toThrow(/fixed native duration/)
+  })
+  it('does not infer generic output seconds without video ownership or for an audio-only field', () => {
+    const model = contract({ duration: { type: 'integer', description: 'Output duration in seconds.', default: 5 } })
+    expect(inferFalVideoTiming(model.runtime.fields)).toBeUndefined()
+    expect(describeFalRuntimeInputs({ ...model, category: 'text-to-audio' }).timing).toBeUndefined()
+    expect(contract({ duration: { type: 'integer', description: 'Output duration of audio in seconds.' } }).runtime.timing).toBeUndefined()
+    expect(contract({ duration: { type: 'integer', description: 'Output duration in milliseconds.' } }).runtime.timing).toBeUndefined()
+  })
+
   it('rejects generated beats below1s while preserving authored bytes and valid half-second timing',()=>{
     const below={...request(5),storyboardShots:[{prompt:'First.',duration:0.5,shotSize:'medium',camera:'static'},{prompt:'Second.',duration:4.5,shotSize:'medium',camera:'static'}]}
     const before=JSON.stringify(below);expect(()=>authoredTimelineSeconds(below)).toThrow('at least 1.0s');expect(JSON.stringify(below)).toBe(before)

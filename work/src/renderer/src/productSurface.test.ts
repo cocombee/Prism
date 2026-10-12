@@ -15,7 +15,7 @@ const providerPromptPreviewSource = readFileSync(new URL('ProviderPromptPreview.
 const taggedPromptSource = readFileSync(new URL('TaggedPromptTextarea.tsx', import.meta.url), 'utf8')
 const continuousAnchorSource = readFileSync(new URL('useContinuousAnchor.ts', import.meta.url), 'utf8')
 const runPresentationSource = readFileSync(new URL('runPresentation.ts', import.meta.url), 'utf8')
-const rendererFiles = [appSource, mediaOfflineSource, projectLibraryCardSource, ...['NodeCardNext.tsx', 'UtilityNodes.tsx', 'ProviderPromptPreview.tsx']
+const rendererFiles = [appSource, mediaOfflineSource, projectLibraryCardSource, ...['NodeCardNext.tsx', 'AssetPromptFields.tsx', 'UtilityNodes.tsx', 'ProviderPromptPreview.tsx']
   .map((name) => readFileSync(new URL(name, import.meta.url), 'utf8'))]
   .join('\n')
 const styles = readFileSync(new URL('styles-next.css', import.meta.url), 'utf8')
@@ -341,8 +341,9 @@ describe('global product-surface regressions', () => {
     expect(styles).toContain('.studio-node.is-canvas-generator .node-status { margin: 8px 10px; }')
   })
 
-  it('shows actionable fidelity context or the native model read-only input bindings', () => {
-    expect(nodeCardSource).toContain('const fidelityInputRules = connectedInputRules.filter((rule) => rule.toggleable && rule.edgeId)')
+  it('keeps legacy fidelity out of both generator surfaces', () => {
+    expect(nodeCardSource).toContain("const fidelityInputRules = ['image-generator', 'video-generator'].includes(data.kind) ? []")
+    expect(nodeCardSource).toContain("const visibleInputRules = ['image-generator', 'video-generator'].includes(data.kind) ? []")
     expect(nodeCardSource).toContain('visibleInputRules.length > 0 && <div className="generator-connected-context nodrag">')
     expect(nodeCardSource).toContain('aria-label="Connected Input Fidelity"')
     expect(nodeCardSource).not.toContain('className="reference-tags"')
@@ -382,7 +383,8 @@ describe('global product-surface regressions', () => {
   it('keeps essential provider-native Voiceover choices directly on the node', () => {
     expect(nodeCardSource).toContain('aria-label="Primary Voice Controls"')
     expect(nodeCardSource).toContain('ariaLabel="Voice provider and model"')
-    expect(nodeCardSource).toContain('ariaLabel="ElevenLabs voice"')
+    expect(nodeCardSource).toContain('<VoicePicker Selector={SimpleMenuSelect}')
+    expect(nodeCardSource).toContain("'ElevenLabs voice'")
     expect(nodeCardSource).toContain('ariaLabel="Voice language"')
     expect(nodeCardSource).toContain('aria-label="Fish Audio voice Reference ID"')
     expect(nodeCardSource).toContain('ariaLabel="ElevenLabs speech speed"')
@@ -496,7 +498,7 @@ describe('global product-surface regressions', () => {
     expect(appSource).toContain('setConnectionNotice(reconciliation.removed.map(({ message }) => message).join(\' \'))')
     expect(appSource).toContain('window.requestAnimationFrame(() => updateNodeInternals(id))')
     expect(nodeCardSource).toContain("data.kind === 'video-generator' && /Kling O3 References/.test(data.progress || '') ? undefined : data.progress")
-    expect(styles).toMatch(/\.semantic-reference > button\.style-create-toggle \{[^}]*width: calc\(100% - 16px\);[^}]*margin: 8px;/)
+    expect(styles).toMatch(/\.semantic-reference > button\.style-create-toggle(?:,\s*\.canvas-list\.is-audio-list > \.list-items > button\.style-create-toggle)? \{[^}]*width: calc\(100% - 16px\);[^}]*margin: 8px;/)
   })
 
   it('keeps Assets navigation lean, consistently weighted, and directly draggable', () => {
@@ -856,6 +858,9 @@ describe('global product-surface regressions', () => {
     expect(utilitySource).not.toContain("value: '0', label: '0.0s'")
     expect(utilitySource).toContain('map(migrateStoryboardPanelDuration)')
     expect(utilitySource).toContain('disabled={!addPanelAvailable}')
+    expect(utilitySource).toContain('appendStoryboardPanel(panels, undefined, appendDurationLimit)')
+    expect(storyboardControlsSource).not.toContain('title={optionTitle}')
+    expect(storyboardControlsSource).not.toContain('title={selected?.disabledReason')
     expect(utilitySource).toContain('targetDuration: connectedVideo?.duration')
     expect(utilitySource).not.toContain('storyboardMode')
   })
@@ -1101,7 +1106,7 @@ describe('global product-surface regressions', () => {
     expect(appSource).toContain("progress: 'Three-Quarter ready · remaining views unlocked'")
   })
 
-  it('keeps semantic creation explicit, prompt-first, and never exposes a stale internal fal selector value', () => {
+  it('keeps semantic creation explicit, with an independent Description and Prompt, and never exposes a stale internal fal selector value', () => {
     expect(rendererFiles).toContain('Describe the character to create…')
     expect(rendererFiles).toContain('Describe the element to create…')
     expect(rendererFiles).toContain('Describe the location to create…')
@@ -1277,7 +1282,7 @@ describe('global product-surface regressions', () => {
   it('reserves the selected media aspect ratio outside connected context and bounded prompt text', () => {
     const contextIndex = nodeCardSource.indexOf('className="generator-connected-context nodrag"')
     const stageIndex = nodeCardSource.indexOf('className="generator-stage nodrag"', contextIndex)
-    const promptIndex = nodeCardSource.indexOf('className="node-prompt generator-prompt nodrag"', stageIndex)
+    const promptIndex = nodeCardSource.indexOf('className="node-prompt generator-prompt media-generator-prompt nodrag"', stageIndex)
     expect(contextIndex).toBeGreaterThan(-1)
     expect(stageIndex).toBeGreaterThan(contextIndex)
     expect(promptIndex).toBeGreaterThan(stageIndex)
@@ -1422,7 +1427,8 @@ describe('global product-surface regressions', () => {
 
   it('loads non-secret model catalogs on connected startup without decrypting credentials or invoking inference', () => {
     expect(appSource).toContain('if (!settingsOpen) return')
-    expect(appSource.match(/window\.prism\.services\.models\(provider\)/g)).toHaveLength(1)
+    expect(appSource.match(/window\.prism\.services\.models\(provider\)/g)).toHaveLength(2)
+    expect(appSource).toContain('const refreshVoiceAvailability = useCallback(async')
     expect(appSource).toMatch(/useEffect\(\(\) => \{\s*const connected = \(Object\.keys\(serviceConnections\)/)
     expect(appSource).toContain('.filter((provider) => serviceConnections[provider])')
     expect(mainSource).toContain('Estimates render automatically on every visible runnable node. They must stay')
@@ -1461,7 +1467,12 @@ describe('global product-surface regressions', () => {
     expect(styles).toContain('.node-asset-tag.is-unsaved, .node-asset-tag.is-unsaved > span, .node-asset-tag.is-unsaved > input { color: #df778d; }')
     expect(appSource).toContain('export function canvasNodeDirtySnapshot(node: StudioNode): StudioNode')
     expect(appSource).toContain('characterEditorOpen: _characterEditorOpen, styleEditorOpen: _styleEditorOpen, semanticEditorOpen: _semanticEditorOpen')
-    expect(appSource).toContain('const serialized = JSON.stringify({ nodes: nodes.map(canvasNodeDirtySnapshot), edges })')
+    expect(appSource).toContain('const serializedCanvasHistory = serializeCanvasHistorySnapshot(nodes, edges)')
+    expect(appSource).toContain('edges: canvasHistoryEdges(edges)')
+    expect(appSource).toContain('switchCanvasHistoryOwner(canvasHistoryByOwner.current')
+    expect(appSource).toContain('if (!sameActivation) canvasHistoryByOwner.current.clear()')
+    expect(appSource).toContain('if (canvasHistoryOwnerRef.current !== owner) return')
+    expect(appSource).toContain('}, [nodes, edges, canvasHistoryOwner])')
     expect(appSource).toContain('nodes: nodes.map(canvasNodeDirtySnapshot)')
   })
 
@@ -1965,7 +1976,7 @@ describe('global product-surface regressions', () => {
     expect(appSource).toContain('window.prism.assets.trashCollection([...deletedIds], updatedWorkflow)')
     expect(appSource).toContain('assetRestore: { ids: [...deletedIds], workflow: structuredClone(originalWorkflow) }')
     expect(appSource).toContain('window.prism.assets.restoreCollection(previous.assetRestore.ids, previous.assetRestore.workflow)')
-    expect(mainSource).toContain("projectPath('05. Canvas', '.prism-trash', transactionId)")
+    expect(mainSource).toContain("projectFolder('Canvas', '.prism-trash', transactionId)")
     expect(mainSource).toContain("trashOriginalPath: source")
     expect(mainSource).toContain('restoreRecoverableAssetFile(stagedPath, originalPath)')
     expect(appSource).toContain('setCanvases(pruned.canvases)')

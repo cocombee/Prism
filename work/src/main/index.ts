@@ -1,3 +1,14 @@
+import { projectFolderPath, projectScaffoldPaths, type ProjectFolder } from './projectFolders'
+import { browseElevenVoices, readVoiceFacets, addElevenSharedVoice, removeElevenVoice, getElevenBrowserVoice, readFalBrowserVoices } from './elevenVoiceBrowser'
+import { VoiceRecentStore } from './voiceRecentStore'
+import { validateVoiceQuery, voicePathId, filterBrowserVoices, type VoiceBrowserProvider } from '../shared/voiceBrowser'
+import { isLockedArtworkReference } from '../shared/inputRules'
+import { linkBytePlusPortrait, resolveBytePlusPortrait, preserveBytePlusPortraitMetadata, revokeBytePlusPortrait, portraitMediaType } from './byteplusPortrait'
+import type { BytePlusPortraitLinkRequest } from '../shared/types'
+import { executeFalDraftRecovery } from './falDraftRecovery'
+import type { BytePlusCreatePayload } from '../shared/byteplusSeedance'
+import { executeVideoDraftCompletion } from './videoDraftCompletion'
+import { createVideoDraftReceipt, supportsFalSeedanceDraft, FAL_SEEDANCE_DRAFT_COMPLETE, type VideoDraftReceipt } from '../shared/videoDraft'
 import { assistantThinkingSelection, OPENAI_API_REASONING_EFFORTS, openAiThinkingRequest } from '../shared/assistantThinking'
 import { PromptBillingStore } from './promptBillingStore'
 import { PromptRewriteRouter, type PromptRequestOwner } from './promptRewriteRouter'
@@ -8,6 +19,7 @@ import type { PromptRewriteOptions, PromptBillingMode } from '../shared/promptCo
 import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
 import { effectiveProviderPromptOwnership } from '../shared/providerPromptOwnership'
 import { SeedancePromptIntegrityError } from '../shared/seedancePromptIntegrity'
+import { nativeFalPromptTransport } from '../shared/nativeFalPromptTransport'
 import { requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError } from '../shared/videoDialogueAudio'
 import { persistHiggsfieldOutput } from './higgsfieldOutput'
 import { performHiggsfieldJobAction, higgsfieldRecoveryView, higgsfieldJobCommand, HiggsfieldJobActions } from './higgsfieldJobRecovery'
@@ -43,6 +55,7 @@ import { readFalModelCatalog } from './falCatalogDiscovery'
 import { readFalCatalogSnapshot, writeFalCatalogSnapshot } from './falCatalogSnapshot'
 import { FalModelSchemaCache, readFalModelSchema } from './falSchemaDiscovery'
 import { executeFalNativeGeneration } from './falNativeGeneration'
+import { assetPromotionOrigin } from './assetPromotionOrigin'
 import { assertFalMediaFileLimit } from './falMediaFileLimit'
 import type { FalSchemaContract } from '../shared/falSchemaBinding'
 import { falEndpointId } from '../shared/falModelCatalog'
@@ -54,7 +67,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import type { FalClient } from '@fal-ai/client'
 import { createOwnedFalClient, subscribeOwnedFalClient } from './falClientOwner'
@@ -62,7 +75,7 @@ import { resolveVideoModel, type VideoModelDefinition } from '../shared/videoMod
 import { BYTEPLUS_BASE_URL } from '../shared/byteplusSeedance'
 import { bytePlusLiveModels, isBytePlusActivationFailure } from '../shared/byteplusAvailability'
 import { compileBytePlusGenerationRequest } from './byteplusGeneration'
-import { runBytePlusTaskAndDownload } from './byteplusTaskRunner'
+import { runBytePlusTask, runBytePlusTaskAndDownload } from './byteplusTaskRunner'
 import { clarityUpscalerInput } from '../shared/clarityUpscaler'
 import { realEsrganVideoUpscalerInput } from '../shared/videoUpscaler'
 import { effectiveFalImageModel, falImageEditInput, FAL_IMAGE_MODELS, imageReferenceLimit } from '../shared/imageModels'
@@ -74,7 +87,7 @@ import { ProjectProfileRecoveryState } from './projectProfileTransaction'
 import { ProviderRequestState } from './providerRequestState'
 import { generationServiceProvider } from '../shared/generationServiceProvider'
 import { readProviderCatalogPages } from './providerCatalogPages'
-import { generateElevenAudio, readElevenAvailability } from './elevenLabsApi'
+import { generateElevenAudio, readElevenAvailability, readPublicElevenVoices } from './elevenLabsApi'
 import { persistElevenAudio } from './elevenLabsAudioPersistence'
 import { isDirectElevenAudio } from '../shared/elevenLabsAudio'
 import { mediaRenameStem, normalizeImportedMediaName, normalizeLogicalAssetName, normalizedOrdinaryMediaIdentity } from '../shared/assetNaming'
@@ -186,7 +199,7 @@ const dataRoot = () => join(app.getPath('userData'), 'studio-data')
 const workspacePointerPath = () => join(dataRoot(), 'current-project.json')
 const recentProjectsPath = () => join(dataRoot(), 'recent-projects.json')
 const projectManifestPath = (root: string) => join(root, 'Prism Foundry Project.json')
-const projectDocumentFolder = (root: string) => join(root, '00. Project')
+const projectDocumentFolder = (root: string) => projectFolderPath(root, 'Project')
 const defaultProjectDocumentPath = (root: string) => join(projectDocumentFolder(root), `${safeFolderName(basename(root), 'Untitled Project')}.prismflow`)
 const projectPath = (...parts: string[]) => {
   const generation = generationContext.getStore()
@@ -194,6 +207,8 @@ const projectPath = (...parts: string[]) => {
   if (!rootPath) throw new Error('Choose or open a project folder first.')
   return join(rootPath, ...parts)
 }
+
+const projectFolder = (name: ProjectFolder, ...parts: string[]) => projectFolderPath(projectPath(), name, ...parts)
 
 function assertGenerationCommit(): void {
   const identity = generationContext.getStore()
@@ -228,7 +243,7 @@ function activateCurrentProject(): void {
     documentPath: resolve(currentProjectDocumentPath),
   })
 }
-const canvasRoot = () => projectPath('05. Canvas')
+const canvasRoot = () => projectFolder('Canvas')
 const workflowPath = () => join(canvasRoot(), 'workflow.json')
 const assetsIndexPath = () => join(canvasRoot(), 'assets.json')
 const globalStylesRoot = () => join(dataRoot(), 'styles')
@@ -453,7 +468,9 @@ async function listServiceModels(provider: ServiceProvider): Promise<ServiceMode
       return await falCatalogCache.read(scope, async () => {
         const key = await loadServiceCredential(provider)
         const models = await readFalModelCatalog({ request: (url) => fetchProviderModelCatalog(provider, url, { headers: { Authorization: `Key ${key}` } }), assertCurrent })
-        const availability: ServiceModelAvailability = { provider, verified: true, models, catalogCheckedAt: new Date().toISOString() }
+        const publicVoices = await readPublicElevenVoices(fetch).then(voices => ({ voices })).catch(() => ({ voiceCatalogError: 'Public voice previews are unavailable.' }))
+        assertCurrent()
+        const availability: ServiceModelAvailability = { provider, verified: true, models, catalogCheckedAt: new Date().toISOString(), ...publicVoices }
         await writeFalCatalogSnapshot(join(app.getPath('userData'), 'fal-public-model-catalog.json'), availability).catch(() => undefined)
         assertCurrent()
         return availability
@@ -624,22 +641,6 @@ async function estimateGenerationCost(request: GenerationRequest) {
   return publishedFalEstimate(request, modelId)
 }
 
-const PROJECT_FOLDERS = [
-  '00. Project',
-  '01. Characters',
-  '02. Elements',
-  '03. Locations',
-  '04. Storyboards',
-  '05. Canvas',
-  '06. Generated Assets/01. Images',
-  '06. Generated Assets/02. Videos',
-  '06. Generated Assets/03. Audio',
-  '07. Imported Assets/01. Images',
-  '07. Imported Assets/02. Videos',
-  '07. Imported Assets/03. Audio',
-  '08. Storyboards',
-] as const
-
 async function scaffoldProject(root: string, existing?: ProjectWorkspace, documentPath?: string): Promise<ProjectWorkspace> {
   return projectCommands.run(() => scaffoldProjectUnlocked(root, existing, documentPath))
 }
@@ -648,7 +649,7 @@ async function scaffoldProjectUnlocked(root: string, existing?: ProjectWorkspace
   await projectProfileRecovery.recover(dataRoot())
   generationLifecycle.activate(null)
   const resolvedRoot = resolve(root)
-  for (const folder of PROJECT_FOLDERS) await mkdir(join(resolvedRoot, folder), { recursive: true })
+  for (const folder of projectScaffoldPaths(resolvedRoot)) await mkdir(folder, { recursive: true })
   try { await rmdir(join(resolvedRoot, '04. Styles')) } catch { /* Preserve a non-empty legacy folder for explicit migration. */ }
   const now = new Date().toISOString()
   const project: ProjectWorkspace = existing || {
@@ -824,7 +825,7 @@ async function removeLegacyImport(): Promise<{ removedAssets: number; removedNod
     readStrictJsonOr<ImportedAsset[]>(assetsIndexPath(), [], 'The saved asset index'),
     readStrictJsonOr<WorkflowDocument | null>(workflowPath(), null, 'The saved canvas'),
   ])
-  const backupFolder = projectPath('00. Project', 'Legacy Import Backup')
+  const backupFolder = projectFolder('Project', 'Legacy Import Backup')
   await mkdir(backupFolder, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   await atomicJson(join(backupFolder, `${stamp}-assets.json`), assets)
@@ -979,8 +980,8 @@ async function atomicJson(path: string, value: unknown): Promise<void> {
 }
 
 async function buildProjectDocument(activeProject: ProjectWorkspace): Promise<ProjectDocument> {
-  const workflow = await readStrictJsonOr<WorkflowDocument | null>(join(activeProject.rootPath, '05. Canvas', 'workflow.json'), null, 'The saved canvas')
-  const assets = await readStrictJsonOr<ImportedAsset[]>(join(activeProject.rootPath, '05. Canvas', 'assets.json'), [], 'The saved asset index')
+  const workflow = await readStrictJsonOr<WorkflowDocument | null>(projectFolderPath(activeProject.rootPath, 'Canvas', 'workflow.json'), null, 'The saved canvas')
+  const assets = await readStrictJsonOr<ImportedAsset[]>(projectFolderPath(activeProject.rootPath, 'Canvas', 'assets.json'), [], 'The saved asset index')
   const portableAssets = assets.map((asset) => {
     const portablePath = relative(activeProject.rootPath, resolve(asset.path))
     return {
@@ -1028,9 +1029,9 @@ async function openProjectDocumentUnlocked(path: string): Promise<ProjectWorkspa
   const document = await readStrictJson<ProjectDocument>(documentPath, 'The portable project document')
   if (!document || document.fileType !== 'prism-foundry-project' || document.schemaVersion !== 1) throw new Error('That is not a valid Prism Foundry .prismflow project.')
   generationLifecycle.activate(null)
-  const root = basename(dirname(documentPath)) === '00. Project' ? dirname(dirname(documentPath)) : dirname(documentPath)
-  const canonicalWorkflow = join(root, '05. Canvas', 'workflow.json')
-  const canonicalAssets = join(root, '05. Canvas', 'assets.json')
+  const root = ['Project', '00. Project'].includes(basename(dirname(documentPath))) ? dirname(dirname(documentPath)) : dirname(documentPath)
+  const canonicalWorkflow = projectFolderPath(root, 'Canvas', 'workflow.json')
+  const canonicalAssets = projectFolderPath(root, 'Canvas', 'assets.json')
   const portableMtime = (await stat(documentPath)).mtimeMs
   const canonicalMtime = async (candidate: string): Promise<number | undefined> => {
     try { return (await stat(candidate)).mtimeMs } catch (error) { if (isMissingFileError(error)) return undefined; throw error }
@@ -1086,8 +1087,8 @@ function mediaCategory(path: string): 'image' | 'video' | 'audio' {
 }
 
 function categoryFolder(category: 'image' | 'video' | 'audio', generated: boolean): string {
-  const leaf = category === 'image' ? '01. Images' : category === 'video' ? '02. Videos' : '03. Audio'
-  return projectPath(generated ? '06. Generated Assets' : '07. Imported Assets', leaf)
+  const leaf = category === 'image' ? 'Images' : category === 'video' ? 'Videos' : 'Audio'
+  return projectFolder(generated ? 'Generated Assets' : 'Imported Assets', leaf)
 }
 
 const CANVAS_CLIPBOARD_FORMAT = 'application/x-prism-foundry-canvas-nodes'
@@ -1109,12 +1110,12 @@ function clipboardImageFilePaths(): string[] {
 }
 
 function importFolder(kind: NodeKind | undefined, source: string, collectionName?: string): { folder: string; category: ImportedAsset['category'] } {
-  if (kind === 'character') return { folder: projectPath('01. Characters', safeFolderName(collectionName, 'Character')), category: 'character' }
-  if (kind === 'element') return { folder: projectPath('02. Elements', safeFolderName(collectionName, 'Element')), category: 'element' }
-  if (kind === 'location') return { folder: projectPath('03. Locations', safeFolderName(collectionName, 'Location')), category: 'location' }
-  if (kind === 'wardrobe') return { folder: projectPath('04. Wardrobes', safeFolderName(collectionName, 'Wardrobe')), category: 'wardrobe' }
+  if (kind === 'character') return { folder: projectFolder('Characters', safeFolderName(collectionName, 'Character')), category: 'character' }
+  if (kind === 'element') return { folder: projectFolder('Elements', safeFolderName(collectionName, 'Element')), category: 'element' }
+  if (kind === 'location') return { folder: projectFolder('Locations', safeFolderName(collectionName, 'Location')), category: 'location' }
+  if (kind === 'wardrobe') return { folder: projectFolder('Wardrobes', safeFolderName(collectionName, 'Wardrobe')), category: 'wardrobe' }
   if (kind === 'style-reference') return { folder: join(globalStylesRoot(), safeFolderName(collectionName, 'Style')), category: 'style' }
-  if (kind === 'storyboard') return { folder: projectPath('04. Storyboards', safeFolderName(collectionName, 'Storyboard')), category: 'storyboard' }
+  if (kind === 'storyboard') return { folder: projectFolder('Storyboards', safeFolderName(collectionName, 'Storyboard')), category: 'storyboard' }
   const category = mediaCategory(source)
   return { folder: categoryFolder(category, false), category }
 }
@@ -1233,6 +1234,26 @@ async function managedAssetById(id: string): Promise<{ asset: ImportedAsset; ind
   if (style) return { asset: style, indexPath: globalStylesIndexPath(), assets: stores.styles }
   const project = stores.project.find((asset) => asset.id === id)
   return project ? { asset: project, indexPath: assetsIndexPath(), assets: stores.project } : null
+}
+
+/** Keep the canonical index and portable projection together for local link edits. */
+async function commitBytePlusPortraitMetadata(managed: { asset: ImportedAsset; indexPath: string }, update: (asset: ImportedAsset) => ImportedAsset): Promise<ImportedAsset> {
+  return assetJsonMutations.run(managed.indexPath, async () => {
+    const previous = await readStrictJson<ImportedAsset[]>(managed.indexPath, 'The saved asset index')
+    if (!Array.isArray(previous)) throw new Error('The saved asset index is invalid.')
+    const asset = previous.find(item => item.id === managed.asset.id)
+    if (!asset || asset.trashedAt || resolve(asset.path) !== resolve(managed.asset.path)) throw new Error('The asset changed before its link could be saved.')
+    const updated = update(asset)
+    await atomicJson(managed.indexPath, previous.map(item => item.id === asset.id ? updated : item))
+    try {
+      if (updated.category !== 'style') await writeProjectDocument()
+    } catch (error) {
+      try { await atomicJson(managed.indexPath, previous) }
+      catch { throw new Error('The trusted asset projection could not be saved or rolled back. Reopen the project to review the canonical asset link.') }
+      throw error
+    }
+    return { ...updated, url: localAssetUrl(updated.path) }
+  })
 }
 
 async function assertManagedAssetPath(asset: ImportedAsset): Promise<string> {
@@ -1388,12 +1409,12 @@ async function importPrismAssetSource(source: string): Promise<ImportedAsset[]> 
 }
 
 function portableAssetFolder(category: ImportedAsset['category'], collectionName: string): string {
-  if (category === 'character') return projectPath('01. Characters', safeFolderName(collectionName, 'Character'))
-  if (category === 'element') return projectPath('02. Elements', safeFolderName(collectionName, 'Element'))
-  if (category === 'location') return projectPath('03. Locations', safeFolderName(collectionName, 'Location'))
-  if (category === 'wardrobe') return projectPath('04. Wardrobes', safeFolderName(collectionName, 'Wardrobe'))
+  if (category === 'character') return projectFolder('Characters', safeFolderName(collectionName, 'Character'))
+  if (category === 'element') return projectFolder('Elements', safeFolderName(collectionName, 'Element'))
+  if (category === 'location') return projectFolder('Locations', safeFolderName(collectionName, 'Location'))
+  if (category === 'wardrobe') return projectFolder('Wardrobes', safeFolderName(collectionName, 'Wardrobe'))
   if (category === 'style') return join(globalStylesRoot(), safeFolderName(collectionName, 'Style'))
-  if (category === 'storyboard') return projectPath('04. Storyboards', safeFolderName(collectionName, 'Storyboard'))
+  if (category === 'storyboard') return projectFolder('Storyboards', safeFolderName(collectionName, 'Storyboard'))
   return categoryFolder(category === 'video' ? 'video' : category === 'audio' ? 'audio' : 'image', false)
 }
 
@@ -1425,12 +1446,12 @@ function relinkDestination(asset: ImportedAsset): string {
   const root = `${resolve(currentProject.rootPath)}${sep}`
   const oldPath = resolve(asset.path)
   if (oldPath.startsWith(root)) return oldPath
-  const folder = asset.category === 'character' ? projectPath('01. Characters', safeFolderName(asset.name, 'Character'))
-    : asset.category === 'element' ? projectPath('02. Elements', safeFolderName(asset.name, 'Element'))
-      : asset.category === 'location' ? projectPath('03. Locations', safeFolderName(asset.name, 'Location'))
-        : asset.category === 'wardrobe' ? projectPath('04. Wardrobes', safeFolderName(asset.name, 'Wardrobe'))
+  const folder = asset.category === 'character' ? projectFolder('Characters', safeFolderName(asset.name, 'Character'))
+    : asset.category === 'element' ? projectFolder('Elements', safeFolderName(asset.name, 'Element'))
+      : asset.category === 'location' ? projectFolder('Locations', safeFolderName(asset.name, 'Location'))
+        : asset.category === 'wardrobe' ? projectFolder('Wardrobes', safeFolderName(asset.name, 'Wardrobe'))
         : asset.category === 'style' ? join(globalStylesRoot(), safeFolderName(asset.name, 'Style'))
-          : asset.category === 'storyboard' ? projectPath('04. Storyboards', safeFolderName(asset.name, 'Storyboard'))
+          : asset.category === 'storyboard' ? projectFolder('Storyboards', safeFolderName(asset.name, 'Storyboard'))
           : categoryFolder(asset.category === 'video' ? 'video' : asset.category === 'audio' ? 'audio' : 'image', asset.origin === 'generated')
   return join(folder, basename(asset.path) || asset.name)
 }
@@ -1609,6 +1630,22 @@ async function downloadResult(url: string, contentType: string | undefined, meta
 }
 
 async function bytePlusMediaUrl(source: { path?: string; url?: string; mediaType?: 'image' | 'video' | 'audio' }): Promise<string> {
+  if (source.path) {
+    const stores = await managedAssetStores()
+    const matches = [...stores.project, ...stores.styles].filter(asset => resolve(asset.path) === resolve(source.path!))
+    const bound = matches.filter(asset => asset.metadata?.byteplusPortrait)
+    if (bound.length) {
+      if (bound.length !== 1 || bound[0].trashedAt) throw new Error('BytePlus trusted asset: the managed source is ambiguous or in Trash. Review the link before generation.')
+      const asset = bound[0], registry = await serviceProfileStore().listProfiles('byteplus', false)
+      runtimeServiceFailures.assertCurrent('byteplus')
+      const selection = projectServiceProfileSelection(registry, { serviceProfileOverrides: runtimeServiceFailures.overrides('byteplus', currentProject?.serviceProfileOverrides) }, 'byteplus')
+      if (!selection.profile || !selection.available) throw new Error('BytePlus trusted asset: select its connected BytePlus account before generation.')
+      const path = await assertManagedAssetPath(asset), bytes = await readFile(path)
+      runtimeServiceFailures.assertCurrent('byteplus')
+      return resolveBytePlusPortrait(asset.metadata!.byteplusPortrait, selection.profile, asset.mimeType, bytes)
+    }
+  }
+  if (source.url && /^asset:/i.test(source.url)) throw new Error('BytePlus trusted asset: link the console Asset ID to the managed source before generation.')
   if (source.url && /^(?:https?:|data:)/i.test(source.url)) return source.url
   if (!source.path) throw new Error('BytePlus requires a readable media reference.')
   const path = assertInsideProject(source.path)
@@ -1622,20 +1659,22 @@ async function runBytePlusGeneration(request: GenerationRequest, videoModel: Vid
     const payload = await compileBytePlusGenerationRequest(request, bytePlusMediaUrl)
     runtimeServiceFailures.assertCurrent('byteplus')
     const key = await loadServiceCredential('byteplus')
+    const draftCreatedAt = new Date().toISOString()
+    let videoDraft: VideoDraftReceipt | undefined
     const result = await runBytePlusTaskAndDownload({
       fetch: (input, init) => { if (init?.method === 'POST') runtimeServiceFailures.assertCurrent('byteplus'); return net.fetch(input, init) },
       apiKey: key,
       payload,
       signal,
       onProgress: (message, status) => mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message, status }),
-      download: (url) => downloadResult(url, 'video/mp4', {
-        provider: 'BytePlus Seedance', modelId, prompt: request.prompt, aspectRatio: request.aspectRatio,
-        duration: request.duration, resolution: request.resolution, motionCadence: request.motionCadence,
-      }, signal),
+      download: (url, task) => {
+        if (request.videoDraft) videoDraft = createVideoDraftReceipt('byteplus', payload.model, task.taskId, request.nodeId, videoDraftAccountFingerprint(key), draftCreatedAt, { duration: payload.duration, aspectRatio: payload.ratio, generateAudio: payload.generate_audio })
+        return downloadResult(url, 'video/mp4', { provider: 'BytePlus Seedance', modelId, prompt: request.prompt, aspectRatio: request.aspectRatio, duration: request.duration, resolution: request.videoDraft ? '480p' : request.resolution, motionCadence: request.motionCadence, videoDraft }, signal)
+      },
     })
     await appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath: result.outputPath, outputUrl: localAssetUrl(result.outputPath) })
     runtimeServiceFailures.delete('byteplus')
-    return { requestId: result.taskId, modelId, outputPath: result.outputPath, outputUrl: localAssetUrl(result.outputPath), outputType: 'video' }
+    return { requestId: result.taskId, modelId, outputPath: result.outputPath, outputUrl: localAssetUrl(result.outputPath), outputType: 'video', videoDraft }
   } catch (error) {
     if (signal?.aborted) throw error
     const message = providerErrorDetail(error, 'BytePlus ModelArk generation failed.')
@@ -1691,7 +1730,7 @@ async function finishDirectImage(request: GenerationRequest, provider: 'openai' 
 }
 
 async function enforceLockedArtwork(request: GenerationRequest, outputPath: string): Promise<void> {
-  const exactArtwork = (request.references || []).filter((reference) => reference.fidelity === 'lock' && reference.role === 'reference' && reference.path && (!reference.mediaType || reference.mediaType === 'image'))
+  const exactArtwork = (request.references || []).filter(isLockedArtworkReference)
   if (!exactArtwork.length) return
   mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Placing locked artwork…', status: 'running' })
   const result = await compositeLockedArtwork(request, outputPath)
@@ -1835,13 +1874,18 @@ async function runNativeFalGeneration(request: GenerationRequest, signal?: Abort
   const native = { ...request.falNative!, ...(promptOwnership !== undefined ? { promptOwnership } : {}), requiresGeneratedSpeech: requiresGeneratedDialogueAudio(request), ...(timelineSeconds !== undefined ? { timelineSeconds } : {}) }
   // The visible final prompt has one owner. No static adapter adds unseen instructions.
   const finalPrompt = request.providerPromptOverride ?? request.prompt
-  if (finalPrompt !== undefined && (!native.promptField || native.values[native.promptField] !== finalPrompt)) throw new Error('The native model prompt must match the visible final prompt. Review its binding.')
+  if (finalPrompt !== undefined && (!native.promptField || native.values[native.promptField] !== nativeFalPromptTransport(request, finalPrompt))) throw new Error('The native model prompt must match the visible final prompt through its actual attachment mapping. Review its binding.')
   const supplied = Object.values(native.media).flat()
   const sources = [...(request.references || []), ...(request.inputPath || request.inputUrl ? [{ path: request.inputPath, url: request.inputUrl, mediaType: request.inputRole === 'source-video' ? 'video' as const : 'image' as const }] : [])]
   for (const source of sources) {
     if (!source.path && !source.url || source.path && extname(source.path).toLowerCase() === '.prismstyle') continue
     if (!supplied.some(item => (source.path ? item.path === source.path : item.url === source.url) && item.mediaType === (source.mediaType || 'image'))) throw new Error('A connected reference is missing from the native model inputs. Review its field binding.')
   }
+  let videoDraft: VideoDraftReceipt | undefined
+  let videoDraftWarning: string | undefined
+  const draftCreatedAt = new Date().toISOString()
+  const draftAccount = native.values.draft === true && supportsFalSeedanceDraft(native.endpointId) ? videoDraftAccountFingerprint(await loadServiceCredential('fal')) : undefined
+  if (draftAccount) native.values = { ...native.values, resolution: '480p' }
   try {
     const result = await executeFalNativeGeneration(native, request.kind, {
       contract: readOwnedFalSchema,
@@ -1862,8 +1906,12 @@ async function runNativeFalGeneration(request: GenerationRequest, signal?: Abort
           mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: queueMessage(update), status: update.status === 'IN_QUEUE' ? 'queued' : 'running' })
         } })
       },
-      persist: async (output, endpointId, abortSignal) => {
-        const path = await downloadResult(output.url, output.contentType, { provider: 'fal.ai', modelId: endpointId, prompt: finalPrompt }, abortSignal, output.type)
+      persist: async (output, endpointId, abortSignal, response) => {
+        if (draftAccount && output.type === 'video') {
+          try { videoDraft = createVideoDraftReceipt('fal', endpointId, (response as { draft_id?: unknown }).draft_id, request.nodeId, draftAccount, draftCreatedAt, { duration: native.values.duration as string | number | undefined, aspectRatio: native.values.aspect_ratio as string | undefined, generateAudio: native.values.generate_audio as boolean | undefined }) }
+          catch { videoDraftWarning = 'Draft video saved. The provider returned no usable completion ID; recover the original fal request in Node Settings before rendering a final.' }
+        }
+        const path = await downloadResult(output.url, output.contentType, { provider: 'fal.ai', modelId: endpointId, prompt: finalPrompt, ...(videoDraft ? { videoDraft, resolution: '480p' } : {}) }, abortSignal, output.type)
         if (output.type === 'image') await enforceLockedArtwork(request, path)
         const url = localAssetUrl(path)
         await appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId: endpointId, status: 'complete', createdAt: new Date().toISOString(), outputPath: path, outputUrl: url })
@@ -1872,7 +1920,7 @@ async function runNativeFalGeneration(request: GenerationRequest, signal?: Abort
     }, signal)
     runtimeServiceFailures.delete('fal')
     const primary = result.outputs[result.primaryIndex]
-    return { requestId: result.requestId, modelId: result.modelId, outputPath: primary.path, outputUrl: primary.url, outputType: primary.type, outputs: result.outputs }
+    return { requestId: result.requestId, modelId: result.modelId, outputPath: primary.path, outputUrl: primary.url, outputType: primary.type, outputs: result.outputs, videoDraft, videoDraftWarning }
   } catch (error) {
     if (signal?.aborted || error instanceof VideoDialogueAudioConflictError || error instanceof SeedancePromptIntegrityError) throw error
     rememberServiceFailure('fal', error)
@@ -2047,7 +2095,74 @@ async function runNativeHiggsfieldGeneration(request: GenerationRequest, signal?
   }
 }
 
+function videoDraftAccountFingerprint(key: string): string {
+  return createHash('sha256').update('Prism Video Draft Account\0').update(key).digest('hex')
+}
+async function runRecoveredFalDraft(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+  const result = await executeFalDraftRecovery(request, {
+    assertCurrent: () => { assertGenerationCommit(); runtimeServiceFailures.assertCurrent('fal') },
+    accountFingerprint: async () => videoDraftAccountFingerprint(await loadServiceCredential('fal')),
+    result: async (endpointId, requestId, abortSignal) => {
+      const contract = await readOwnedFalSchema(endpointId)
+      assertGenerationCommit(); runtimeServiceFailures.assertCurrent('fal')
+      const client = createOwnedFalClient(await loadServiceCredential('fal'), falElectronFetch, () => { assertGenerationCommit(); runtimeServiceFailures.assertCurrent('fal') })
+      const recovered = await client.queue.result(endpointId, { requestId, abortSignal })
+      assertGenerationCommit(); runtimeServiceFailures.assertCurrent('fal')
+      await validateFalContractValue(contract.output, recovered.data, 'Output')
+      return recovered
+    },
+    persist: async (url, receipt, abortSignal) => {
+      const path = await downloadResult(url, 'video/mp4', { provider: 'fal.ai', modelId: receipt.modelId, resolution: '480p', videoDraft: receipt }, abortSignal, 'video')
+      const outputUrl = localAssetUrl(path)
+      await appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId: receipt.modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath: path, outputUrl })
+      return { path, url: outputUrl }
+    },
+  }, signal)
+  runtimeServiceFailures.delete('fal')
+  return result
+}
+async function runLinkedVideoDraftCompletion(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+  const result = await executeVideoDraftCompletion(request, {
+    assertCurrent: () => { assertGenerationCommit(); runtimeServiceFailures.assertCurrent(request.draftCompletion!.provider) },
+    receipt: async source => {
+      const path = await assertManagedMediaPath(source)
+      const assets = await readJson<ImportedAsset[]>(assetsIndexPath(), [])
+      const asset = assets.find(item => resolve(item.path) === resolve(path) && !item.trashedAt && item.mimeType.startsWith('video/'))
+      if (!asset?.metadata?.videoDraft) throw new Error('The selected managed video has no original draft receipt.')
+      return asset.metadata.videoDraft
+    },
+    accountFingerprint: async provider => videoDraftAccountFingerprint(await loadServiceCredential(provider)),
+    submit: async (receipt, input, abortSignal) => {
+      if (receipt.provider === 'byteplus') {
+        const key = await loadServiceCredential('byteplus')
+        const task = await runBytePlusTask({ fetch: (url, init) => { if (init?.method === 'POST') { runtimeServiceFailures.assertCurrent('byteplus'); assertGenerationCommit(); abortSignal?.throwIfAborted() } return net.fetch(url, init) }, apiKey: key, payload: input as BytePlusCreatePayload, signal: abortSignal,
+          onProgress: (message, status) => mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message, status }) })
+        return { requestId: task.taskId, url: task.outputUrl, contentType: 'video/mp4' }
+      }
+      const contract = await readOwnedFalSchema(FAL_SEEDANCE_DRAFT_COMPLETE)
+      await validateFalContractValue(contract.input, input)
+      runtimeServiceFailures.assertCurrent('fal'); assertGenerationCommit(); abortSignal?.throwIfAborted()
+      const client = createOwnedFalClient(await loadServiceCredential('fal'), falElectronFetch, () => { runtimeServiceFailures.assertCurrent('fal'); assertGenerationCommit() })
+      const submitted = await subscribeOwnedFalClient(client, FAL_SEEDANCE_DRAFT_COMPLETE, { input, logs: true, abortSignal,
+        onQueueUpdate: update => mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: queueMessage(update), status: update.status === 'IN_QUEUE' ? 'queued' : 'running' }) })
+      await validateFalContractValue(contract.output, submitted.data, 'Output')
+      const video = (submitted.data as { video: { url: string; content_type?: string } }).video
+      return { requestId: submitted.requestId, url: video.url, contentType: video.content_type || 'video/mp4' }
+    },
+    persist: async (output, receipt, abortSignal) => {
+      const path = await downloadResult(output.url, output.contentType, { provider: receipt.provider, modelId: receipt.modelId, resolution: '1080p', videoDraft: receipt }, abortSignal, 'video')
+      const url = localAssetUrl(path)
+      await appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: request.kind, modelId: receipt.modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath: path, outputUrl: url })
+      return { path, url }
+    },
+  }, signal)
+  runtimeServiceFailures.delete(request.draftCompletion!.provider)
+  return result
+}
+
 async function runGeneration(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+  if (request.falDraftRecovery) return runRecoveredFalDraft(request, signal)
+  if (request.draftCompletion) return runLinkedVideoDraftCompletion(request, signal)
   assertGenerationRequirements(request)
   assertVideoProviderPromptPreflight(request)
   if (!currentProject) throw new Error('Choose or open a project folder first.')
@@ -2471,6 +2586,50 @@ function registerIpc(): void {
       return snapshot
     })
   })
+  const voiceRecents = new VoiceRecentStore(join(dataRoot(), 'voice-browser-recents'))
+  const voiceProvider = (value: unknown): VoiceBrowserProvider => {
+    if (value !== 'elevenlabs' && value !== 'fal') throw new Error('Unsupported voice service.')
+    return value
+  }
+  const voiceReadContext = async (provider: VoiceBrowserProvider) => {
+    const key = await loadServiceCredential(provider)
+    const assertCurrent = () => runtimeServiceFailures.assertCurrent(provider)
+    assertCurrent()
+    return { options: { fetch: falElectronFetch, key: provider === 'elevenlabs' ? key : '', assertSubmission: assertCurrent }, assertCurrent,
+      historyPath: voiceRecents.path(currentProjectOwner(), provider, key) }
+  }
+  ipcMain.handle('services:browse-voices', (_event, input: unknown, query: unknown) => {
+    const provider = voiceProvider(input), q = validateVoiceQuery(query)
+    return withProviderRequest(provider, async () => {
+      const ctx = await voiceReadContext(provider)
+      if (q.tab === 'recent') return { voices: filterBrowserVoices(await voiceRecents.read(ctx.historyPath),q), hasMore:false }
+      if (provider === 'fal' && q.tab === 'mine') return { voices: filterBrowserVoices(await readFalBrowserVoices(ctx.options),q), hasMore:false }
+      return browseElevenVoices(ctx.options,q)
+    })
+  })
+  ipcMain.handle('services:voice-facets', (_event, input: unknown) => {
+    const provider = voiceProvider(input)
+    return withProviderRequest(provider, async () => readVoiceFacets((await voiceReadContext(provider)).options,provider === 'elevenlabs'))
+  })
+  ipcMain.handle('services:add-shared-voice', (_event, input: unknown) => withProviderRequest('elevenlabs',async () => {
+    const ctx = await voiceReadContext('elevenlabs')
+    return addElevenSharedVoice(ctx.options,input)
+  }))
+  ipcMain.handle('services:remove-voice', (_event, id: unknown) => withProviderRequest('elevenlabs',async () => {
+    const ctx = await voiceReadContext('elevenlabs')
+    return removeElevenVoice(ctx.options,id)
+  }))
+  ipcMain.handle('services:select-voice', (_event, input: unknown, selected: unknown) => {
+    const provider = voiceProvider(input), id = voicePathId(selected)
+    return withProviderRequest(provider,async () => {
+      const ctx = await voiceReadContext(provider)
+      const voice = provider === 'elevenlabs' ? await getElevenBrowserVoice(ctx.options,id) : (await readFalBrowserVoices(ctx.options)).find(v => v.id === id)
+      if (!voice) throw new Error('This voice is unavailable for the selected service.')
+      ctx.assertCurrent()
+      await voiceRecents.remember(ctx.historyPath,voice,ctx.assertCurrent)
+      return voice
+    })
+  })
   ipcMain.handle('services:models', async (_event, provider: unknown) => {
     if (typeof provider !== 'string' || !SERVICE_PROVIDERS.includes(provider as ServiceProvider)) throw new Error('Unknown AI service.')
     return withProviderRequest(provider as ServiceProvider, () => listServiceModels(provider as ServiceProvider))
@@ -2768,13 +2927,14 @@ function registerIpc(): void {
     if (!(rawBytes instanceof Uint8Array) && !(rawBytes instanceof ArrayBuffer)) throw new Error('No media buffer was received.')
     const mimeType = typeof rawMimeType === 'string' ? rawMimeType : ''
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(mimeType)) throw new Error('Sequence frames must be PNG, JPEG, or WebP images.')
+    const sourceMetadata = preserveBytePlusPortraitMetadata(metadata, undefined)
     const bytes = Buffer.from(rawBytes instanceof ArrayBuffer ? new Uint8Array(rawBytes) : rawBytes)
     if (!bytes.length || bytes.length > 50 * 1024 * 1024) throw new Error('Sequence frame data is empty or too large.')
     const extension = mimeType === 'image/jpeg' ? '.jpg' : mimeType === 'image/webp' ? '.webp' : '.png'
     const stem = (typeof rawName === 'string' ? rawName : 'sequence-final-frame').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().slice(0, 80) || 'sequence-final-frame'
     const target = join(categoryFolder('image', true), `${Date.now()}-${randomUUID().slice(0, 8)}-${stem}${extension}`)
     await writeFile(target, bytes, { flag: 'wx' })
-    return registerGeneratedAsset(target, metadata)
+    return registerGeneratedAsset(target, sourceMetadata)
   })
   ipcMain.handle('assets:mark-canvas-copy', () => {
     clipboard.writeBuffer(CANVAS_CLIPBOARD_FORMAT, Buffer.from('prism-foundry-canvas-nodes-v1'))
@@ -2837,7 +2997,7 @@ function registerIpc(): void {
     if (typeof rawName !== 'string' || !rawName.trim()) throw new Error('Character library: enter a Character name before saving.')
     const bytes = Buffer.from(rawBytes instanceof ArrayBuffer ? new Uint8Array(rawBytes) : rawBytes)
     if (!bytes.length || bytes.length > 50 * 1024 * 1024) throw new Error('Character library: the compiled reference sheet is empty or too large.')
-    const internalFolder = join(projectPath('01. Characters', safeFolderName(rawName, 'Character')), '.prism-internal')
+    const internalFolder = join(projectFolder('Characters', safeFolderName(rawName, 'Character')), '.prism-internal')
     await mkdir(internalFolder, { recursive: true })
     const target = join(internalFolder, 'character-reference-sheet.jpg')
     await writeFile(target, bytes)
@@ -2893,7 +3053,7 @@ function registerIpc(): void {
       const editTargetAssetId = request.intent.mode === 'replace-existing' ? request.intent.targetAssetId : undefined
       const editTarget = editTargetAssetId ? originalAssets.find((asset) => asset.id === editTargetAssetId) : undefined
       const physicalCollectionName = editTarget ? basename(dirname(editTarget.path)) : collisionSafeCollectionName(defaultCollectionName, occupiedCollectionNames)
-      const internalFolder = join(projectPath('01. Characters', physicalCollectionName), '.prism-internal')
+      const internalFolder = join(projectFolder('Characters', physicalCollectionName), '.prism-internal')
       await mkdir(internalFolder, { recursive: true })
       sheetTarget = join(internalFolder, 'character-reference-sheet.jpg')
       targetExisted = await pathExists(sheetTarget)
@@ -2988,12 +3148,57 @@ function registerIpc(): void {
     await assetJsonMutations.mutateArray<ImportedAsset>(managed.indexPath, (assets) => {
       const asset = assets.find((candidate) => candidate.id === id)
       if (!asset) throw new Error('Asset not found.')
-      updated = { ...asset, metadata }
+      updated = { ...asset, metadata: preserveBytePlusPortraitMetadata(metadata, asset.metadata) }
       return assets.map((candidate) => candidate.id === id ? updated! : candidate)
     })
     if (!updated) throw new Error('Asset not found.')
     if (updated.category !== 'style') await writeProjectDocument()
     return { ...updated, url: localAssetUrl(updated.path) }
+  })
+  ipcMain.handle('assets:byteplus-portrait-context', async (_event, id: unknown) => {
+    if (!currentProject) throw new Error('Choose or open a project folder first.')
+    if (typeof id !== 'string' || !id || id.length > 200) throw new Error('Invalid asset ID.')
+    const requestedOwner = currentProjectOwner()
+    return projectCommands.runForOwner(requestedOwner, currentProjectOwner, async () => {
+      const managed = await managedAssetById(id)
+      if (!managed || managed.asset.trashedAt) throw new Error('Asset not found or in Trash.')
+      const registry = await serviceProfileStore().listProfiles('byteplus', false)
+      const selection = projectServiceProfileSelection(registry, currentProject, 'byteplus')
+      return { assetId: id, mediaType: portraitMediaType(managed.asset.mimeType), available: selection.available, profile: selection.profile, binding: managed.asset.metadata?.byteplusPortrait }
+    })
+  })
+  ipcMain.handle('assets:link-byteplus-portrait', async (_event, raw: unknown) => {
+    if (!currentProject) throw new Error('Choose or open a project folder first.')
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(key => !['assetId', 'profileId', 'consoleAssetId', 'consoleActiveConfirmed', 'expiresAt'].includes(key))) throw new Error('Invalid trusted asset link.')
+    const request = raw as BytePlusPortraitLinkRequest
+    if (typeof request.assetId !== 'string' || !request.assetId || request.assetId.length > 200 || typeof request.profileId !== 'string' || !request.profileId || request.profileId.length > 200) throw new Error('Invalid trusted asset owner.')
+    const requestedOwner = currentProjectOwner()
+    return projectCommands.runForOwner(requestedOwner, currentProjectOwner, async () => {
+      const managed = await managedAssetById(request.assetId)
+      if (!managed || managed.asset.trashedAt) throw new Error('Asset not found or in Trash.')
+      const registry = await serviceProfileStore().listProfiles('byteplus', false)
+      const selection = projectServiceProfileSelection(registry, currentProject, 'byteplus')
+      if (!selection.available || !selection.profile || selection.profile.id !== request.profileId) throw new Error('The selected BytePlus account changed or is disconnected. Review the account before linking.')
+      const sourcePath = await assertManagedAssetPath(managed.asset), bytes = await readFile(sourcePath)
+      const latestRegistry = await serviceProfileStore().listProfiles('byteplus', false)
+      const latestSelection = projectServiceProfileSelection(latestRegistry, currentProject, 'byteplus')
+      if (!latestSelection.available || latestSelection.profile?.id !== selection.profile.id || latestSelection.profile.accountIdentifier !== selection.profile.accountIdentifier) throw new Error('The selected BytePlus account changed while the source was read. Review the account before linking.')
+      const binding = linkBytePlusPortrait(request, selection.profile, managed.asset.mimeType, bytes)
+      return commitBytePlusPortraitMetadata(managed, asset => ({ ...asset, metadata: { ...asset.metadata, byteplusPortrait: binding } }))
+    })
+  })
+  ipcMain.handle('assets:revoke-byteplus-portrait', async (_event, id: unknown) => {
+    if (!currentProject) throw new Error('Choose or open a project folder first.')
+    if (typeof id !== 'string' || !id || id.length > 200) throw new Error('Invalid asset ID.')
+    const requestedOwner = currentProjectOwner()
+    return projectCommands.runForOwner(requestedOwner, currentProjectOwner, async () => {
+      const managed = await managedAssetById(id)
+      if (!managed) throw new Error('Asset not found.')
+      return commitBytePlusPortraitMetadata(managed, asset => {
+        if (!asset.metadata?.byteplusPortrait) throw new Error('This asset has no local BytePlus link.')
+        return { ...asset, metadata: { ...asset.metadata, byteplusPortrait: revokeBytePlusPortrait(asset.metadata.byteplusPortrait) } }
+      })
+    })
   })
   ipcMain.handle('assets:update-state', async (_event, id: unknown, patch: unknown) => {
     if (!currentProject) throw new Error('Choose or open a project folder first.')
@@ -3092,7 +3297,7 @@ function registerIpc(): void {
         for (const asset of selected) {
           const roots = asset.category === 'style' ? [globalStylesRoot()] : [projectRoot]
           const source = await assertManagedPathAllowMissingLeaf(asset.path, roots)
-          const stagingRoot = asset.category === 'style' ? join(globalStylesRoot(), '.prism-trash', transactionId) : projectPath('05. Canvas', '.prism-trash', transactionId)
+          const stagingRoot = asset.category === 'style' ? join(globalStylesRoot(), '.prism-trash', transactionId) : projectFolder('Canvas', '.prism-trash', transactionId)
           stagingRoots.add(stagingRoot)
           const staged = await stageRecoverableAssetFile(source, stagingRoot, `${asset.id}${extname(source).toLocaleLowerCase('en-US')}`)
           const stagedPath = staged.stagedPath
@@ -3179,7 +3384,7 @@ function registerIpc(): void {
       const originalHistory = await readStrictJsonOr<HistoryEntry[]>(historyPath(), [], 'The generation history')
       const selected = originalAssets.filter((asset) => ids.has(asset.id))
       if (selected.length !== ids.size) throw new Error('Project asset collection is incomplete or invalid.')
-      const stagingRoot = projectPath('05. Canvas', '.prism-delete-staging', randomUUID())
+      const stagingRoot = projectFolder('Canvas', '.prism-delete-staging', randomUUID())
       const staged: Array<{ source: string; stagedPath: string }> = []
       try {
         await mkdir(stagingRoot, { recursive: true })
@@ -3337,6 +3542,7 @@ function registerIpc(): void {
     if (!Array.isArray(rawPaths) || !['character', 'element', 'location', 'wardrobe', 'style-reference'].includes(String(kind))) throw new Error('Invalid asset promotion request.')
     const name = safeFolderName(typeof collectionName === 'string' ? collectionName : undefined, kind === 'style-reference' ? 'Style' : String(kind))
     const promoted: ImportedAsset[] = []
+    const indexed = await readStrictJsonOr<ImportedAsset[]>(assetsIndexPath(), [], 'The saved asset index')
     for (const rawPath of rawPaths) {
       if (typeof rawPath !== 'string') continue
       const source = assertInsideProject(rawPath)
@@ -3345,7 +3551,7 @@ function registerIpc(): void {
       await mkdir(destinationInfo.folder, { recursive: true })
       const destination = join(destinationInfo.folder, uniqueAssetName(source))
       await copyFile(source, destination, fsConstants.COPYFILE_EXCL)
-      promoted.push(await registerAsset({ id: randomUUID(), name: basename(source), path: destination, url: localAssetUrl(destination), mimeType: mimeFor(destination), category: destinationInfo.category, origin: 'generated', fileSize: (await stat(destination)).size, createdAt: new Date().toISOString() }))
+      promoted.push(await registerAsset({ id: randomUUID(), name: basename(source), path: destination, url: localAssetUrl(destination), mimeType: mimeFor(destination), category: destinationInfo.category, origin: assetPromotionOrigin(source, indexed), fileSize: (await stat(destination)).size, createdAt: new Date().toISOString() }))
     }
     return promoted
   })

@@ -1,4 +1,5 @@
 import type { GenerationRequest } from './types'
+import { nativeFalPromptTransport } from './nativeFalPromptTransport'
 import type { FalNativeRequest } from './falNativeExecution'
 import { effectiveProviderPromptOwnership, effectiveVideoEndpoint, hasExactAuthoredProviderBody, providerPromptOwnershipErrors } from './providerPromptOwnership'
 import { ownsExactSeedanceMaster } from './seedanceAuthoredMaster'
@@ -21,13 +22,21 @@ export function seedancePromptIntegrityFailures(request: GenerationRequest): str
   const owner = effectiveProviderPromptOwnership(request)
   if (request.falNative) {
     const native = request.falNative, visible = request.providerPromptOverride ?? request.prompt
+    if (owner === 'compiled') {
+      const finalErrors = falNativeCompiledPromptErrors({ ...native, promptOwnership: owner })
+      if (finalErrors.length) return finalErrors
+    }
     if (owner === 'compiled' || visible !== undefined) {
       if (typeof native.promptField !== 'string' || !native.promptField.trim()) return ['The native model prompt needs an explicit prompt field binding before submission.']
       const body = native.values && Object.hasOwn(native.values, native.promptField) ? native.values[native.promptField] : undefined
       if (typeof body !== 'string') return ['The native model prompt field needs its final text before submission.']
-      if (visible !== undefined && body !== visible) return ['The native model prompt must match the visible final prompt. Review its binding.']
+      if (visible !== undefined) {
+        let expected: string
+        try { expected = nativeFalPromptTransport(request, visible) }
+        catch (error) { return [error instanceof Error ? error.message : 'Review the native reference binding.'] }
+        if (body !== expected) return ['The native model prompt must match the visible final prompt through its actual attachment mapping. Review its binding.']
+      }
     }
-    if (owner === 'compiled') return falNativeCompiledPromptErrors({ ...native, promptOwnership: owner })
   }
   if (hasExactAuthoredProviderBody(request) || !effectiveVideoEndpoint(request)?.includes('seedance')) return []
   const body = owner === 'compiled' ? request.providerPromptOverride : ownsExactSeedanceMaster(request) ? request.authoredPrompt : undefined

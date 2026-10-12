@@ -1,3 +1,4 @@
+import { nativeVideoDefaults } from './nativeVideoDefaults'
 import { preserveHiggsfieldSelection, type HiggsfieldNodeSelection } from './higgsfieldNodeBinding'
 import type { FalVideoTiming } from './videoTiming'
 import type { FalJson, FalSchemaContract } from './falSchemaBinding'
@@ -63,6 +64,7 @@ export function reconcileFalNodeBinding(state: FalNativeNodeState, contract: Fal
   const primitiveValues = Object.fromEntries(Object.entries(state.values).filter(([, value]) => value === null || typeof value !== 'object'))
   const reconciled = reconcileFalInputValues(previous, contract.runtime, primitiveValues)
   reconciled.values = { ...reconciled.values, ...state.values }
+  if (state.flow === 'video') reconciled.values = nativeVideoDefaults(contract.runtime.fields, state, reconciled.values, contract.runtime.timing?.kind === 'seconds' ? { duration: contract.runtime.timing.field } : {}, contract.runtime.fields.some(field => field.media?.role === 'source-video'))
   for (const field of contract.runtime.fields) if (!Object.prototype.hasOwnProperty.call(state.values, field.key)) {
     const value = reconciled.values[field.key]
     if (field.control === 'unsupported' || field.control === 'media' && (value === null || Array.isArray(value) && !value.length)) delete reconciled.values[field.key]

@@ -57,7 +57,7 @@ const fal={provider:'fal',verified:true,models:[
  ...[4,3,2,1].map(version=>({id:'fixture/northstar-image-'+version,label:'FLUX.'+version,category:'text-to-image',catalog:{service:'fal.ai',company:'Black Forest Labs',release:'FLUX.'+version,mode:'Text to Image'}})),
  {id:'fixture/openai-image-qa',label:'FLUX Kontext QA',category:'text-to-image',catalog:{service:'fal.ai',company:'Black Forest Labs',release:'FLUX Kontext QA',mode:'Text to Image'}}
 ]};
-const wanContract={endpointId:WAN_ENDPOINT,schemaPath:'/alibaba/wan-3.0/reference-to-video',category:'image-to-video',input:{type:'object',properties:{prompt:{type:'string'},duration:{default:5,anyOf:[{type:'integer',minimum:2,maximum:30},{type:'null'}]}}},output:{type:'object'}};
+const wanContract={endpointId:WAN_ENDPOINT,schemaPath:'/alibaba/wan-3.0/reference-to-video',category:'image-to-video',input:{type:'object',properties:{prompt:{type:'string'},audio:{type:'boolean',default:true},resolution:{type:'string',enum:['480p','720p','1080p'],default:'1080p'},aspect_ratio:{type:'string',enum:['adaptive','16:9','9:16'],default:'adaptive'},duration:{default:5,anyOf:[{type:'integer',minimum:2,maximum:30},{type:'null'}]}}},output:{type:'object'}};
 wanContract.runtime={...describeFalRuntimeInputs(wanContract),fingerprint:'wan-duration-fixture'};
 const wanFal={provider:'fal',verified:true,models:[{id:WAN_ENDPOINT,label:'Wan 3.0 · Reference to Video',category:'image-to-video',catalog:{service:'fal.ai',company:'Alibaba',release:'Wan 3.0',mode:'Reference to Video'}}]};
 const inputContract=(endpointId)=>describeHiggsfieldInputContract(endpointId,structuredClone(higgsfieldInputSchema(endpointId)),FINGERPRINT);
@@ -120,7 +120,7 @@ window.__showWanDuration=async width=>{root.render(<Case key={'wan-duration-capt
 window.__showVideoActionState=async(width,actionState)=>{root.render(<Case key={'video-action-'+width+'-'+actionState} width={width} actionState={actionState}/>);await wait();await wait();};
 window.__measureVideoAction=()=>{const card=document.querySelector('#root .react-flow__node[data-id="video-315"]');if(!card)throw Error('Missing action parity card');const read=element=>{if(!element)throw Error('Missing footer parity button');const rect=element.getBoundingClientRect(),style=getComputedStyle(element);return {label:element.getAttribute('aria-label'),disabled:element.disabled,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},radius:style.borderRadius,borderWidth:style.borderWidth,transform:style.transform,background:style.backgroundColor}};return {action:read(card.querySelector('.footer-run')),settings:read(card.querySelector('button[aria-label="Node Settings"]')),sound:read(card.querySelector('button[aria-label="Generate Native Sound"]'))};};
 const menu=()=>document.querySelector('.grouped-menu-select-menu');
-const routeOf=row=>row.title.split(' · ').at(-1);
+const routeOf=row=>row.id.slice(row.closest('[role="listbox"]').id.length+1);
 const optionRows=()=>[...menu().querySelectorAll('[role="option"]')];
 const open=async selector=>{const button=document.querySelector(selector);if(!button)throw Error('Missing selector '+selector);button.click();await wait();if(!menu())throw Error('Selector did not open '+selector);return menu()};
 const close=async()=>{menu()?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await wait();};
@@ -146,13 +146,27 @@ window.__exercise=async()=>{
  window.__publishCatalog();await wait();await wait();
  if(menu()!==firstMenu)throw Error('Catalog arrival closed or replaced the first-open selector');
  const coldAfter=optionRows().map(routeOf);
- if(!coldAfter.includes(${JSON.stringify('fal-native::fixture/omni-1.1/reference')}))throw Error('Late catalog did not appear in the still-open selector');
+ if(!coldAfter.includes(${JSON.stringify('fal-native::fixture/omni-1.1/reference')}))throw Error('Late catalog did not appear in the still-open selector '+JSON.stringify({coldBefore,coldAfter}));
  await close();await open(videoSelector(315));
  if(JSON.stringify(optionRows().map(routeOf))!==JSON.stringify(coldAfter))throw Error('Second opening contains routes absent from the first hydrated opening');
  const coldCatalogEvidence={coldBefore,coldAfter,firstMenuPreserved:true};await close();
  for(const width of [250,315,375]){
   root.render(<Case key={'wan-duration-'+width} width={width} durationOnly/>);await wait();await wait();
   const durationId='wan-duration-'+width,durationCard=document.querySelector('#root .react-flow__node[data-id="'+durationId+'"]');
+  const sound=durationCard.querySelector('button[aria-label="Generate Native Sound"]');
+  if(!sound||sound.disabled||sound.getAttribute('aria-pressed')!=='true')throw Error('Boolean Wan audio did not expose an active clickable sound token');
+  sound.click();await wait();
+  if(window.__snapshots[width]().find(node=>node.id===durationId).data.falNative.values.audio!==false)throw Error('Wan sound did not use actual Boolean audio field');
+  const offSound=document.querySelector('#root .react-flow__node[data-id="'+durationId+'"] button[aria-label="Generate Native Sound"]');
+  if(!offSound||offSound.disabled||offSound.getAttribute('aria-pressed')!=='false')throw Error('Wan sound toggle did not expose its off state');
+  offSound.click();await wait();
+  if(window.__snapshots[width]().find(node=>node.id===durationId).data.falNative.values.audio!==true)throw Error('Wan sound toggle did not switch back on');
+  await open('#root .react-flow__node[data-id="'+durationId+'"] button[aria-label="Motion FPS"]');
+  const wanFpsOptions=optionRows().map(row=>row.textContent.trim());
+  if(!wanFpsOptions.includes('30 fps (Native)')||!wanFpsOptions.includes('24 fps')||wanFpsOptions.includes('35 fps'))throw Error('Wan Native30 ceiling was lost');
+  optionRows().find(row=>row.textContent.trim()==='24 fps').click();await wait();
+  if(window.__snapshots[width]().find(node=>node.id===durationId).data.motionCadence!==24)throw Error('User-mode Wan cadence choice froze');
+
   const durationFooter=durationCard?.querySelector('.compact-video-footer-group[aria-label="Video Footer Controls"]');
   const durationModel=durationFooter?.querySelector('button[aria-label="Video Model"]');
   const durationButton=durationFooter?.querySelector('button[aria-label="Video Duration"]');
@@ -177,7 +191,7 @@ window.__exercise=async()=>{
   const wanAutoLabel=paintedDurationLabel();
   if(!Object.prototype.hasOwnProperty.call(wanAuto.falNative.values,'duration')||wanAuto.falNative.values.duration!==null)throw Error('Wan nullable Auto choice did not save explicit JSON null: '+JSON.stringify({values:wanAuto.falNative.values,label:wanAutoLabel}));
   if(wanAutoLabel!=='Auto')throw Error('Wan nullable Auto choice has the wrong closed label: '+JSON.stringify({values:wanAuto.falNative.values,label:wanAutoLabel}));
-  await chooseWanDuration((_label,row)=>row.title.endsWith(' · @default'));
+  await chooseWanDuration((_label,row)=>routeOf(row)==='@default');
   const wanDefault=window.__snapshots[width]().find(node=>node.id===durationId).data;
   const wanDefaultLabel=paintedDurationLabel();
   if(Object.prototype.hasOwnProperty.call(wanDefault.falNative.values,'duration')||wanDefaultLabel!=='5.0s')throw Error('Selecting the Wan default must remove its authored override and show 5.0s only');
@@ -188,7 +202,7 @@ window.__exercise=async()=>{
   const videoButton=()=>document.querySelector(videoSelector(width)),imageButton=()=>document.querySelector(imageSelector(width));
   const geometry=['video','image'].map(kind=>{const button=kind==='video'?videoButton():imageButton();if(!button)throw Error('Missing '+kind+' model trigger; '+document.body.innerText);const style=getComputedStyle(button);return {kind,height:button.getBoundingClientRect().height,radius:style.borderRadius,align:style.justifyContent,textAlign:getComputedStyle(button.querySelector('.selected-label')).textAlign,chevron:button.querySelector(':scope > svg')?.getBoundingClientRect().width};});
   const closedIdentity=videoButton().querySelector('.selected-label-full').textContent.trim();
-  if(!closedIdentity.endsWith('…')||/Text to Video|Reference to Video/.test(closedIdentity)||!videoButton().title.includes('Text to Video'))throw Error('Closed native identity must retain base name plus one ellipsis, with the full selected mode in its tooltip');
+  if(!closedIdentity.endsWith('…')||/Text to Video|Reference to Video/.test(closedIdentity)||videoButton().title)throw Error('Closed native identity must retain base name plus one ellipsis, with no selection tooltip');
   if(!document.querySelector('#root .react-flow__node[data-id="video-'+width+'"] button[aria-label="Run"]')?.disabled)throw Error('Generation must remain disabled in the fixture');
   const initialNative=window.__snapshots[width]().find(node=>node.id==='video-'+width).data.higgsfieldNative;
   const currentGroups=videoModelGroups(fal,higgsfield,window.__snapshots[width]().find(node=>node.id==='video-'+width).data);
@@ -211,7 +225,7 @@ window.__exercise=async()=>{
   if(JSON.stringify(labels)!==JSON.stringify(expectedMenuLabels))throw Error('Direct rows must show Featured followed by exact connected-provider headings: '+labels.join('|'));
   if(JSON.stringify(renderedGroups.map(group=>group.label))!==JSON.stringify(expected.allGroups.map(group=>group.label))||JSON.stringify(renderedGroups.map(group=>group.rows))!==JSON.stringify(expected.allGroups.map(group=>group.rows.map(row=>row.option.value))))throw Error('Provider groups or their exact projected route order changed');
   if(!ids.includes('fal-native::'+${JSON.stringify(FAL_KLING_FIXTURE)})||!ids.includes('higgsfield-native::'+TEXT_ENDPOINT))throw Error('The same Kling model is not separately selectable from both connected hosts');
-  const hostRows=options.filter(option=>[routeOf(option)].includes('fal-native::'+${JSON.stringify(FAL_KLING_FIXTURE)})||routeOf(option)==='higgsfield-native::'+TEXT_ENDPOINT).map(option=>({route:routeOf(option),title:option.title,host:option.title.split(' · ').at(-2)}));
+  const hostRows=options.filter(option=>[routeOf(option)].includes('fal-native::'+${JSON.stringify(FAL_KLING_FIXTURE)})||routeOf(option)==='higgsfield-native::'+TEXT_ENDPOINT).map(option=>({route:routeOf(option),title:option.title,host:option.querySelector('[data-company="fal"]')?'fal.ai':option.querySelector('[data-company="higgsfield"]')?'Higgsfield':undefined}));
   if(!hostRows.some(row=>row.host==='fal.ai')||!hostRows.some(row=>row.host==='Higgsfield'))throw Error('Exact host labels are missing for the same model: '+JSON.stringify(hostRows));
   const textRoutes=window.__registry.textRoutes.map(route=>'higgsfield-native::'+route),referenceRoutes=window.__registry.referenceRoutes.map(route=>'higgsfield-native::'+route);
   if(textRoutes.some(route=>!ids.includes(route))||referenceRoutes.some(route=>!ids.includes(route)))throw Error('An admitted Higgsfield text/reference endpoint is missing from direct menu rows');
@@ -228,7 +242,7 @@ window.__exercise=async()=>{
   const nativeFooter=videoCard.querySelector('.compact-video-footer-group[aria-label="Video Footer Controls"]');
   const primaryFields=videoCard.querySelector('[aria-label="Primary Higgsfield Fields"]');
   const motionButton=videoCard.querySelector('button[aria-label="Motion FPS"]');
-  if(!nativeFooter||!motionButton||!motionButton.disabled||(!motionButton.title.includes('User prompt is preserved') || motionButton.title.includes('connected Storyboard')))throw Error('Native video must retain Motion FPS in Manual mode with its compiled-prompt explanation');
+  if(!nativeFooter||!motionButton||motionButton.disabled)throw Error('Native video must allow an explicit Motion FPS selection in User mode');
   if(!nativeFooter.querySelector('button[aria-label="Video Aspect Ratio"]')||!nativeFooter.querySelector('button[aria-label="Video Duration"]')||!nativeFooter.querySelector('button[aria-label="Generate Native Sound"]')||!nativeFooter.querySelector('.quantity-stepper')||!nativeFooter.querySelector('button[aria-label="Node Settings"]')||!nativeFooter.querySelector('button[aria-label="Run"]'))throw Error('The native footer omitted an established ratio/duration/quantity/sound/settings/run control');
   if(nativeFooter.querySelector('button[aria-label="Native FPS"]'))throw Error('Kling must not receive an invented Native FPS control');
   if(primaryFields?.querySelector('button[aria-label="Video Aspect Ratio"],button[aria-label="Video Duration"],button[aria-label="Generate Native Sound"]'))throw Error('A footer-owned schema control is duplicated above the native footer');
@@ -278,7 +292,7 @@ window.__exercise=async()=>{
    const nativeFpsButton=ltxFooter.querySelector('button[aria-label="Native FPS"]');
    if(!nativeFpsButton||!nativeFpsButton.textContent.includes('25 fps'))throw Error('Schema-declared LTX Native FPS must be visible with its exact default');
    const manualCadence=ltxFooter.querySelector('button[aria-label="Motion FPS"]');
-   if(!manualCadence.disabled||(!manualCadence.title.includes('User prompt is preserved') || manualCadence.title.includes('connected Storyboard')))throw Error('LTX Motion FPS must remain disabled in User mode');
+   if(!manualCadence||manualCadence.disabled)throw Error('LTX Motion FPS must accept explicit User cadence choices');
    await chooseFieldOption(width,'Native FPS',label=>label==='50 fps');
    await chooseFieldOption(width,'Video Duration',label=>label==='10.0s');
    await chooseFieldOption(width,'Video Aspect Ratio',label=>label==='9:16');
@@ -433,11 +447,11 @@ root.render(<Case width={315}/>);
         expect(row.commands.some((command: { id: string; owner: string; endpoint: string }) => command.id === `video-${row.width}` && command.owner === 'fal' && command.endpoint === 'fixture/northstar-1/text')).toBe(false)
         expect(row.commands.some((command: { id: string; owner: string; patch?: Record<string, unknown> }) => command.id === `image-${row.width}` && command.owner === 'node' && command.patch?.imageProvider === 'openai' && command.patch?.imageModelId === 'gpt-image-2.5-sunburst')).toBe(true)
         expect(row.geometry.every((geometry: { height: number; radius: string; align: string; textAlign: string; chevron: number }) => geometry.height === 28 && geometry.radius === '999px' && geometry.align === 'flex-start' && geometry.textAlign === 'left' && geometry.chevron > 0)).toBe(true)
-        expect(row.wanDurationAudit.initialValues).toEqual({})
-        expect(row.wanDurationAudit.numberValues).toEqual({ duration: 12 })
+        expect(row.wanDurationAudit.initialValues).toEqual({ audio: true })
+        expect(row.wanDurationAudit.numberValues).toEqual({ audio: true, duration: 12 })
         expect(typeof row.wanDurationAudit.numberValues.duration).toBe('number')
-        expect(row.wanDurationAudit.autoValues).toEqual({ duration: null })
-        expect(row.wanDurationAudit.defaultValues).toEqual({})
+        expect(row.wanDurationAudit.autoValues).toEqual({ audio: true, duration: null })
+        expect(row.wanDurationAudit.defaultValues).toEqual({ audio: true })
         expect(row.wanDurationAudit.initialLabel).toContain('5.0s')
         expect(row.wanDurationAudit.autoLabel).toBe('Auto')
         expect(row.wanDurationAudit.defaultLabel).toBe('5.0s')
@@ -459,7 +473,7 @@ root.render(<Case width={315}/>);
       expect(footer.ltxAfter.higgsfieldNative.values).toMatchObject({ fps: 50, duration: 10, aspect_ratio: '9:16', resolution: '1080p', generate_audio: false })
       expect(footer.ltxAfter.frameRate).toBeUndefined()
       expect(footer.ltxAfter.motionCadence).toBeUndefined()
-      expect(footer.ltxMotionDisabled).toBe(true)
+      expect(footer.ltxMotionDisabled).toBe(false)
 
       const evidenceDirectory = process.env.PRISM_FLAT_MODEL_CHOICES_EVIDENCE_DIR
       if (evidenceDirectory) {

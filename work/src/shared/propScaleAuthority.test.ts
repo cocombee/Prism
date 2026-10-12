@@ -53,7 +53,7 @@ describe('typed referenced-prop scale authority', () => {
       authoredScaleStatement: 'The case is exactly 32 cm wide.', approvedScaleExclusions: ['case scale drift'], shotIds: ['s1'],
     }
     const element: StudioNode = { id: 'case', type: 'studio', position: { x: 0, y: 0 }, data: {
-      kind: 'element', title: 'Case', referenceTag: '@case', propScaleAuthority: lock,
+      kind: 'element', title: 'Case', referenceTag: '@case', referenceDescription: 'Sole Case design reference for the authored scale-locked prop.', propScaleAuthority: lock,
       referenceAssets: [{ id: 'case-ref', name: 'case.png', path: '/case.png', mimeType: 'image/png', createdAt: '' }],
     } }
     const storyboard: StudioNode = { id: 'storyboard', type: 'storyboard', position: { x: 0, y: 0 }, data: {
@@ -76,7 +76,7 @@ describe('typed referenced-prop scale authority', () => {
     const normalize = (value: string) => value.replaceAll('@storyboard', 'storyboard')
     expect(normalize(providerPromptPreviewCompilation(resolved).text)).toBe(normalize(composed))
     expect(normalize(visibleProviderPromptBody(resolved))).toBe(normalize(composed))
-    expect(normalize(providerSeedancePayloadCompilation(resolved).text.replaceAll('[Image1]', '@case'))).toBe(normalize(composed))
+    expect(normalize(providerSeedancePayloadCompilation(resolved).text.replaceAll('@Image1', '@case'))).toBe(normalize(composed))
     expect(composed.match(/hands and grip adapt/g)).toHaveLength(1)
     expect(composed.slice(composed.indexOf('SHOT 2 ·'))).not.toMatch(/hands and grip adapt|32 cm/)
 

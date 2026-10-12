@@ -21,12 +21,87 @@ function dependencies(contract: FalSchemaContract) {
  return deps
 }
 describe('actual graph to owned native executor', () => {
+ it('compiles connected textual Storyboard timing without pretending it is an attached visual reference', () => {
+  const fixture = captured.models[1]
+  const contract = bind({ ...compileFalSchemaContract('alibaba/wan-3.0/reference-to-video', fixture.openapi), category: fixture.metadata.category })
+  const end = target(contract), board = node('board', 'storyboard', { storyboardPanels: [
+   { id: 'one', prompt: 'A paper bird turns.', duration: 1.5, shotSize: 'wide', camera: 'static', transitionToNext: 'continue' },
+   { id: 'two', prompt: 'The same bird settles.', duration: 2.5, shotSize: 'wide', camera: 'static' },
+  ] })
+  end.data.promptMode = 'auto'; end.data.falNative!.values.duration = '4'
+  const request = buildGenerationRequest(end, [end, board], [{ id: 'board-generate', source: board.id, target: end.id, sourceHandle: 'storyboard-out', targetHandle: 'storyboard-in' }])
+  expect(request.prompt).not.toMatch(/@board = .*authority|@board matches the reference/)
+  expect(request.prompt).not.toContain('Storyboard plan:')
+  expect(request.prompt).toContain('0.0–1.5s —')
+  expect(request.prompt).toContain('1.5–4.0s —')
+  expect(request.falNative!.media).toEqual({})
+  expect(request.storyboardShots?.map(shot => shot.duration)).toEqual([1.5, 2.5])
+ })
+
+ it.each(['custom', 'native'] as const)('uses verified Wan30 capture for %s cadence without fabricating a provider FPS field', mode => {
+  const fixture = captured.models[1]
+  const contract = bind({ ...compileFalSchemaContract('alibaba/wan-3.0/reference-to-video', fixture.openapi), category: fixture.metadata.category })
+  const end = target(contract)
+  Object.assign(end.data, { promptMode: 'auto', prompt: 'A dancer turns in place.', motionCadence: 16, motionCadenceMode: mode, frameRate: 24 })
+  const request = buildGenerationRequest(end, [end], [])
+  expect(request.nativeOutputFrameRate).toBe(30)
+  expect(request.prompt).toContain('Capture at 30fps and play back at 30fps at normal speed.')
+  expect(request.prompt).not.toContain('Capture at 12fps')
+  expect(request.motionCadence).toBe(mode === 'custom' ? 16 : undefined)
+  expect(request.falNative!.values).not.toHaveProperty('fps')
+  end.data.promptMode = 'manual'
+  end.data.motionCadenceMode = 'native'
+  expect(buildGenerationRequest(end, [end], []).prompt).toBe(end.data.manualPromptDraft)
+ })
+
+ it.each(['choice', 'number', 'text'])('honors the current %s FPS field, not a retired saved value', control => {
+  const end = target(model())
+  Object.assign(end.data, { promptMode: 'auto', prompt: 'A dancer turns in place.', motionCadence: 35, motionCadenceMode: 'custom' })
+  end.data.falNative!.values.fps = '48'
+  delete end.data.falNative!.fieldControls!.fps
+  const retired = buildGenerationRequest(end, [end], [])
+  expect(retired.nativeOutputFrameRate).toBe(24)
+  expect(retired.motionCadence).toBe(24)
+  end.data.falNative!.fieldControls!.fps = control
+  const declared = buildGenerationRequest(end, [end], [])
+  expect(declared.nativeOutputFrameRate).toBe(48)
+  expect(declared.motionCadence).toBe(35)
+  expect(declared.prompt).toContain('Capture at 48fps')
+ })
+ it('does not compile a display-only capture rate for an unknown native endpoint', () => {
+  const fixture = captured.models[1]
+  const contract = bind({ ...compileFalSchemaContract('fictional/new-video/reference-to-video', fixture.openapi), category: fixture.metadata.category })
+  const end = target(contract)
+  Object.assign(end.data, { promptMode: 'auto', prompt: 'A dancer turns in place.', motionCadenceMode: 'native' })
+  const request = buildGenerationRequest(end, [end], [])
+  expect(request.nativeOutputFrameRate).toBeNull()
+  expect(request.prompt).not.toMatch(/Capture at \d+fps|Deliver at \d+fps|equivalent to 1\//)
+ })
+
+ it('keeps an unknown default Native and an explicit saved custom cadence reviewable before submission', () => {
+  const fixture = captured.models[1]
+  const contract = bind({ ...compileFalSchemaContract('fictional/new-video/reference-to-video', fixture.openapi), category: fixture.metadata.category })
+  const end = target(contract)
+  Object.assign(end.data, { promptMode: 'auto', prompt: 'A dancer turns in place.' })
+  const native = buildGenerationRequest(end, [end], [])
+  expect(native.nativeOutputFrameRate).toBeNull()
+  expect(native.motionCadence).toBeUndefined()
+  expect(native.prompt).not.toContain('Visual Motion FPS intent: 24fps')
+  Object.assign(end.data, { motionCadenceMode: 'custom', motionCadence: 16 })
+  const review = buildGenerationRequest(end, [end], [])
+  expect(review.motionCadence).toBe(16)
+  expect(review.prompt).toContain('uniform 1/16-second intervals')
+  expect(generationRequirementFailures(review)).toContain('verify native output FPS before using a custom Motion FPS, or select Native')
+  end.data.motionCadenceMode = 'native'
+  expect(generationRequirementFailures(buildGenerationRequest(end, [end], []))).not.toContain('verify native output FPS before using a custom Motion FPS, or select Native')
+ })
+
  it('wires native Motion FPS into compiled intent while preserving Manual bytes and native fields', () => {
   const contract = model(), end = target(contract)
   end.data.promptMode = 'auto'; end.data.prompt = 'A dancer turns in place.'; end.data.motionCadence = 16
   const auto = buildGenerationRequest(end, [end], [])
   expect(auto.motionCadence).toBe(16)
-  expect(auto.prompt).toMatch(/16fps/)
+  expect(auto.prompt).toMatch(/16fps/);expect(auto.prompt).toContain('uniform 1/16-second intervals');expect(auto.prompt).not.toContain('stop-motion cadence');expect(auto.prompt).not.toContain('natural directional exposure blur')
   expect(auto.falNative!.values).not.toHaveProperty('fps')
   expect(auto.falNative!.values).not.toHaveProperty('motionCadence')
   end.data.promptMode = 'manual'
@@ -34,6 +109,28 @@ describe('actual graph to owned native executor', () => {
   expect(manual.motionCadence).toBeUndefined()
   expect(manual.prompt).toBe(end.data.manualPromptDraft)
   expect(manual.falNative!.values.prompt).toBe(end.data.manualPromptDraft)
+ })
+ it('uses the visible User default before a prompt mode has been saved',()=>{
+  const end=target(model());delete end.data.promptMode;end.data.motionCadence=16
+  const unchanged=buildGenerationRequest(end,[end],[])
+  expect(unchanged.prompt).toBe(end.data.manualPromptDraft)
+  expect(unchanged.motionCadence).toBeUndefined()
+  end.data.motionCadenceMode='custom'
+  expect(buildGenerationRequest(end,[end],[]).prompt).toContain('uniform 1/16-second intervals')
+ })
+ it('applies only an explicitly selected User cadence, preserves authored bytes, and removes it on Native',()=>{
+  const end=target(model()), authored=end.data.manualPromptDraft
+  end.data.motionCadence=16;end.data.motionCadenceMode='custom'
+  const custom=buildGenerationRequest(end,[end],[])
+  expect(end.data.manualPromptDraft).toBe(authored)
+  expect(custom.prompt).toContain(`${authored}\n\nMOTION CADENCE:`)
+  expect(custom.prompt?.match(/MOTION CADENCE:/g)).toHaveLength(1)
+  expect(custom.prompt).toContain('uniform 1/16-second intervals')
+  expect(custom.falNative!.values).not.toHaveProperty('fps')
+  end.data.motionCadence=60
+  expect(buildGenerationRequest(end,[end],[]).motionCadence).toBe(24)
+  end.data.motionCadenceMode='native'
+  expect(buildGenerationRequest(end,[end],[]).prompt).toBe(authored)
  })
  it.each([20, 50])('preserves manual bytes and sends %i references through the captured route', async count => {
   const contract = model(), end = target(contract), images = refs(count === 50 ? 30 : count, 'image'), videos = refs(count === 50 ? 10 : 0, 'video'), audio = refs(count === 50 ? 10 : 0, 'audio'), sources = [...images, ...videos, ...audio]
@@ -66,10 +163,11 @@ describe('actual graph to owned native executor', () => {
   const sources = [node('room', 'upload', { referenceTag: '@room', outputType: 'image', assetPath: '/fixture/room.png' }), node('hero', 'upload', { referenceTag: '@hero', outputType: 'image', assetPath: '/fixture/hero.png' }), node('motion', 'upload', { referenceTag: '@motion', outputType: 'video', assetPath: '/fixture/motion.mp4' }), node('beat', 'upload', { referenceTag: '@beat', outputType: 'audio', assetPath: '/fixture/beat.wav' })]
   const edges = sources.map(source => connect(source, source.data.outputType === 'image' ? 'reference-in' : source.data.outputType === 'video' ? 'video-reference-in' : 'audio-reference-in'))
   const request = buildGenerationRequest(end, [end, ...sources], edges), deps = dependencies(contract)
-  expect(request.prompt).toContain('Show [Image2] then [Image1] while [Video1] follows [Audio1].')
+  expect(request.prompt).toContain('Show @hero then @room while @motion follows @beat.')
+  expect(request.falNative!.values.prompt).toContain('Show @Image2 then @Image1 while @Video1 follows @Audio1.')
   expect(request.falNative!.media.image_urls.map(source => source.path)).toEqual(['/fixture/room.png', '/fixture/hero.png'])
   await executeFalNativeGeneration(request.falNative!, request.kind, deps)
-  expect(deps.submit.mock.calls[0][2].prompt).toBe(request.prompt)
+  expect(deps.submit.mock.calls[0][2].prompt).toBe(request.falNative!.values.prompt)
  })
  it('keeps a locked start frame tag and authority with the real image route', () => {
   const fixture = captured.models[0], contract = bind({ ...compileFalSchemaContract(fixture.endpoint_id, fixture.openapi), category: fixture.metadata.category }), end = target(contract)
@@ -101,7 +199,7 @@ describe('actual graph to owned native executor', () => {
   const reopenedNodes=JSON.parse(JSON.stringify(nodes)) as StudioNode[],ready=buildGenerationRequest(reopenedNodes[0],reopenedNodes,JSON.parse(JSON.stringify(edges))),enabled=dependencies(contract)
   expect(ready.providerPromptOwnership).toBe('compiled');expect(ready.falNative!.requiresGeneratedSpeech).toBe(true)
   await executeFalNativeGeneration(ready.falNative!,ready.kind,enabled)
-  expect(enabled.submit.mock.calls[0][2].generate_audio).toBe(true);expect(enabled.submit.mock.calls[0][2].prompt).toBe(ready.prompt)
+  expect(enabled.submit.mock.calls[0][2].generate_audio).toBe(true);expect(enabled.submit.mock.calls[0][2].prompt).toBe(ready.falNative!.values.prompt)
   expect(String(enabled.submit.mock.calls[0][2].prompt).match(/Selamat pagi[.]/g)).toHaveLength(1)
   end.data.promptMode='manual';end.data.manualPromptDraft='  Exact silent acting body.  '
   const manual=buildGenerationRequest(end,nodes,edges)

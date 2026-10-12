@@ -1,3 +1,4 @@
+import { referenceIntroductionLine } from './assetReferenceDescriptions'
 import { describe, expect, it } from 'vitest'
 import type { Edge } from '@xyflow/react'
 import type { StudioNode } from './types'
@@ -10,14 +11,14 @@ import { generationRequirementFailures } from './generationReadiness'
 const node = (id: string, kind: StudioNode['data']['kind'], data: Partial<StudioNode['data']> = {}): StudioNode => ({
   id, type: 'studio', position: { x: 0, y: 0 }, data: { kind, title: id, ...data },
 })
-const asset = (id: string) => ({ id, name: `${id}.png`, path: `/fixture/${id}.png`, mimeType: 'image/png', createdAt: '' })
+const asset = (id: string) => ({ id, name: `${id}.png`, path: `/fixture/${id}.png`, mimeType: 'image/png', createdAt: '', metadata: { referenceDescription: 'Authored fixture reference purpose.' } })
 const edge = (source: string, target: string, targetHandle: string, sourceHandle = 'media-out'): Edge => ({
   id: `${source}-${target}-${targetHandle}`, source, target, sourceHandle, targetHandle,
 })
 
 function pipelineFixture() {
   const wardrobe = node('coat', 'wardrobe', { referenceTag: '@coat', referenceAssets: [asset('coat')], appearanceScope: 'wardrobe', appearanceSelection: 'explicit-replacement' })
-  const prop = node('case', 'element', { referenceTag: '@case', referenceAssets: [asset('case')] })
+  const prop = node('case', 'element', { referenceTag: '@case', referenceDescription: 'The case carried by Maya; sole prop-design reference.', referenceAssets: [asset('case')] })
   const character = node('maya', 'character', { title: 'Maya', referenceTag: '@maya', characterAuthorityMode: 'identity-body-with-layers', referenceAssets: [asset('maya')] })
   const location = node('station', 'location', { referenceTag: '@station', referenceAssets: [asset('station')] })
   const style = node('look', 'style-reference', { referenceTag: '@look', styleSavedAt: '2026-10-09', stylePrompt: 'Authored muted copper photography.' })
@@ -57,7 +58,7 @@ describe('ordered semantic production pipeline', () => {
       expect(media).toHaveLength(1)
       expect(media![0]).toMatchObject({ authority, path: source.data.assetPath })
       expect(generationRequirementFailures(request)).toEqual([])
-      expect(providerSeedancePayloadCompilation(request).text).toContain(mediaType === 'video' ? '[Video1]' : '[Audio1]')
+      expect(providerSeedancePayloadCompilation(request).text).toContain(mediaType === 'video' ? '@Video1' : '@Audio1')
     },
   )
 
@@ -73,16 +74,16 @@ describe('ordered semantic production pipeline', () => {
     expect(generationRequirementFailures(request)).toEqual([])
     const visible = providerPromptPreview(request)
     expect(visible).toContain("Use @coat for @maya's wardrobe.")
-    expect(visible).toContain('Use @case for the element used by @maya.')
+    expect(visible).toContain(referenceIntroductionLine(request.references!.find(reference => reference.tag === '@case')!)!)
     expect(visible).toContain('Use @maya as Maya.')
-    expect(visible).toContain('Use @station for the location.')
+    expect(visible).toContain(referenceIntroductionLine(request.references!.find(reference => reference.tag === '@station')!)!)
     expect(visible).toContain('Authored muted copper photography.')
     expect(visible).toContain('FOUR SHOTS, THREE HARD CUTS, 10s TOTAL')
     expect(visible.match(/^HARD CUT\.$/gm)).toHaveLength(3)
     expect(visible).toContain('“Tunggu di sini.”')
     expect(visible.match(/^NEGATIVE PROMPT$/gm)).toHaveLength(1)
     expect(compileProviderPromptForSubmission(request).text).toBe(visible)
-    const expectedPayload = visible.replaceAll('@coat', '[Image1]').replaceAll('@case', '[Image2]').replaceAll('@maya', '[Image3]').replaceAll('@station', '[Image4]')
+    const expectedPayload = visible.replaceAll('@coat', '@Image1').replaceAll('@case', '@Image2').replaceAll('@maya', '@Image3').replaceAll('@station', '@Image4')
     expect(providerSeedancePayloadCompilation(request).text).toBe(expectedPayload)
     expect(request.resolution).toBe('720p')
     expect(nodes.find((item) => item.id === 'board')!.data.storyboardPanels).toEqual(panels)
@@ -99,13 +100,13 @@ describe('ordered semantic production pipeline', () => {
       node('prompt', 'prompt', { prompt: 'Keep the authored station sequence.' }),
       node('text-route', 'router', { routeSignal: 'text' }),
       node('image', 'image-generator', { prompt: 'Create a station notice.', outputPath: '/fixture/image.png', outputType: 'image' }),
-      node('edit', 'image-editor', { prompt: 'Change only the notice border.', outputPath: '/fixture/edit.png', outputType: 'image' }),
-      node('upscale', 'upscaler', { outputPath: '/fixture/upscale.png', outputType: 'image', scale: 2 }),
+      node('edit', 'image-editor', { referenceDescription: 'The station notice with its approved border.', prompt: 'Change only the notice border.', outputPath: '/fixture/edit.png', outputType: 'image' }),
+      node('upscale', 'upscaler', { referenceDescription: 'The station notice appearance reference.', outputPath: '/fixture/upscale.png', outputType: 'image', scale: 2 }),
       node('image-list', 'list', { listSignal: 'image' }),
       node('clip', 'upload', { title: 'Motion Clip', assetPath: '/fixture/clip.mp4', outputType: 'video' }),
       node('video-route', 'router', { routeSignal: 'video' }),
-      node('voice', 'voiceover', { prompt: 'Tunggu di sini.', outputPath: '/fixture/voice.wav', outputType: 'audio' }),
-      node('sfx', 'sound-effects', { prompt: 'Case latch click.', outputPath: '/fixture/sfx.wav', outputType: 'audio' }),
+      node('voice', 'voiceover', { referenceDescription: 'Maya’s authored speech and its timing.', prompt: 'Tunggu di sini.', outputPath: '/fixture/voice.wav', outputType: 'audio' }),
+      node('sfx', 'sound-effects', { referenceDescription: 'The sound of the case latch clicking.', prompt: 'Case latch click.', outputPath: '/fixture/sfx.wav', outputType: 'audio' }),
       node('audio-list', 'list', { listSignal: 'audio' }),
       node('gallery', 'gallery'),
       node('note', 'sticky-note', { prompt: 'ANNOTATION_MUST_NOT_BECOME_PROVIDER_TEXT' }),
@@ -132,10 +133,10 @@ describe('ordered semantic production pipeline', () => {
     expect(visible).not.toContain('ANNOTATION_MUST_NOT_BECOME_PROVIDER_TEXT')
     expect(compileProviderPromptForSubmission(request).text).toBe(visible)
     const payload = providerSeedancePayloadCompilation(request).text
-    expect(payload).toContain('[Video1]')
-    expect(payload).toContain('[Audio1]')
-    expect(payload).toContain('[Audio2]')
-    expect(payload).not.toContain('[Video2]')
+    expect(payload).toContain('@Video1')
+    expect(payload).toContain('@Audio1')
+    expect(payload).toContain('@Audio2')
+    expect(payload).not.toContain('@Video2')
     const restoredNodes = JSON.parse(JSON.stringify(nodes)) as StudioNode[]
     const restoredEdges = JSON.parse(JSON.stringify(edges)) as Edge[]
     expect(providerSeedancePayloadCompilation(buildGenerationRequest(restoredNodes.find((item) => item.id === 'video')!, restoredNodes, restoredEdges)).text).toBe(payload)

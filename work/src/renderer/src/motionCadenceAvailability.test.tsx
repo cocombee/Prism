@@ -1,3 +1,4 @@
+import { nativeFpsLabel } from '../../shared/videoCadenceSelection'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
@@ -21,7 +22,7 @@ const code = ts.transpileModule(`const control = ${expression.getText(source)}; 
 const GroupedMenuSelect = (props: { ariaLabel: string; displayLabel: string }) => <button aria-label={props.ariaLabel}>{props.displayLabel}</button>
 function actualControl(frameRate: number | undefined, modelId = 'wan-controlled'): FluidGroupControl {
   const selectedVideoModel = resolveVideoModel(modelId), data = { frameRate, videoEngine: modelId }
-  const bindings = { React, data, selectedVideoModel, effectiveMotionCadence: normalizedMotionCadence(selectedVideoModel, frameRate), nativeVideoFps: knownOutputFrameRate(selectedVideoModel, frameRate), motionCadenceOptions, resolveVideoModel, GroupedMenuSelect, runtime: undefined, id: 'fixture-node' }
+  const bindings = { React, data, selectedVideoModel, effectiveMotionCadence: normalizedMotionCadence(selectedVideoModel, frameRate), nativeVideoFps: knownOutputFrameRate(selectedVideoModel, frameRate), motionCadenceOptions, resolveVideoModel, nativeFpsLabel, running: false, GroupedMenuSelect, runtime: undefined, id: 'fixture-node' }
   return new Function(...Object.keys(bindings), code)(...Object.values(bindings))
 }
 function render(control: FluidGroupControl) {
@@ -48,24 +49,24 @@ describe('production Motion FPS availability through shared control allocator', 
     expect(rows.length).toBeGreaterThanOrEqual(2); expect(rows.length).toBeLessThanOrEqual(3)
     expect(rows[0].controls[0].id).toBe('model'); expect(rows.at(-1)?.controls.slice(-2).map(c => c.id)).toEqual(['settings', 'run'])
   })
-  it('omits an empty Motion FPS slot at supported Native12 without undefined text or lost actions', () => {
+  it('retains Native12 and its legal cadence without undefined text or lost actions', () => {
     const model = resolveVideoModel('wan-controlled')
     expect(knownOutputFrameRate(model, 12)).toBe(12)
-    expect(motionCadenceOptions(model, 12)).toEqual([])
+    expect(motionCadenceOptions(model, 12)).toEqual([12])
     const html = render(actualControl(12))
-    expect(html).not.toContain('aria-label="Motion FPS"')
+    expect(html).toContain('aria-label="Motion FPS"')
     expect(html).not.toContain('undefined fps')
     expect(html).toContain('aria-label="Node Settings"'); expect(html).toContain('aria-label="Run"')
   })
-  it.each([[16, 12], [24, 16], [25, 24], [60, 24]])('keeps the legal selector/default at Native%s', (frameRate, expected) => {
+  it.each([[16, 16], [24, 24], [25, 24], [60, 24]])('keeps the legal selector/default at Native%s', (frameRate, expected) => {
     const html = render(actualControl(frameRate))
     expect(html).toContain('aria-label="Motion FPS"'); expect(html).toContain(`${expected} fps`)
-    expect(motionCadenceOptions(resolveVideoModel('wan-controlled'), frameRate).every(value => value < frameRate)).toBe(true)
+    expect(motionCadenceOptions(resolveVideoModel('wan-controlled'), frameRate).every(value => value <= frameRate)).toBe(true)
   })
   it('retains all documented motion choices when encoded FPS is unknown', () => {
-    const model = resolveVideoModel('bytedance/seedance-2.5/reference-to-video')
+    const model = resolveVideoModel('bytedance/seedance-2.0/reference-to-video')
     expect(knownOutputFrameRate(model)).toBeUndefined()
-    expect(motionCadenceOptions(model)).toEqual([12, 16, 24, 25, 35, 50, 60])
+    expect(motionCadenceOptions(model)).toEqual([12, 16, 24, 35, 50, 60])
     expect(render(actualControl(undefined, model.id))).toContain('24 fps')
   })
 })

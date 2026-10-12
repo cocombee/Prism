@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import { ArrowDown, ArrowUp, AudioLines, Bot, ChevronDown, Clapperboard, Clock3, Copy, Frame, Image as ImageIcon, Link2, List, Lock, MessageCircle, Play, Plus, Route, StickyNote, Trash2, Unlock, Video, Volume2, WandSparkles } from 'lucide-react'
 import type { StudioNode } from '../../shared/types'
-import { fallbackAssetTag, FluidControlGroup, FooterSaveAction, GroupedMenuSelect, hasMaterializedAsset, NodeRuntimeContext, type FluidGroupControl } from './NodeCardNext'
+import { AssetRenamePopover, SemanticCreateToggle, fallbackAssetTag, FluidControlGroup, FooterSaveAction, GroupedMenuSelect, hasMaterializedAsset, NodeRuntimeContext, type FluidGroupControl } from './NodeCardNext'
 import type { AssistantProvider } from '../../shared/assistantModels'
 import { modelDisplayName } from '../../shared/modelNames'
 import { formatDurationSeconds } from '../../shared/videoModels'
@@ -15,12 +15,16 @@ import { measuredFloatingMenuWidth, selectorTriggerFontSize, useContinuousAnchor
 import { normalizedStoryboardTransition } from '../../shared/storyboardSequence'
 import { reconcileStoryboardDurationBudget, STORYBOARD_DURATION_FALLBACK_OPTIONS } from '../../shared/storyboardDurationBudget'
 import { storyboardTriggerMenuKeyAction } from '../../shared/storyboardMenuInteraction'
+import { useNodeErrorNotice } from './useNodeErrorNotice'
 import { nodeNotificationCategory } from '../../shared/nodeNotificationCategory'
 import { ASSISTANT_PROVIDER_GROUPS, assistantCatalogsWithSavedSelection, latestAssistantModelGroups, resolveAssistantSelection, type AssistantCatalogs } from '../../shared/assistantProviderSelection'
 import { filterAndRankSelectorOptions, selectorSearchKeyAction, setSelectorPortalOpen } from '../../shared/selectorSearch'
 import { appendStoryboardPanel, canAppendStoryboardPanel, migrateStoryboardPanelDuration, removeStoryboardPanel, STORYBOARD_MAX_PANELS } from '../../shared/storyboardPanels'
 import { editStoryboardOriginal, migrateStoryboardPromptVersions, selectStoryboardPromptVersion, selectedStoryboardPrompt } from '../../shared/storyboardPromptVersions'
 import { APP_ICONS } from './iconSystem'
+import { AudioPlayer } from './AudioPlayer'
+import { GeneratedMediaOverlay } from './GeneratedMediaOverlay'
+import { mediaRenameStem } from '../../shared/assetNaming'
 
 function UtilityNodeActions({ id, locked = false }: { id: string; locked?: boolean }) {
   const runtime = useContext(NodeRuntimeContext)
@@ -93,6 +97,14 @@ export const ListNode = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const runtime = useContext(NodeRuntimeContext)
   const items = (data.listItems || []).filter((item) => item.type !== 'text')
   const batch = runtime?.listBatchState(id)
+  const [renameTarget, setRenameTarget] = useState<{ sourceNodeId: string; index: number; path: string } | null>(null)
+  const [renameName, setRenameName] = useState('')
+  const commitRename = () => {
+    if (!renameTarget || !renameName.trim()) return
+    void runtime?.renameGeneratedMedia?.(renameTarget.sourceNodeId, renameTarget.index, renameName, renameTarget.path)
+    setRenameTarget(null)
+  }
+  const audioList = batch?.signal === 'audio' || (items.length > 0 && items.every(item => item.type === 'audio'))
   const changeItems = (next: typeof items) => runtime?.updateNode(id, { listItems: next })
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction
@@ -106,20 +118,28 @@ export const ListNode = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const addItem = () => batch?.adjustable ? runtime?.adjustListBatchQuantity(id, 1) : runtime?.importAsset(id)
   const MediaIcon = batch?.signal === 'video' ? Video : batch?.signal === 'audio' ? AudioLines : ImageIcon
   return (
-    <article className={`canvas-list utility-actions-host ${selected ? 'is-selected' : ''}`}>
+    <article className={`canvas-list utility-actions-host ${audioList ? 'is-audio-list' : ''} ${selected ? 'is-selected' : ''}`}>
       <UtilityNodeActions id={id} locked={data.locked} />
+      {renameTarget && <AssetRenamePopover value={renameName} onChange={setRenameName} onCommit={commitRename} onCancel={() => setRenameTarget(null)} />}
       <header><span className="node-icon"><List size={15} /></span><div><strong>List</strong><small>{items.length} item{items.length === 1 ? '' : 's'} · {batch?.signal ? `${batch.signal[0].toUpperCase()}${batch.signal.slice(1)} Batch` : 'Media Batch'}</small></div></header>
       <div className="list-items">
         {items.map((item, index) => (
-          <div className="list-item nodrag" key={item.id}>
-            <span>{index + 1}</span>
-            {item.asset ? item.type === 'video' ? <video src={item.asset.url} preload="metadata" playsInline /> : item.type === 'audio' ? <div className="list-audio"><Volume2 size={14} /><audio src={item.asset.url} controls preload="metadata" /></div> : <img src={item.asset.url} alt={item.asset.name || 'List media'} loading="lazy" decoding="async" />
-              : <div className={`list-pending is-${item.status || 'pending'}`}>{item.type === 'video' ? <Video size={20} /> : item.type === 'audio' ? <AudioLines size={20} /> : <ImageIcon size={20} />}<strong>Output {index + 1}</strong><small>{item.status === 'generating' ? 'Generating' : item.status === 'failed' ? 'Failed' : 'Pending'}</small></div>}
+          <div className={item.type === 'audio' ? 'list-audio-row generated-media-stage nodrag' : 'list-item nodrag'} key={item.id} aria-label={`Output ${index + 1}`} >
+            {item.type !== 'audio' && <span>{index + 1}</span>}
+            {item.asset?.url ? item.type === 'video' ? <video src={item.asset.url} preload="metadata" playsInline /> : item.type === 'audio' ? <AudioPlayer src={item.asset.url} onReveal={!item.sourceNodeId && item.asset.path ? () => { void window.prism.assets.revealPath(item.asset!.path!) } : undefined} /> : <img src={item.asset.url} alt={item.asset.name || 'List media'} loading="lazy" decoding="async" />
+              : item.type === 'audio' ? <div className="list-audio-pending"><button type="button" className="compact-settings compact-options" aria-label={`Play Output ${index + 1}`} disabled><Play size={14} /></button><AudioLines size={20} /><span role="status">Output {index + 1} · {item.status === 'generating' ? 'Generating' : item.status === 'failed' ? 'Failed' : 'Pending'}</span></div> : <div className={`list-pending is-${item.status || 'pending'}`}>{item.type === 'video' ? <Video size={20} /> : <ImageIcon size={20} />}<strong>Output {index + 1}</strong><small>{item.status === 'generating' ? 'Generating' : item.status === 'failed' ? 'Failed' : 'Pending'}</small></div>}
+            {item.type === 'audio' && item.asset && item.sourceNodeId && item.sourceResultIndex !== undefined && <GeneratedMediaOverlay hideNavigation activeIndex={item.sourceResultIndex} total={1}
+              favorite={Boolean(runtime?.generatedMediaFavorite(item.sourceNodeId, item.sourceResultIndex))}
+              onPrevious={() => {}} onNext={() => {}}
+              onReveal={() => runtime?.revealGeneratedMedia(item.sourceNodeId!, item.sourceResultIndex!)}
+              onEdit={() => { if (!item.asset?.path) return; setRenameName(mediaRenameStem(item.asset.path.split(/[\\/]/).pop() || item.asset.name)); setRenameTarget({ sourceNodeId: item.sourceNodeId!, index: item.sourceResultIndex!, path: item.asset.path }) }}
+              onFavorite={() => runtime?.setGeneratedMediaFavorite(item.sourceNodeId!, item.sourceResultIndex!, !runtime.generatedMediaFavorite(item.sourceNodeId!, item.sourceResultIndex!))}
+              onDelete={() => runtime?.trashGeneratedMedia(item.sourceNodeId!, item.sourceResultIndex!)} />}
             {item.sourceNodeId ? !item.asset && batch?.adjustable && (batch.quantity || 1) > 1 && item.sourceResultIndex === (batch.quantity || 1) - 1 && <div className="list-item-actions"><button data-tooltip="Remove Output" aria-label={`Remove Output ${index + 1}`} onClick={() => runtime?.adjustListBatchQuantity(id, -1)}><Trash2 size={11} /></button></div>
               : <div className="list-item-actions"><button data-tooltip="Move Item Up" aria-label={`Move Item ${index + 1} Up`} onClick={() => move(index, -1)} disabled={index === 0}><ArrowUp size={11} /></button><button data-tooltip="Move Item Down" aria-label={`Move Item ${index + 1} Down`} onClick={() => move(index, 1)} disabled={index === items.length - 1}><ArrowDown size={11} /></button><button data-tooltip="Delete Item" aria-label={`Delete Item ${index + 1}`} onClick={() => changeItems(items.filter((candidate) => candidate.id !== item.id))}><Trash2 size={11} /></button></div>}
           </div>
         ))}
-        <button className="list-add-item nodrag" aria-label={addLabel} disabled={addDisabled} data-tooltip={addDisabled ? `This generator supports up to ${batch?.maxQuantity} outputs.` : undefined} onClick={addItem}>{items.length ? <Plus size={16} /> : <MediaIcon size={24} />}<span>{addLabel}</span>{!items.length && <small>{batch?.adjustable ? 'Increase the connected generator quantity' : 'Import image, video, or audio'}</small>}</button>
+        {audioList ? <SemanticCreateToggle label={addLabel} disabled={addDisabled} onClick={addItem} /> : <button className="list-add-item nodrag" aria-label={addLabel} disabled={addDisabled} data-tooltip={addDisabled ? `This generator supports up to ${batch?.maxQuantity} outputs.` : undefined} onClick={addItem}>{items.length ? <Plus size={16} /> : <MediaIcon size={24} />}<span>{addLabel}</span>{!items.length && <small>{batch?.adjustable ? 'Increase the connected generator quantity' : 'Import image, video, or audio'}</small>}</button>}
       </div>
       <footer className="nodrag">
         <span>{batch?.adjustable ? `Synced with ${batch.sourceTitle || 'generator'} · x${batch.quantity}` : batch?.sourceCount ? `${batch.sourceCount} generator batches` : `${items.length} media item${items.length === 1 ? '' : 's'}`}</span>
@@ -168,13 +188,15 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
   const totalDuration = durationBudget.totalDuration
   const overBudget = durationBudget.overBudget
   const remainingDuration = connectedVideo?.duration !== undefined ? connectedVideo.duration - totalDuration : undefined
-  const addPanelAvailable = canAppendStoryboardPanel(panels, remainingDuration)
+  const appendDurationLimit = Math.min(durationBudget.modelPerPanelMax, remainingDuration ?? durationBudget.modelPerPanelMax)
+  const addPanelAvailable = canAppendStoryboardPanel(panels, appendDurationLimit)
   const storyboardInputRules = runtime?.connectedInputRules(id) || []
   const storyboardPromptTags = [...new Set(storyboardInputRules.flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))]
   const availableStoryboardPromptTags = runtime?.availablePromptTags(id) || storyboardPromptTags
   const nodeBusy = data.runState === 'queued' || data.runState === 'running'
-  const storyboardNotificationCategory = nodeNotificationCategory(data)
-  const storyboardStatus = storyboardNotificationCategory === 'error' ? data.error : storyboardNotificationCategory === 'running' || storyboardNotificationCategory === 'transient' ? data.progress : undefined
+  const storyboardError = useNodeErrorNotice(data)
+  const storyboardNotificationCategory = nodeNotificationCategory({ ...data, error: storyboardError })
+  const storyboardStatus = storyboardNotificationCategory === 'error' ? storyboardError : storyboardNotificationCategory === 'running' || storyboardNotificationCategory === 'transient' ? data.progress : undefined
   const rawAssistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availablePromptModels?.(provider) || runtime?.availableModels(provider) || []])) as AssistantCatalogs
   const assistantCatalogs = assistantCatalogsWithSavedSelection(rawAssistantCatalogs, data.assistantProvider, data.assistantModelId, Boolean(data.assistantProvider && runtime?.modelAvailabilityVerified?.(data.assistantProvider)))
   const groupedAssistantModels = latestAssistantModelGroups(assistantCatalogs)
@@ -188,7 +210,7 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
   })
   const addPanel = () => {
     if (!addPanelAvailable) return
-    const result = appendStoryboardPanel(panels)
+    const result = appendStoryboardPanel(panels, undefined, appendDurationLimit)
     if (!result.added) return
     pendingPanelFocus.current = result.focusPanelId || null
     changePanels(result.panels)
@@ -252,7 +274,7 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
             </div></div>
             <div className="storyboard-panel-compose">
               <div className="storyboard-prompt-field">
-                <TaggedPromptTextarea value={activePrompt} connectedTags={storyboardPromptTags} availableTags={availableStoryboardPromptTags} disabled={panel.locked || selectedPromptVersion === 'revamped'} placeholder="Describe this shot…" onValueChange={(prompt) => { changePanels(panels.map((candidate) => candidate.id === panel.id ? editStoryboardOriginal(candidate, prompt) : candidate)); runtime?.connectPromptTags(id, prompt, activePrompt) }} />
+                <TaggedPromptTextarea value={activePrompt} connectedTags={storyboardPromptTags} autoSize={false} availableTags={availableStoryboardPromptTags} disabled={panel.locked || selectedPromptVersion === 'revamped'} placeholder="Describe this shot…" onValueChange={(prompt) => { changePanels(panels.map((candidate) => candidate.id === panel.id ? editStoryboardOriginal(candidate, prompt) : candidate)); runtime?.connectPromptTags(id, prompt, activePrompt) }} />
                 <div className="storyboard-control-reveal-zone">
                   <div className="storyboard-prompt-actions">
                     {hasTransitionActions && <div className="storyboard-transition-choice" role="radiogroup" aria-label={`Transition after panel ${index + 1}`}>
@@ -280,7 +302,7 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
           </section>
           )
         })}
-        {panels.length < panelLimit && <button className="storyboard-add-panels" disabled={!addPanelAvailable} title={!addPanelAvailable ? 'No sequence time remains. Reduce an earlier panel or increase Video duration.' : undefined} onClick={addPanel}><Plus size={13} />Add Panel</button>}
+        {panels.length < panelLimit && <button className="storyboard-add-panels" disabled={!addPanelAvailable} onClick={addPanel}><Plus size={13} />Add Panel</button>}
       </div>
       {connectedVideo?.timingError && <div className="storyboard-feedback-row storyboard-duration-helper" role="status" aria-live="polite">{connectedVideo.timingError}</div>}
       {connectedVideo && durationBudget.helper && <div className="storyboard-feedback-row storyboard-duration-helper is-overflow" role="status" aria-live="polite">{durationBudget.helper.text}</div>}
@@ -335,8 +357,9 @@ export const AssistantNode = memo(({ id, data, selected }: NodeProps<StudioNode>
   const account = runtime?.promptProviderAccount?.(provider) || runtime?.providerAccount(provider)
   const blocked = Boolean(account && ['credit-required', 'temporarily-limited', 'unavailable'].includes(account.state))
   const assistantBusy = data.runState === 'queued' || data.runState === 'running'
-  const assistantNotificationCategory = nodeNotificationCategory(data)
-  const assistantStatus = assistantNotificationCategory === 'error' ? data.error : assistantNotificationCategory === 'running' || assistantNotificationCategory === 'transient' ? data.progress : undefined
+  const assistantError = useNodeErrorNotice(data)
+  const assistantNotificationCategory = nodeNotificationCategory({ ...data, error: assistantError })
+  const assistantStatus = assistantNotificationCategory === 'error' ? assistantError : assistantNotificationCategory === 'running' || assistantNotificationCategory === 'transient' ? data.progress : undefined
   return <article className={`assistant-node ${selected ? 'is-selected' : ''} ${blocked ? 'is-access-blocked' : ''}`} title={blocked ? account?.message : undefined} aria-busy={assistantBusy || undefined}>
     <header><Bot size={15} /><div><strong>{data.title || 'Assistant'}</strong><small>Prompt revamp</small></div></header>
     <div className="assistant-model-row nodrag">

@@ -59,6 +59,8 @@ export function reusableEditorDraft(data: StudioNodeData, mode: ReusableEditorSe
     ...cleanResultState,
     title,
     prompt: '',
+    referenceDescription: '',
+    referenceDescriptionMode: 'auto',
     stylePrompt: data.kind === 'style-reference' ? '' : undefined,
     styleDescription: data.kind === 'style-reference' ? '' : data.styleDescription,
     stylePresetId: undefined,

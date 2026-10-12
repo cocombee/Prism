@@ -100,9 +100,9 @@ describe('complete dressed-body and same-body appearance authority', () => {
     expect(compiled.continuityLedger?.global.wardrobe).toEqual([])
     expect(orderedProviderImageReferences(request).map((reference) => reference.tag)).toEqual(['@maya'])
     const payload = providerSeedancePayloadCompilation(request).text
-    expect(payload).toContain('Use [Image1] as Maya.')
+    expect(payload).toContain('Use @Image1 as Maya.')
     expect(payload).not.toContain('@maya-coat')
-    expect(payload).not.toContain('[Image2]')
+    expect(payload).not.toContain('@Image2')
   })
 
   it('C: projects an explicitly selected Wardrobe only as appearance on the same counted body', () => {
@@ -253,7 +253,7 @@ describe('complete dressed-body and same-body appearance authority', () => {
     expect(submitted).toContain("Use @maya-coat for @maya's wardrobe.")
     expect(submitted).toContain('Approved Maya identity.')
     const adapter = providerSeedancePayloadCompilation(request).text
-    expect(adapter).toMatch(/Use \[Image\d+\] for \[Image\d+\]'s wardrobe\./)
+    expect(adapter).toMatch(/Use @Image\d+ for @Image\d+'s wardrobe\./)
     const manifest = buildStoryboardConnectedContextManifest('storyboard', [character, wardrobe, storyboard, video], edges, '@maya enters.', storyboard.data.storyboardPanels![0])
     expect(manifest.text).toContain('body-authority=identity-body-with-layers')
     expect(manifest.text).toContain('anchor=@maya-coat | role=Appearance | owner=@maya | scope=wardrobe | selection=explicit-replacement | shots=shot-i')

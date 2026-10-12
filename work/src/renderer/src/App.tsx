@@ -5100,7 +5100,7 @@ export function App() {
               <button onClick={() => setSemanticCreateKind('character')}><UserRound size={18} /><span>Character</span><small>Create a reusable identity</small><kbd>3</kbd></button>
               <button onClick={() => setSemanticCreateKind('location')}><Mountain size={18} /><span>Location</span><small>Create a reusable environment</small><kbd>4</kbd></button>
               <button onClick={() => setSemanticCreateKind('element')}><Box size={18} /><span>Element</span><small>Create 2–4 consistent angles</small><kbd>5</kbd></button>
-              <button onClick={() => addNode('storyboard')}><Clapperboard size={18} /><span>Storyboard</span><small>Plan shots with a required style</small><kbd>6</kbd></button>
+              <button onClick={() => addNode('storyboard')}><Clapperboard size={18} /><span>Storyboard</span><small>Plan shots and timing</small><kbd>6</kbd></button>
             </div>
             <button className="primary-action" onClick={() => setPaletteOpen(true)}><Plus size={16} /> Add Node <kbd>N</kbd></button>
           </section>

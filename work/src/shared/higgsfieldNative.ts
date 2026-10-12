@@ -27,7 +27,7 @@ export const HIGGSFIELD_SEEDANCE_MODELS = Object.freeze(HIGGSFIELD_SEEDANCE_RUNN
 })))
 /** Only routes with verified independent native adapters belong in selectable menus. */
 export const HIGGSFIELD_RUNNABLE_MODELS = Object.freeze([...HIGGSFIELD_GENJUTSU_MODELS, ...HIGGSFIELD_SEEDANCE_MODELS, ...HIGGSFIELD_TEXT_VIDEO_MODELS, ...HIGGSFIELD_REFERENCE_VIDEO_MODELS])
-export const HIGGSFIELD_BUNDLED_CATALOG_REVISION = `${HIGGSFIELD_CONTRACT_REVISION}|${HIGGSFIELD_SEEDANCE_INPUT_REVISION}|${HIGGSFIELD_TEXT_VIDEO_REVISION}|${HIGGSFIELD_REFERENCE_VIDEO_REVISION}`
+export const HIGGSFIELD_BUNDLED_CATALOG_REVISION = `${HIGGSFIELD_CONTRACT_REVISION}|${HIGGSFIELD_SEEDANCE_INPUT_REVISION}|${HIGGSFIELD_TEXT_VIDEO_REVISION}|${HIGGSFIELD_REFERENCE_VIDEO_REVISION}|published-main-catalog-2026-10-12-v3`
 export function higgsfieldBundledCatalogModels() {
   return HIGGSFIELD_RUNNABLE_MODELS.map(model => ({
     id: model.id, label: model.label, category: model.kind !== 'genjutsu' ? 'video' : 'video-to-video',
@@ -156,5 +156,5 @@ export function higgsfieldNativeFields(endpointId:string,inputSchema?:FalSchemaN
 export function higgsfieldPromptFamily(endpointId:string):'seedance'|'kling'|'wan'|'generic' {
   const model=higgsfieldModel(endpointId)
   if(model.kind==='seedance'||model.kind==='genjutsu')return 'seedance'
-  return model.company==='Kling'?'kling':model.company==='Alibaba'?'wan':'generic'
+  return model.company==='ByteDance'?'seedance':model.company==='Kling'?'kling':model.company==='Alibaba'?'wan':'generic'
 }

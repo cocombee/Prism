@@ -245,3 +245,11 @@ The imported monolith remains inactive migration evidence in `references/product
 - Do not rebuild or re-sign an existing Codex candidate to make inspection convenient; inspect the exact artifact first.
 - Do not bypass a native file chooser or foreground-approval failure. The observed absence of Storyboard Image Layout UI/CSS is packaged evidence, not permission to rebuild; a blocked native chooser is incomplete visual coverage, not evidence of success or failure of the requested interaction.
 - Preserve the approved fallback and all current Hermes source edits during candidate inspection. Stop before approval or promotion.
+
+## Approved shared node inset and prompt ownership — 13 October 2026
+
+- General outer padding and gaps between fields are separate owners. Standard node prompt/body inset is 12px; top and bottom match horizontal inset. Shared generator footers use 8px on all sides, independently of existing control gaps. Preserve the user-approved Storyboard footer and grouped speaker/sample controls.
+- Standard generation and standalone Prompt fields start at three rendered lines, grow through Enter or wrapping to seven, and shrink after deletion or widening. Boxed Description fields share equal 12px internal insets but retain their fixed three-line scrolling role. Specialized Storyboard shot editors retain their own field family.
+- Standalone Prompt uses the existing LLM catalog selector and terminal circular Revamp action in a footer; no header Enhance toggle. Reuse existing model persistence, runtime and icon tokens.
+- Empty Upload corners remain rounded at the terminal bottom. Input/output real handles and hover rails appear behind opaque node bodies when covered, with existing unoccluded reveal and connection geometry retained.
+- Installed batch evidence is in Codex Apps/Prism/Prompt And Node Insets Native Evidence.json. Rendered regression checks passed; live visual acceptance remains user-owned and pending.

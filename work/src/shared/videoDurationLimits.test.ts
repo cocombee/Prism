@@ -87,7 +87,7 @@ describe('current independent Higgsfield timing', () => {
     const contract = describeHiggsfieldInputContract(endpoint, schema, 'a'.repeat(64))
     const state = reconcileHiggsfieldNodeBinding({ ...selectHiggsfieldBinding({}, endpoint, []).higgsfieldNative, values: {} }, contract)
     const data = { videoEngine: 'wan-controlled' as const, duration: 1, higgsfieldNative: state }, before = JSON.stringify(data)
-    expect(generatorVideoDurationLimits(data, undefined, contract)).toMatchObject({ minimum: 4, maximum: 40, selectedSeconds: 8 })
+    expect(generatorVideoDurationLimits(data, undefined, contract)).toMatchObject({ minimum: 4, maximum: 40, selectedSeconds: 4 })
     expect(generatorVideoDurationLimits(data, undefined, contract).error).toBeUndefined()
     expect(videoMaximumLabel(generatorVideoDurationLimits(data, undefined, contract))).toBe('Max 40s')
     expect(generatorVideoDurationLimits({ ...data, higgsfieldNative: { ...state, values: { duration: 4.5 } } }, undefined, contract)).toMatchObject({ selectedSeconds: 4.5, error: expect.stringContaining('unsupported') })
@@ -95,7 +95,7 @@ describe('current independent Higgsfield timing', () => {
     expect(generatorVideoDurationLimits(data, undefined, { ...contract, fingerprint: 'b'.repeat(64) }).maximum).toBeUndefined()
     const generator = { id: 'video', data: { kind: 'video-generator', ...data }, position: { x: 0, y: 0 } } as StudioNode
     const connected = connectedStoryboardVideo([generator], [{ id: 'edge', source: 'storyboard', target: 'video', targetHandle: 'storyboard-in' }], 'storyboard', undefined, () => contract)
-    expect(connected).toMatchObject({ modelId: endpoint, duration: 8, minimumSeconds: 4, maximumSeconds: 40 })
+    expect(connected).toMatchObject({ modelId: endpoint, duration: 4, minimumSeconds: 4, maximumSeconds: 40 })
   })
   it('does not invent generated-clip bounds for source-timed Edit', () => {
     const endpoint = 'bytedance/seedance-2.5/video-edit'

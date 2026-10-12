@@ -8,6 +8,7 @@ import { activeMediaName } from './generatedMedia'
 import { normalizeLogicalAssetName } from './assetNaming'
 import { promptTagTokens } from './promptTags'
 import { workflowTag } from './inputRules'
+import { resolvedAssetReferenceDescription } from './assetReferenceDescriptions'
 import {
   SEEDANCE_ATTRIBUTE_BREAKDOWN_IDS,
   SEEDANCE_DIRECTOR_SOURCE_HASH,
@@ -26,10 +27,13 @@ function panelSetting(value: StoryboardPanel['duration'] | StoryboardPanel['shot
 export type StoryboardConnectedContextRole = 'Character' | 'Appearance' | 'Location' | 'Element/Prop' | 'Style' | 'Image Reference' | 'Video Reference' | 'Audio Reference'
 
 export interface StoryboardConnectedContextEntry {
+  /** Internal graph identity, never serialized into provider context. */
+  sourceNodeId?: string
   role: StoryboardConnectedContextRole
   tag?: string
   name: string
   caption?: string
+  referenceDescription?: string
   aliases: string[]
   insertionHint?: string
   matchedAlias?: string
@@ -64,7 +68,7 @@ const WEAK_FILENAME_ALIASES: Record<string, string[]> = {
   car: ['vehicle'],
 }
 
-function safeMetadataText(value: unknown, maxLength = 140): string | undefined {
+export function safeMetadataText(value: unknown, maxLength = 140): string | undefined {
   if (typeof value !== 'string') return undefined
   const raw = value.trim()
   if (!raw || UNSAFE_METADATA.test(raw) || ORDINAL_REFERENCE_TOKEN.test(raw)) return undefined
@@ -206,10 +210,12 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
     if (role === 'Appearance' && owner && (excludedCharacterTags.has(owner) || effectiveCast?.known && !activeCharacterTags.has(owner))) return []
     const referenceExclusive = Boolean(tag && hasConnectedVisualMedia(source))
     return [{
+      sourceNodeId: source.id,
       role,
       tag,
       name,
       caption: referenceExclusive ? undefined : connectedContextCaption(source),
+      referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges, connectedOwner).trim() || undefined,
       aliases: connectedContextAliases(source, name, tag),
       semanticTagCandidate: Boolean(tag),
       visualAuthorityMode: referenceExclusive ? 'reference-exclusive' : 'text-described',
@@ -274,6 +280,11 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
     entry.insertionHint = `Assigned wardrobe: ${entry.tag} is worn by ${owner.tag} only; preserve the typed assignment and do not infer identity from the wardrobe.`
   }
 
+  return connectedContextManifest(entries)
+}
+
+/** Existing bounded typed manifest shared by Storyboard and standalone Prompt Revamp. */
+export function connectedContextManifest(entries: StoryboardConnectedContextEntry[]): StoryboardConnectedContextManifest {
   if (!entries.length) return { entries, text: '' }
   const lines = entries.map((entry) => [
     `anchor=${entry.tag || 'none'}`,
@@ -288,6 +299,7 @@ export function buildStoryboardConnectedContextManifest(storyboardId: string, no
     entry.propScaleAuthority?.approvedScaleExclusions?.length ? `approved-scale-exclusions=${entry.propScaleAuthority.approvedScaleExclusions.join(', ')}` : '',
     `name=${entry.name}`,
     entry.caption ? `caption=${entry.caption}` : '',
+    entry.referenceDescription ? `authored-reference-description=${entry.referenceDescription}` : '',
     entry.aliases.length ? `aliases=${entry.aliases.join(', ')}` : '',
     entry.matchedAlias ? `matched-alias=${entry.matchedAlias}` : '',
     entry.requiredInsertion && entry.tag ? `required-anchor=${entry.tag}` : '',
@@ -344,6 +356,7 @@ export function storyboardSemanticTaggingPolicy(): string {
   directorProvenance('revamp-hidden-policy', SEEDANCE_REFERENCE_EXCLUSIVE_IDS)
   return `PROVIDER-SEMANTIC TAGGING POLICY:
 - Resolve meaning in any language, dialect, slang, transliteration, colloquial spelling, or minor misspelling. Reason from typed role, safe connected name and weak aliases, the full panel prose, and the full ordered sequence context; exact token equality alone is insufficient. Connected visual captions and metadata are identification/search data only and never appearance authority.
+- An authored-reference-description is the user's explicit asset purpose, part/state and semantic relationship. Use it to identify which reference the action means; retain its named @asset relationships and typed domain. It cannot override actual Wardrobe ownership, change a Location reference into an end-frame, add cast, or invent new action or appearance.
 - Video Reference controls only its assigned camera/motion/performance timing; Audio Reference controls only assigned sound/speech/timing. Mention their existing semantic tags only when the authored shot assigns their use; never infer identity, wardrobe, location, events or dialogue from metadata. Actual media pass downstream to model-owned sockets and limits.
 - Style is look/feel context only: never insert a Style tag into shot prose or treat Style as Character, Appearance, Location, Element/Prop or Image Reference. The generator receives Style through its dedicated look/feel routing.
 - Automatically mention the unambiguous active connected Character, its explicitly assigned Wardrobe, and sole connected Location. Preserve typed cast, exclusions, wardrobe owner and shot scope. Elements/Props, ordinary image references, audio and video require an authored tag or an explicit natural-language use/mention; connection alone never adds them to the action.

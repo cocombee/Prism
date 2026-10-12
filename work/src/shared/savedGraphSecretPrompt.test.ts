@@ -5,7 +5,7 @@ import { buildGenerationRequest } from './workflowResolver'
 import { providerPromptPreviewCompilation, providerSeedancePayloadCompilation } from './referenceInstructions'
 
 const asset = (id: string, name: string, category: ImportedAsset['category'], metadata: ImportedAsset['metadata'] = {}): ImportedAsset => ({
-  id, name, path: `/project/${name}`, mimeType: 'image/png', category, origin: 'imported', createdAt: '2026-08-23T00:00:00.000Z', metadata,
+  id, name, path: `/project/${name}`, mimeType: 'image/png', category, origin: 'imported', createdAt: '2026-08-23T00:00:00.000Z', metadata: { referenceDescription: 'Completed fixture reference: preserve the supplied asset in its connected role.', ...metadata },
 })
 const node = (id: string, kind: StudioNodeData['kind'], data: Partial<StudioNodeData> = {}): StudioNode => ({ id, type: 'studio', position: { x: 0, y: 0 }, data: { kind, title: id, ...data } })
 const edge = (source: string, target: string, targetHandle: string): Edge => ({ id: `${source}-${target}-${targetHandle}`, source, sourceHandle: 'media-out', target, targetHandle })
@@ -53,17 +53,17 @@ describe('saved graph secret Seedance prompt', () => {
     expect(scene).not.toContain('@video-01-scene-01-telefon-pintar-customer')
     const props = preview.blocks.find((block) => block.label === 'WARDROBE, ACCESSORY, AND PROP CONTINUITY')!.text
     expect(props).toContain('@video-01-scene-01-telefon-pintar-customer')
-    expect(preview.blocks.at(-1)?.label).toBe('Reference roles')
+    expect(preview.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
 
     const payload = providerSeedancePayloadCompilation(request)
-    expect(payload.text).toContain('Use [Image2] as actor-c.')
-    expect(payload.text).toContain('Use [Image1] for [Image2]\'s wardrobe.')
-    expect(payload.text).toContain('Use [Image4] as actor-d.')
-    expect(payload.text).toContain('Use [Image3] for [Image4]\'s wardrobe.')
+    expect(payload.text).toContain('Use @Image2 as actor-c.')
+    expect(payload.text).toContain('Use @Image1 for @Image2\'s wardrobe.')
+    expect(payload.text).toContain('Use @Image4 as actor-d.')
+    expect(payload.text).toContain('Use @Image3 for @Image4\'s wardrobe.')
     expect(payload.text).not.toContain('remains worn only by')
     expect(payload.text).not.toMatch(/@actor-[cd]\b/)
     expect(payload.text).not.toMatch(/@video-0[15]-scene-/)
-    expect(payload.text).not.toContain('[Image7]')
+    expect(payload.text).not.toContain('@Image7')
   })
 
   it('binds every selected view of one semantic identity through its provider slots', () => {
@@ -84,9 +84,9 @@ describe('saved graph secret Seedance prompt', () => {
     expect(preview.text).toContain('@actor-c retains the exact connected Character identity')
     expect(preview.text).not.toMatch(/@Image\d+/)
     const payload = providerSeedancePayloadCompilation(request)
-    expect(payload.text).toContain('[Image1] + [Image2]')
-    expect(payload.text).toContain('Use [Image1] + [Image2] as actor-c.')
-    expect(payload.text).toContain('[Image1] + [Image2] retains the exact connected Character identity')
+    expect(payload.text).toContain('@Image1 + @Image2')
+    expect(payload.text).toContain('Use @Image1 + @Image2 as actor-c.')
+    expect(payload.text).toContain('@Image1 + @Image2 retains the exact connected Character identity')
     expect(payload.text).not.toContain('@actor-c')
   })
 

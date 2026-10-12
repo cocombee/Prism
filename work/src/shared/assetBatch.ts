@@ -9,6 +9,7 @@ export interface AssetBatchInspection {
   perceptualFingerprint: string
   contentFingerprint: string
   viewCount: number
+  referenceDescription?: string
 }
 
 export interface AcceptedAssetBatch {

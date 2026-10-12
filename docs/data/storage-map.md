@@ -7,12 +7,14 @@
 | Electron `userData/studio-data` | current/recent project pointers, non-secret service profile registry, and encrypted provider credentials |
 | `studio-data/service-profiles/<provider>/<profile-id>.enc` | one `safeStorage` ciphertext per provider profile |
 | project root | Prism project manifest and owned media |
-| `00. Project/*.prismflow` | portable editable project document |
-| `05. Canvas/workflow.json` | canonical workflow state |
-| `05. Canvas/assets.json` | project asset index |
-| `05. Canvas/history.json` | generation history |
+| `Project/*.prismflow` | portable editable project document |
+| `Canvas/workflow.json` | canonical workflow state |
+| `Canvas/assets.json` | project asset index |
+| `Canvas/history.json` | generation history |
 | global styles store | reusable Style assets |
 | `.prismasset` | portable bounded asset archive |
+
+New projects use readable roots: Project, Characters, Elements, Locations, Wardrobes, Styles, Storyboards, Canvas, Generated Assets and Imported Assets. Generated/Imported media leaves are Images, Videos and Audio. Existing legacy numbered roots remain readable in place through main/projectFolders.ts; merely opening a legacy project does not move it or create a parallel readable tree. Main-owned projectFolderPath is shared by scaffolding, import/generation, semantic save, portable documents and recovery. It does not strip numbering from filenames, shots, canvases or user-authored category folders.
 
 Writes that replace canonical JSON must be atomic. Schema changes require versioning, migration tests, backup/restore proof, and downgrade/rollback decisions.
 
@@ -92,7 +94,7 @@ Temporary fictional transports exercise actual source and compiled main helpers.
 
 ## Workflow command ownership — 10 October 2026
 
-`WorkflowSaveOwner` pins project identity, root and portable document path for both load and save. `main/workflowPersistence.ts` binds the actual command queue to that owner; renderer `workflowSaveCoordinator` snapshots graph edits, repeats pending newer saves, and rejects callbacks from an old project or superseded same-project activation. Active-account selection preserves documentPath. Canonical `05. Canvas/workflow.json` and the portable project document retain the same graph; corrupt canonical bytes remain unchanged when load fails. Atomic filesystem writes are queued under the owning project, with existing root/readiness authorization retained.
+`WorkflowSaveOwner` pins project identity, root and portable document path for both load and save. `main/workflowPersistence.ts` binds the actual command queue to that owner; renderer `workflowSaveCoordinator` snapshots graph edits, repeats pending newer saves, and rejects callbacks from an old project or superseded same-project activation. Active-account selection preserves documentPath. Canonical `Canvas/workflow.json` and the portable project document retain the same graph; corrupt canonical bytes remain unchanged when load fails. Atomic filesystem writes are queued under the owning project, with existing root/readiness authorization retained.
 
 Native model presets, partial drafts, repairs, fingerprint/revision and retired port/edge state are ordinary persisted graph data. They are not silently dropped when a current schema removes a control or socket. Existing graphs need no destructive migration. Production save/load callback composition and actual renderer save/remount checks exercised isolated canonical and portable files across all five Seedance modes; this does not attest real project/account restart safety or live provider output.
 
@@ -102,3 +104,24 @@ The renderer activation helper sequences owned loading before auxiliary/provider
 ## Obsolete provider settings —10 October2026
 
 provider-settings.json is no longer read, written or enforced. Retain existing bytes without migration/deletion. Availability derives from the selected ServiceProfileStore profile and actual credential-file existence, with runtime project/account guards. Disconnect retains the key; Sign Out removes that profile key. No real-user settings or keys were inspected by this change.
+
+
+## BytePlus console-link persistence — 12 October 2026
+
+Optional `ImportedAsset.metadata.byteplusPortrait` version 1 stores provider/region, immutable profile ID and non-secret account identifier, console Asset ID, original-byte SHA-256, Image/Video type, linked/revoked state, link timestamp, explicit console attestation and optional known expiry. It follows the canonical asset index and portable project projection, alongside retained authored descriptions. Byte-identical path relocation does not invalidate it; changed bytes or another account do. Unknown expiry remains absent.
+
+Dedicated main link edits hold the asset-index queue through portable projection. A known projection-write failure restores the prior canonical index; a rollback failure reports recovery required. There is no new multi-file crash transaction: the existing canonical index/reopen rules remain authoritative. Reopening does not assert live provider approval. Old projects with no binding retain ordinary media behavior; older readers can ignore the optional field. No destructive migration runs.
+
+
+## Output folder naming migration — 12 October 2026
+
+Installed ASAR436c314e884d6c4ce645718468a51f725bbb1187b50960b68e94cbfec5239871. Current Media Reuse Acceptance alone was migrated while the app was quiesced, using a full ZIP rollback, collision/symlink/source-drift checks and protected-job ownership preflight. Existing path, protocol URL and relative-path references were updated; authored prose and immutable project/node/asset/account identities were retained. Nine original binary files equal the backup; canonical/portable workflow parity and actual playback/Finder access survive normal restart. Original Haji92 frozen files remain unchanged. Other legacy projects were not migrated.
+
+The migration maintenance script lives in Codex Apps/Prism/Output Folder Naming Migration.py; it is not an automatic runtime migration. Five tests cover actual paths/URLs/portable bytes, collisions, source drift, exception rollback and symlink/protected job preservation. A protected remote job requiring relocation blocks migration rather than receiving an implicit rebind. Forced-crash/power-loss automatic recovery is not established; the full ZIP remains the recovery source. Source and native receipts are owned by Codex Apps/Prism/Output Folder Naming Build Plan.json, Migration Evidence.json and Native Evidence.json.
+
+
+## Ephemeral MP3 upload derivative — 12 October 2026
+
+Installed main higgsfieldAudioConversion.ts produces a bounded PCM WAV buffer from an already authorized stable MP3 read. It finalizes only its own RIFF/data lengths, preserving decoded samples/rate/channels/duration. No source write, persistent derivative file, new asset/profile, schema migration or journal format change. higgsfieldSeedanceManagedMedia binds opaque original/derived buffer provenance to the same source path and no-follow file identity; both executors share preparation/validation. Existing actual WAV bytes remain unchanged. Upload metadata uses actual derivative WAV MIME while source metadata retains original identity.
+
+Whole unique-set inspection reserves all original buffers; each conversion is capped by64MiB and half the remaining512MiB after originals and already retained derivatives, accounting for current chunks plus concatenation. Expansions fail before upload, never clip. Ten small sources remain admissible. Node/profile/source/cancellation changes block rather than reusing foreign media. These are local retained-buffer/resource limits, not advertised provider limits or OS-RSS certification. Ready output persistence and protected provider jobs remain existing owners.

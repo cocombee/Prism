@@ -56,3 +56,10 @@ describe('explicit catalog voice sample playback', () => {
     expect(f.states.at(-1)).toBe('error')
   })
 })
+
+it('stops another voice preview across footer and browser owners before playing, including late promises', async () => {
+ const first=fixture(),second=fixture();const one=first.player.play('https://cdn.example.com/one.mp3');const two=second.player.play('https://cdn.example.com/two.mp3')
+ expect(first.samples[0].pause).toHaveBeenCalledOnce();expect(first.states.at(-1)).toBe('idle')
+ second.pending[0].resolve();await two;first.pending[0].resolve();await one
+ expect(second.states.at(-1)).toBe('playing');expect(first.states.at(-1)).toBe('idle');second.player.stop()
+})

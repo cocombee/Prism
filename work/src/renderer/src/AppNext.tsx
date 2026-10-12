@@ -1,5 +1,10 @@
+import { BytePlusPortraitDialog } from './BytePlusPortraitDialog'
+import { mediaReferenceConnectionType } from '../../shared/mediaReferenceModes'
+import { videoDraftModelTransition } from '../../shared/videoDraft'
+import { supportsFalSeedanceDraft } from '../../shared/videoDraft'
 import { directStoryboardStyles, detachStoryboardStyleNodes } from '../../shared/storyboardStyleRouting'
 import { PromptRewriteScope } from './promptRewriteScope'
+import { sharedPromptContext, sharedPromptRewriteInstruction, validateSharedPromptRewrite } from '../../shared/promptConnectedContext'
 import { SUBSCRIPTION_PROVIDERS, type PromptConnectionView, type PromptBillingMode } from '../../shared/promptConnection'
 import { createStoryboardPanel } from '../../shared/storyboardPanels'
 import { ProviderAvailabilityContext } from './ProviderAvailabilityContext'
@@ -119,6 +124,8 @@ import type {
   StudioNodeData,
   WorkflowDocument,
   ImportedAsset,
+  BytePlusPortraitContext,
+  BytePlusPortraitLinkRequest,
   AssetRelinkResult,
   AssetRelinkMode,
   ProjectWorkspace,
@@ -149,7 +156,7 @@ import { ASSISTANT_PROVIDER_GROUPS, assistantCatalogsWithSavedSelection, resolve
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, canvasPanButtons, EDGE_ACTION_HOVER_DELAY_MS, isMiddleMouseButton, isMiddleMousePressed, isTextEntryTarget, optionWheelZoomViewport, shouldEndMiddleMousePan, shouldZoomCanvasFromWheel, type CanvasInteractionTool } from '../../shared/canvasInteractions'
 import { nativeTextHistoryAction } from '../../shared/textEditorSelection'
 import { canvasKeyboardAction } from '../../shared/keyboard'
-import { sanitizeCanvasHistoryNodes } from '../../shared/canvasHistoryRuntime'
+import { canvasHistoryEdges, recordCanvasHistorySnapshot, switchCanvasHistoryOwner, sanitizeCanvasHistoryNodes, type CanvasHistoryState } from '../../shared/canvasHistoryRuntime'
 import { cancelNodeProgressExpiry, nodeLifecycleTransition, nodeNotificationCategory, scheduleNodeProgressExpiry, type NodeProgressExpiryTimers } from '../../shared/nodeNotificationCategory'
 import { appShortcutsSuppressed } from '../../shared/selectorSearch'
 import { connectedStoryboardVideo as resolveConnectedStoryboardVideo } from '../../shared/storyboardVideoSync'
@@ -157,7 +164,7 @@ import { STYLE_PRESETS } from '../../shared/stylePresets'
 import { previewFocalPosition } from '../../shared/previewFocus'
 import { CHARACTER_COMPLETION_VIEWS, characterCompletionPrompt, singleCharacterSheetPrompt } from '../../shared/characterViews'
 import { compileCharacterSheet } from './characterSheet'
-import { buildGenerationRequest, inspectGenerationRequest, recursiveUpstreamSemanticTags, resolveWorkflowInput } from '../../shared/workflowResolver'
+import { buildGenerationPromptPreviewRequest, buildGenerationRequest, inspectGenerationRequest, recursiveUpstreamSemanticTags, resolveWorkflowInput } from '../../shared/workflowResolver'
 import { visibleProviderPromptBody } from '../../shared/referenceInstructions'
 import { formatRequirementList, generationRequirementFailures } from '../../shared/generationReadiness'
 import { nodeCreationDefaults } from '../../shared/nodeDefaults'
@@ -190,11 +197,12 @@ import { activeGeneratedResult, generatedResultName } from '../../shared/generat
 import { pruneAssetDeployments } from '../../shared/assetDeployment'
 import { characterAssetsForMode, filterAssetsByFinalOrigin, groupSemanticAssets, hydrateSemanticAssetViews, semanticAssetCollectionKey, withoutPromotedSourceDuplicates, type SemanticAssetCollection } from '../../shared/semanticAssetCollections'
 import { alignedNodePositions, centeredNodePosition, duplicateNodePosition, nodeLayoutSize, normalizeStandardNodeWidths, STANDARD_NODE_WIDTH, type NodeAlignment } from '../../shared/canvasLayout'
-import { expandGroupedPositionChanges, toggleNodeGroup } from '../../shared/canvasGrouping'
+import { expandGroupedPositionChanges, remapCopiedNodeGroups, toggleNodeGroup } from '../../shared/canvasGrouping'
 import { assignElementView, ELEMENT_ANCHOR_VIEW, ELEMENT_VIEWS, elementCompletionPrompt, elementViewAssets, missingElementViews } from '../../shared/elementViews'
 import { generatorBatchType, isBatchGenerator, listItemsSignature, synchronizeListBatchItems } from '../../shared/listBatch'
 import { incompleteSemanticReason, notReadyEdgePresentation, semanticWarning, upstreamIncompleteSemanticReasons, upstreamSemanticWarnings } from '../../shared/semanticReadiness'
-import { localAssetGenerationPrompt, reusableAssetHydrationPatch } from '../../shared/semanticAssetPromptBoundary'
+import { assetReferenceDescription, localAssetGenerationPrompt, mediaAssetDescriptionPatch, reusableAssetHydrationPatch } from '../../shared/semanticAssetPromptBoundary'
+import { assetDescriptionPlaceholderForNode, assetDescriptionKnownTags, automaticAssetDescriptionPatch, mediaDescriptionConnectedToGenerator, resolvedAssetReferenceDescription, assetDescriptionRevampContext, assetDescriptionRevampInstruction, validateAssetDescriptionRevamp } from '../../shared/assetReferenceDescriptions'
 import { projectSemanticAssetNodes, semanticAssetAvailability, semanticEdgePresentation } from '../../shared/semanticAssetAvailability'
 import { minimapCornerRadiusForZoom, responsiveMinimapSize, roundedMinimapMaskPath } from '../../shared/minimapGeometry'
 import { continuityVideoEngine, extractFinalVideoFrame, orderedSequenceNodes } from './sequenceContinuity'
@@ -208,7 +216,7 @@ import { ProjectLibraryCard } from './ProjectLibraryCard'
 
 import { projectServiceProfileSelection } from '../../shared/serviceProfiles'
 import { recoverCharacterSemanticConnectionAtEnd } from './characterSemanticConnectEnd'
-import { activeVideoPromptMode, migrateVideoUserSeed, resetManualPrompt as resetManualPromptState, switchVideoPromptMode, videoPromptCompileFingerprint, type VideoPromptMode } from '../../shared/videoPromptMode'
+import { activeVideoPromptMode, migrateVideoUserSeed, resetManualPrompt as resetManualPromptState, switchVideoPromptMode, videoPromptCompileFingerprint, videoPromptInputsConnected, type VideoPromptMode } from '../../shared/videoPromptMode'
 import { startStartupHydration } from './startupHydration'
 import { startServiceAvailabilityRefresh } from './serviceAvailabilityRefresh'
 import { createServiceResponseScope } from './serviceResponseScope'
@@ -278,6 +286,8 @@ export function canvasNodeDirtySnapshot(node: StudioNode): StudioNode {
   const { selected: _selected, dragging: _dragging, measured: _measured, ...persistentNode } = node
   return sanitizeCanvasHistoryNodes([{ ...persistentNode, data } as StudioNode])[0]
 }
+
+const serializeCanvasHistorySnapshot = (nodes: StudioNode[], edges: Edge[]) => JSON.stringify({ nodes: nodes.map(canvasNodeDirtySnapshot), edges: canvasHistoryEdges(edges) })
 
 type ForwardQuickConnectState = {
   direction: 'forward'
@@ -733,6 +743,8 @@ export function App() {
   const [renamingAssetId, setRenamingAssetId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [assetMenuId, setAssetMenuId] = useState<string | null>(null)
+  const [portraitDialog, setPortraitDialog] = useState<{ asset: ImportedAsset; assets: ImportedAsset[]; context?: BytePlusPortraitContext; loading: boolean; busy: boolean; error: string } | null>(null)
+  const portraitDialogRevision = useRef(0)
   const [selectedCanvasAssetKey, setSelectedCanvasAssetKey] = useState<string | null>(null)
   const [selectedAssetKeys, setSelectedAssetKeys] = useState<string[]>([])
   const [assetSelectionAnchor, setAssetSelectionAnchor] = useState<string | null>(null)
@@ -1168,6 +1180,10 @@ export function App() {
   const redoStack = useRef<CanvasSnapshot[]>([])
   const lastSnapshot = useRef('')
   const restoringHistory = useRef(false)
+  const canvasHistoryOwnerRef = useRef('')
+  const canvasHistoryActivationRef = useRef(-1)
+  const canvasHistoryByOwner = useRef(new Map<string, CanvasHistoryState>())
+  const liveHistorySnapshot = useRef('')
   const connectionStart = useRef<Parameters<OnConnectStart>[1] | null>(null)
   const canvasClipboard = useRef<CanvasClipboard | null>(null)
   const lastCanvasPointer = useRef<{ x: number; y: number } | null>(null)
@@ -1375,7 +1391,7 @@ export function App() {
         updatedAt: new Date().toISOString(),
       }
       await window.prism.assets.trashCollection([...deletedIds], updatedWorkflow)
-      undoStack.current = [...undoStack.current.slice(-49), { nodes: sanitizeCanvasHistoryNodes(structuredClone(originalPage.nodes)), edges: structuredClone(originalPage.edges), assetRestore: { ids: [...deletedIds], workflow: structuredClone(originalWorkflow) } }]
+      undoStack.current = [...undoStack.current.slice(-49), { nodes: sanitizeCanvasHistoryNodes(structuredClone(originalPage.nodes)), edges: canvasHistoryEdges(structuredClone(originalPage.edges)), assetRestore: { ids: [...deletedIds], workflow: structuredClone(originalWorkflow) } }]
       redoStack.current = []
       setCanUndo(true)
       setCanRedo(false)
@@ -1385,7 +1401,7 @@ export function App() {
       setPages(activeCanvas.pages)
       setNodes(activePage.nodes)
       setEdges(staticEdges(activePage.edges))
-      lastSnapshot.current = JSON.stringify({ nodes: activePage.nodes, edges: staticEdges(activePage.edges) })
+      lastSnapshot.current = serializeCanvasHistorySnapshot(activePage.nodes, staticEdges(activePage.edges))
       setAssets(await window.prism.assets.list())
       setMissingAssetIds((current) => current.filter((id) => !deletedIds.has(id)))
       setGeneratedMediaViewer((current) => current?.kind === 'assets' && current.assetIds.some((id) => deletedIds.has(id)) ? null : current)
@@ -1433,8 +1449,45 @@ export function App() {
     action()
   }, [deleteRequest, skipDeleteReminder])
 
+  const closePortraitDialog = useCallback(() => {
+    portraitDialogRevision.current += 1
+    setPortraitDialog(null)
+  }, [])
+
+  const openPortraitDialog = useCallback(async (asset: ImportedAsset, collection: ImportedAsset[] = [asset]) => {
+    const revision = ++portraitDialogRevision.current, activation = projectActivation.current
+    const owns = () => portraitDialogRevision.current === revision && projectActivation.current === activation
+    const candidates = collection.filter(item => !item.trashedAt && /^(image|video)\//.test(item.mimeType))
+    setAssetMenuId(null)
+    setContextMenu(null)
+    setPortraitDialog({ asset, assets: candidates, loading: true, busy: false, error: '' })
+    try {
+      const context = await window.prism.assets.byteplusPortraitContext(asset.id)
+      if (owns()) setPortraitDialog({ asset, assets: candidates, context, loading: false, busy: false, error: '' })
+    } catch (error) {
+      if (owns()) setPortraitDialog({ asset, assets: candidates, loading: false, busy: false, error: error instanceof Error ? error.message : String(error) })
+    }
+  }, [])
+
+  const savePortraitLink = useCallback(async (request?: BytePlusPortraitLinkRequest) => {
+    if (!portraitDialog || portraitDialog.busy || portraitDialog.loading) return
+    const revision = portraitDialogRevision.current, activation = projectActivation.current, assetId = portraitDialog.asset.id
+    if (request && request.assetId !== assetId) return
+    const owns = () => portraitDialogRevision.current === revision && projectActivation.current === activation
+    setPortraitDialog(current => current ? { ...current, busy: true, error: '' } : current)
+    try {
+      const updated = request ? await window.prism.assets.linkByteplusPortrait(request) : await window.prism.assets.revokeByteplusPortrait(assetId)
+      if (!owns()) return
+      setAssets(current => current.map(asset => asset.id === updated.id ? updated : asset))
+      closePortraitDialog()
+    } catch (error) {
+      if (owns()) setPortraitDialog(current => current ? { ...current, busy: false, error: error instanceof Error ? error.message : String(error) } : current)
+    }
+  }, [closePortraitDialog, portraitDialog])
+
   const activateProject = useCallback(async (selectedProject: ProjectWorkspace, refreshRecentProjects = true) => {
         const activation = ++projectActivation.current
+        closePortraitDialog()
         serviceReadiness.current.invalidate()
         serviceBusyOperations.current = { count: 0 }
         setServiceBusy(false)
@@ -1555,7 +1608,7 @@ export function App() {
         setNodes(withCollapsedCharacterEditors(selectedPage.nodes))
         const selectedEdges = staticEdges(selectedPage.edges)
         setEdges(selectedEdges)
-        lastSnapshot.current = JSON.stringify({ nodes: selectedPage.nodes, edges: selectedEdges })
+        lastSnapshot.current = serializeCanvasHistorySnapshot(selectedPage.nodes, selectedEdges)
         setHistory(entries)
         setAssets(assetStatus.map((item) => migratedAssetRecords.get(item.asset.id) || item.asset))
         setMissingAssetIds(assetStatus.filter((item) => item.missing).map((item) => item.asset.id))
@@ -1571,7 +1624,7 @@ export function App() {
           if (projectActivation.current !== activation) return
           throw error
         }
-  }, [setEdges, setNodes, setViewport])
+  }, [closePortraitDialog, setEdges, setNodes, setViewport])
 
   useEffect(() => {
     let active = true
@@ -1672,25 +1725,41 @@ export function App() {
     return stop
   }, [serviceConnections, project?.id, project?.rootPath])
 
+  const canvasHistoryOwner = JSON.stringify([projectActivation.current, project?.id, project?.rootPath, activeCanvasId, activePageId])
+  const serializedCanvasHistory = serializeCanvasHistorySnapshot(nodes, edges)
+  if (canvasHistoryOwnerRef.current === canvasHistoryOwner) liveHistorySnapshot.current = serializedCanvasHistory
+  const currentCanvasHistoryState = (): CanvasHistoryState => ({ undo: undoStack.current.map(snapshot => JSON.stringify(snapshot)), redo: redoStack.current.map(snapshot => JSON.stringify(snapshot)), baseline: lastSnapshot.current })
+  const applyCanvasHistoryState = (state: CanvasHistoryState) => {
+    undoStack.current = state.undo.map(snapshot => JSON.parse(snapshot) as CanvasSnapshot)
+    redoStack.current = state.redo.map(snapshot => JSON.parse(snapshot) as CanvasSnapshot)
+    lastSnapshot.current = state.baseline
+    setCanUndo(state.undo.length > 0)
+    setCanRedo(state.redo.length > 0)
+  }
+  useEffect(() => {
+    if (!loaded.current || !project || canvasHistoryOwnerRef.current === canvasHistoryOwner) return
+    if (historyTimer.current) window.clearTimeout(historyTimer.current)
+    const sameActivation = canvasHistoryActivationRef.current === projectActivation.current
+    if (!sameActivation) canvasHistoryByOwner.current.clear()
+    const next = switchCanvasHistoryOwner(canvasHistoryByOwner.current, sameActivation ? canvasHistoryOwnerRef.current : '', canvasHistoryOwner, currentCanvasHistoryState(), liveHistorySnapshot.current, serializedCanvasHistory, restoringHistory.current)
+    canvasHistoryOwnerRef.current = canvasHistoryOwner
+    canvasHistoryActivationRef.current = projectActivation.current
+    liveHistorySnapshot.current = serializedCanvasHistory
+    restoringHistory.current = false
+    applyCanvasHistoryState(next)
+  }, [canvasHistoryOwner, nodes, edges])
+
   useEffect(() => {
     if (!loaded.current || !project) return
     if (historyTimer.current) window.clearTimeout(historyTimer.current)
+    const owner = canvasHistoryOwner
     historyTimer.current = window.setTimeout(() => {
-      const serialized = JSON.stringify({ nodes: nodes.map(canvasNodeDirtySnapshot), edges })
-      if (restoringHistory.current) {
-        restoringHistory.current = false
-        lastSnapshot.current = serialized
-        return
-      }
-      if (lastSnapshot.current && serialized !== lastSnapshot.current) {
-        undoStack.current = [...undoStack.current.slice(-49), JSON.parse(lastSnapshot.current) as CanvasSnapshot]
-        redoStack.current = []
-        setCanUndo(true)
-        setCanRedo(false)
-      }
-      lastSnapshot.current = serialized
+      if (canvasHistoryOwnerRef.current !== owner) return
+      applyCanvasHistoryState(recordCanvasHistorySnapshot(currentCanvasHistoryState(), serializedCanvasHistory, restoringHistory.current))
+      restoringHistory.current = false
     }, 350)
-  }, [nodes, edges])
+    return () => { if (historyTimer.current) window.clearTimeout(historyTimer.current) }
+  }, [nodes, edges, canvasHistoryOwner])
 
   const persistedCanvasFingerprint = useMemo(() => JSON.stringify({
     nodes: nodes.map(canvasNodeDirtySnapshot),
@@ -1782,12 +1851,18 @@ export function App() {
   }, [activeCanvasId, activePageId, canvases, edges, nodes, pages, persistWorkflow, project, saveState])
 
   const undoCanvas = useCallback(async () => {
+    if (canvasHistoryOwnerRef.current !== canvasHistoryOwner) return
+    if (historyTimer.current) window.clearTimeout(historyTimer.current)
+    applyCanvasHistoryState(recordCanvasHistorySnapshot(currentCanvasHistoryState(), serializeCanvasHistorySnapshot(nodes, edges), restoringHistory.current))
+    restoringHistory.current = false
     const previous = undoStack.current.at(-1)
     if (!previous) return
     undoStack.current = undoStack.current.slice(0, -1)
     if (previous.assetRestore) {
+      const owner = canvasHistoryOwnerRef.current
       try {
         await window.prism.assets.restoreCollection(previous.assetRestore.ids, previous.assetRestore.workflow)
+        if (canvasHistoryOwnerRef.current !== owner) return
         const restoredWorkflow = previous.assetRestore.workflow
         const restoredCanvases = restoredWorkflow.canvases || []
         const restoredCanvas = restoredCanvases.find((canvas) => canvas.id === restoredWorkflow.activeCanvasId) || restoredCanvases[0]
@@ -1803,7 +1878,7 @@ export function App() {
         const restoredNodes = sanitizeCanvasHistoryNodes(restoredPage.nodes)
         setNodes(restoredNodes)
         setEdges(staticEdges(restoredPage.edges))
-        lastSnapshot.current = JSON.stringify({ nodes: restoredNodes, edges: staticEdges(restoredPage.edges) })
+        lastSnapshot.current = serializeCanvasHistorySnapshot(restoredNodes, staticEdges(restoredPage.edges))
         setAssets(await window.prism.assets.list())
         setHistory(await window.prism.history.list())
         redoStack.current = []
@@ -1811,6 +1886,7 @@ export function App() {
         setCanRedo(false)
         setProjectNotice('Undo restored the asset, its managed files, and every affected Canvas reference.')
       } catch (error) {
+        if (canvasHistoryOwnerRef.current !== owner) return
         undoStack.current = [...undoStack.current, previous]
         setCanUndo(true)
         setProjectError(error instanceof Error ? error.message : String(error))
@@ -1818,28 +1894,32 @@ export function App() {
       return
     }
     const previousNodes = sanitizeCanvasHistoryNodes(previous.nodes)
-    redoStack.current = [...redoStack.current, { nodes: sanitizeCanvasHistoryNodes(structuredClone(nodes)), edges: structuredClone(edges) }]
+    redoStack.current = [...redoStack.current, { nodes: sanitizeCanvasHistoryNodes(structuredClone(nodes)), edges: canvasHistoryEdges(structuredClone(edges)) }]
     restoringHistory.current = true
-    lastSnapshot.current = JSON.stringify({ ...previous, nodes: previousNodes })
+    lastSnapshot.current = serializeCanvasHistorySnapshot(previousNodes, staticEdges(previous.edges))
     setNodes(previousNodes)
     setEdges(staticEdges(previous.edges))
     setCanUndo(undoStack.current.length > 0)
     setCanRedo(true)
-  }, [edges, nodes, setEdges, setNodes])
+  }, [canvasHistoryOwner, edges, nodes, setEdges, setNodes])
 
   const redoCanvas = useCallback(() => {
+    if (canvasHistoryOwnerRef.current !== canvasHistoryOwner) return
+    if (historyTimer.current) window.clearTimeout(historyTimer.current)
+    applyCanvasHistoryState(recordCanvasHistorySnapshot(currentCanvasHistoryState(), serializeCanvasHistorySnapshot(nodes, edges), restoringHistory.current))
+    restoringHistory.current = false
     const next = redoStack.current.at(-1)
     if (!next) return
     redoStack.current = redoStack.current.slice(0, -1)
     const nextNodes = sanitizeCanvasHistoryNodes(next.nodes)
-    undoStack.current = [...undoStack.current, { nodes: sanitizeCanvasHistoryNodes(structuredClone(nodes)), edges: structuredClone(edges) }]
+    undoStack.current = [...undoStack.current, { nodes: sanitizeCanvasHistoryNodes(structuredClone(nodes)), edges: canvasHistoryEdges(structuredClone(edges)) }]
     restoringHistory.current = true
-    lastSnapshot.current = JSON.stringify({ ...next, nodes: nextNodes })
+    lastSnapshot.current = serializeCanvasHistorySnapshot(nextNodes, staticEdges(next.edges))
     setNodes(withCollapsedCharacterEditors(nextNodes))
     setEdges(staticEdges(next.edges))
     setCanUndo(true)
     setCanRedo(redoStack.current.length > 0)
-  }, [edges, nodes, setEdges, setNodes])
+  }, [canvasHistoryOwner, edges, nodes, setEdges, setNodes])
 
   const toggleSelectedGroup = useCallback((nodeIds?: string[]) => {
     setNodes((current) => {
@@ -2006,7 +2086,7 @@ export function App() {
       }))
       return
     }
-    const effectivePatch = sourceBeforePatch ? nodeLifecycleTransition(sourceBeforePatch.data, patch) : patch
+    const effectivePatch = sourceBeforePatch ? nodeLifecycleTransition(sourceBeforePatch.data, videoDraftModelTransition(sourceBeforePatch.data, patch)) : patch
     const nextSourceData = sourceBeforePatch ? { ...sourceBeforePatch.data, ...effectivePatch } : undefined
     const dynamicPortChange = Boolean(sourceBeforePatch && (
       sourceBeforePatch.data.kind === 'video-generator' && Object.prototype.hasOwnProperty.call(effectivePatch, 'videoEngine')
@@ -2251,13 +2331,13 @@ export function App() {
     const minX = Math.min(...copied.nodes.map((node) => node.position.x))
     const minY = Math.min(...copied.nodes.map((node) => node.position.y))
     const ids = new Map(copied.nodes.map((node) => [node.id, crypto.randomUUID()]))
-    const pastedNodes = copied.nodes.map((node) => ({
+    const pastedNodes = remapCopiedNodeGroups(copied.nodes.map((node) => ({
       ...structuredClone(node),
       id: ids.get(node.id)!,
       selected: true,
       position: { x: position.x + node.position.x - minX, y: position.y + node.position.y - minY },
       data: { ...structuredClone(node.data), title: `${node.data.title} copy`, runState: 'idle' as const, progress: undefined, error: undefined },
-    }))
+    })))
     const pastedEdges = copied.edges.map((edge) => ({
       ...structuredClone(edge),
       id: crypto.randomUUID(),
@@ -2431,6 +2511,7 @@ export function App() {
           setServiceModels({})
           setServiceAccounts({})
           projectActivation.current += 1
+          closePortraitDialog()
           serviceReadiness.current.invalidate()
           serviceBusyOperations.current = { count: 0 }
           setServiceBusy(false)
@@ -2455,7 +2536,7 @@ export function App() {
     if (!project) return
     try {
       const result = await window.prism.projects.removeLegacyImport()
-      setProjectNotice(`Removed ${result.removedAssets} inherited asset${result.removedAssets === 1 ? '' : 's'} and ${result.removedNodes} inherited node${result.removedNodes === 1 ? '' : 's'}. Backup JSON is in 00. Project/Legacy Import Backup.`)
+      setProjectNotice(`Removed ${result.removedAssets} inherited asset${result.removedAssets === 1 ? '' : 's'} and ${result.removedNodes} inherited node${result.removedNodes === 1 ? '' : 's'}. Backup JSON is in the project’s Legacy Import Backup folder.`)
       await activateProject(project)
     } catch (error) { setProjectError(error instanceof Error ? error.message : String(error)) }
   }, [activateProject, project])
@@ -2624,6 +2705,7 @@ export function App() {
     const url = asset.url || `prism-asset://local/${encodeURIComponent(asset.path)}`
     setAssets((current) => [asset, ...current.filter((candidate) => candidate.id !== asset.id)])
     updateNode(id, {
+      ...mediaAssetDescriptionPatch(asset),
       assetPath: asset.path,
       assetUrl: url,
       outputType: asset.mimeType.startsWith('video/') ? 'video' : asset.mimeType.startsWith('audio/') ? 'audio' : 'image',
@@ -2654,7 +2736,8 @@ export function App() {
       const nodeId = createNode('upload', { x: position.x + (index % 3) * 330, y: position.y + Math.floor(index / 3) * 310 })
       updateNode(nodeId, {
         title: asset.name,
-        assetPath: asset.path,
+        ...mediaAssetDescriptionPatch(asset),
+      assetPath: asset.path,
         assetUrl: asset.url,
         outputType: asset.mimeType.startsWith('video/') ? 'video' : asset.mimeType.startsWith('audio/') ? 'audio' : 'image',
       })
@@ -2699,6 +2782,7 @@ export function App() {
             title: collection.name,
             referenceTag: `@${collection.name}`,
             referenceAssets: collection.assets,
+            ...reusableAssetHydrationPatch(collection.category, collection.assets),
             prompt,
             ...(collection.category === 'character' ? { characterRole: undefined, characterEditorOpen: false } : { semanticEditorOpen: false }),
             progress: `${collection.assets.length} ${collection.category} view${collection.assets.length === 1 ? '' : 's'} ready`,
@@ -2711,6 +2795,7 @@ export function App() {
           nodeId = createNode('upload', position)
           updateNode(nodeId, {
             title: asset.name,
+            ...mediaAssetDescriptionPatch(asset),
             assetPath: asset.path,
             assetUrl: asset.url || `prism-asset://local/${encodeURIComponent(asset.path)}`,
             outputType: asset.mimeType.startsWith('video/') ? 'video' : asset.mimeType.startsWith('audio/') ? 'audio' : 'image',
@@ -3256,7 +3341,7 @@ export function App() {
           characterView: 'front',
           characterInputMode: 'single',
           characterSheetViews: CHARACTER_COMPLETION_VIEWS.map((view) => view.id),
-          assetGenerationPrompt: localAssetGenerationPrompt(source.data),
+          assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
           prompt: undefined,
           provider: provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'fal.ai',
           modelId,
@@ -3412,7 +3497,7 @@ export function App() {
         const result = await window.prism.generation.run({ ...request, quantity: 1, aspectRatio: request.aspectRatio, ...semanticImageRequestControls({ ...source.data, imageProvider: provider, imageModelId: modelId }) })
         const promoted = await window.prism.assets.promote([result.outputPath], 'element', source.data.title || 'Element')
         if (!promoted[0]) throw new Error('The generated Element Sheets image could not be saved.')
-        const sheet = await window.prism.assets.updateMetadata(promoted[0].id, { ...promoted[0].metadata, assetName: logicalName, elementView: ELEMENT_ANCHOR_VIEW, elementInputMode: 'single', assetGenerationPrompt: localAssetGenerationPrompt(source.data), prompt: undefined, provider: provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'fal.ai', modelId, aspectRatio: request.aspectRatio })
+        const sheet = await window.prism.assets.updateMetadata(promoted[0].id, { ...promoted[0].metadata, assetName: logicalName, elementView: ELEMENT_ANCHOR_VIEW, elementInputMode: 'single', assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'), prompt: undefined, provider: provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'fal.ai', modelId, aspectRatio: request.aspectRatio })
         updateNode(nodeId, { referenceAssets: [sheet, ...inactiveModeAssets], outputPath: result.outputPath, outputUrl: result.outputUrl, outputType: result.outputType, modelId: result.modelId, generatedResults: [{ path: result.outputPath, url: result.outputUrl, type: result.outputType, modelId: result.modelId }], activeResultIndex: 0, runState: 'complete', progress: 'Element Sheets complete · Multiple Element Views', semanticEditorOpen: true, error: undefined })
         setHistory(await window.prism.history.list())
         setAssets(await window.prism.assets.list())
@@ -3443,7 +3528,7 @@ export function App() {
           assetName: logicalName,
           elementView: ELEMENT_ANCHOR_VIEW,
           elementInputMode: 'multi',
-          assetGenerationPrompt: localAssetGenerationPrompt(source.data),
+          assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
           prompt: undefined,
           provider: provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'fal.ai',
           modelId,
@@ -3499,7 +3584,7 @@ export function App() {
           assetName: logicalName,
           elementView: targetView.id,
           elementInputMode: 'multi',
-          assetGenerationPrompt: localAssetGenerationPrompt(source.data),
+          assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
           prompt: undefined,
           provider: provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'fal.ai',
           modelId,
@@ -3525,6 +3610,7 @@ export function App() {
       return
     }
     const promotedForRollback: string[] = []
+    if (!resolvedAssetReferenceDescription(source, nodes, edges).trim()) { updateNode(nodeId, { error: 'Fill the Description before saving this asset.' }); return }
     try {
       const currentAssets = await window.prism.assets.list()
       const currentById = new Map(currentAssets.map((asset) => [asset.id, asset]))
@@ -3543,7 +3629,7 @@ export function App() {
         const managed = registered || (await window.prism.assets.promote([reference.path], 'character', name))[0]
         if (!managed) throw new Error(`Character library: ${reference.name} is missing and could not be recovered into this Character.`)
         if (!registered) promotedForRollback.push(managed.id)
-        managedAssets.push({ ...managed, metadata: { ...managed.metadata, ...reference.metadata, assetName: name, characterInputMode, characterAspectRatio: source.data.characterAspectRatio || '1:1', assetGenerationPrompt: localAssetGenerationPrompt(source.data), prompt: undefined, provider: source.data.imageProvider || 'fal.ai', modelId: source.data.imageModelId } })
+        managedAssets.push({ ...managed, metadata: { ...managed.metadata, ...reference.metadata, assetName: name, characterInputMode, characterAspectRatio: source.data.characterAspectRatio || '1:1', assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'), prompt: undefined, provider: source.data.imageProvider || 'fal.ai', modelId: source.data.imageModelId } })
       }
       const committed = await window.prism.assets.commitCharacterCollection({
         name,
@@ -3564,6 +3650,7 @@ export function App() {
           characterInputMode: 'single',
           characterAspectRatio: source.data.characterAspectRatio || '1:1',
           referenceAssets: saved,
+          referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
           characterSheetPath: undefined,
           characterSheetUrl: undefined,
           characterSheetViews: undefined,
@@ -3580,6 +3667,7 @@ export function App() {
           characterInputMode: 'multi',
           characterAspectRatio: source.data.characterAspectRatio || '1:1',
           referenceAssets: saved,
+          referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
           characterSheetPath: committed.sheet.path,
           characterSheetUrl: committed.sheet.url,
           characterSheetViews: committed.sheet.views,
@@ -3603,7 +3691,7 @@ export function App() {
       const detail = error instanceof Error ? error.message : String(error)
       updateNode(nodeId, { error: /^Character library:/i.test(detail) ? detail : `Character library: ${detail}` })
     }
-  }, [nodes, setNodes, updateNode])
+  }, [edges, nodes, setNodes, updateNode])
 
   const saveSemanticAsset = useCallback(async (nodeId: string, rawName: string) => {
     const source = nodes.find((node) => node.id === nodeId && (node.data.kind === 'element' || node.data.kind === 'location' || node.data.kind === 'wardrobe'))
@@ -3617,6 +3705,7 @@ export function App() {
       if (source) updateNode(nodeId, { error: `Generate or add a ${source.data.kind === 'location' ? 'Location' : source.data.kind === 'wardrobe' ? 'Wardrobe' : 'Element'} reference before saving.` })
       return
     }
+    if (!resolvedAssetReferenceDescription(source, nodes, edges).trim()) { updateNode(nodeId, { error: 'Fill the Description before saving this asset.' }); return }
     try {
       const semanticKind = source.data.kind as 'element' | 'location' | 'wardrobe'
       const currentAssets = await window.prism.assets.list()
@@ -3626,22 +3715,24 @@ export function App() {
         const registered = reference.category === semanticKind && !reusableSaveMustCopyReference(source.data, reference.id) ? currentById.get(reference.id) : undefined
         const managed = registered || (await window.prism.assets.promote([reference.path], semanticKind, name))[0]
         if (!managed) throw new Error(`${name} contains a missing reference that could not be saved.`)
-        saved.push(await window.prism.assets.updateMetadata(managed.id, { ...managed.metadata, ...reference.metadata, assetName: name, assetGenerationPrompt: localAssetGenerationPrompt(source.data), prompt: undefined, ...(semanticKind === 'element' ? { elementInputMode } : {}) }))
+        saved.push(await window.prism.assets.updateMetadata(managed.id, { ...managed.metadata, ...reference.metadata, assetName: name, assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'), prompt: undefined, ...(semanticKind === 'element' ? { elementInputMode } : {}) }))
       }
       setAssets(await window.prism.assets.list())
       updateNode(nodeId, { title: name, referenceTag: `@${name}`, referenceAssets: saved, semanticReplacementAuthority: undefined, semanticEditorOpen: false, runState: 'complete', progress: undefined, error: undefined })
     } catch (error) {
       updateNode(nodeId, { error: error instanceof Error ? error.message : String(error) })
     }
-  }, [nodes, updateNode])
+  }, [edges, nodes, updateNode])
 
   const commitSemanticAssetResult = useCallback(async (nodeId: string, selectedResultId: string) => {
     const source = nodes.find((node) => node.id === nodeId && ['character', 'element', 'location', 'wardrobe', 'style-reference'].includes(node.data.kind))
     if (!source) return
+    if (!resolvedAssetReferenceDescription(source, nodes, edges).trim()) { updateNode(nodeId, { error: 'Fill the Description before saving this asset.' }); return }
     try {
       const authority = source.data.semanticReplacementAuthority
       const intent = authority ? { mode: 'replace-existing' as const, ...authority } : { mode: 'create-new' as const }
       const committed = await window.prism.assets.commitSemanticResult({ nodeId, selectedResultId, intent })
+      committed.asset = await window.prism.assets.updateMetadata(committed.asset.id, { ...committed.asset.metadata, referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto') })
       const savedReference = { id: committed.asset.id, path: committed.asset.path, url: committed.asset.url, source: 'saved' as const, createdAt: committed.asset.createdAt }
       updateNode(nodeId, {
         referenceAssets: [committed.asset], outputPath: committed.asset.path, outputUrl: committed.asset.url, outputType: 'image',
@@ -3655,19 +3746,20 @@ export function App() {
       const migrated = migrateSemanticAssetLifecycleMetadata(source.data).semanticAssetLifecycle
       updateNode(nodeId, { semanticAssetLifecycle: migrated ? { ...migrated, status: 'SAVE_FAILED' } : migrated, error: error instanceof Error ? error.message : String(error), progress: undefined })
     }
-  }, [nodes, updateNode])
+  }, [edges, nodes, updateNode])
 
   const inspectAssetBatch = useCallback((kind: AssetBatchKind, paths: string[]) => window.prism.assets.inspectBatch(paths, kind), [])
   const chooseAssetBatch = useCallback((kind: AssetBatchKind) => window.prism.assets.chooseBatch(kind), [])
   const saveAssetBatchRow = useCallback(async (kind: AssetBatchKind, row: AssetBatchInspection, rawName: string) => {
     const name = normalizeLogicalAssetName(rawName)
     if (!name) throw new Error('Name this asset before saving it.')
+    if (!row.referenceDescription?.trim()) throw new Error('Fill this asset’s Description before saving it.')
     const imported = await window.prism.assets.importPaths([row.path], kind, name)
     const source = imported[0]
     if (!source) throw new Error(`Could not import ${row.fileName}.`)
     await window.prism.assets.updateMetadata(source.id, {
       ...source.metadata,
-      assetName: name,
+      assetName: name, referenceDescription: row.referenceDescription, referenceDescriptionMode: 'authored',
       ...(kind === 'character' ? { characterInputMode: 'single', characterView: 'front' } : {}),
       ...(kind === 'element' ? { elementInputMode: 'single', elementView: ELEMENT_ANCHOR_VIEW } : {}),
       ...(kind === 'location' ? { locationInputMode: 'single' } : {}),
@@ -3675,6 +3767,62 @@ export function App() {
     })
     setAssets(await window.prism.assets.list())
   }, [])
+
+  const availableDescriptionTags = useCallback(() => assetDescriptionKnownTags(nodes), [nodes])
+
+  const mediaReferenceType = useCallback((nodeId: string) => mediaReferenceConnectionType(nodeId, nodes, edges), [nodes, edges])
+
+  const mediaDescriptionConnected = useCallback((nodeId: string) => mediaDescriptionConnectedToGenerator(nodeId, nodes, edges), [nodes, edges])
+
+  useEffect(() => {
+    setNodes(current => {
+      let changed = false
+      const next = current.map(node => {
+        const patch = automaticAssetDescriptionPatch(node, current, edges)
+        if (!patch) return node
+        changed = true
+        return { ...node, data: { ...node.data, ...patch } }
+      })
+      return changed ? next : current
+    })
+  }, [nodes, edges, setNodes])
+
+  const assetDescriptionHint = useCallback((nodeId: string) => {
+    const node = nodes.find(item => item.id === nodeId)
+    return node ? assetDescriptionPlaceholderForNode(node, nodes, edges) : ''
+  }, [nodes, edges])
+
+  const assetDescriptionValue = useCallback((nodeId: string) => {
+    const node = nodes.find(item => item.id === nodeId)
+    return node ? resolvedAssetReferenceDescription(node, nodes, edges) : ''
+  }, [nodes, edges])
+
+  const revampAssetDescription = useCallback(async (nodeId: string) => {
+    const source = nodes.find(node => node.id === nodeId)
+    if (!source || !['character', 'wardrobe', 'element', 'location', 'style-reference', 'upload', 'image-generator', 'image-editor', 'upscaler', 'video-generator', 'output', 'voiceover', 'sound-effects', 'music-generator'].includes(source.data.kind)) return
+    if (source.data.runState === 'running' || source.data.runState === 'queued') return
+    const origin = promptGraphRef.current
+    const context = assetDescriptionRevampContext(source, nodes, edges)
+    if (!context.description.trim()) { updateNode(nodeId, { error: 'Write what this asset represents before revamping its Description.' }); return }
+    const catalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availablePromptModels(provider)])) as AssistantCatalogs
+    const selection = resolveAssistantSelection(source.data.assistantProvider, source.data.assistantModelId, catalogs)
+    if (!selection) { updateNode(nodeId, { error: 'Choose an available Revamp model for this Description.' }); return }
+    const { provider, model } = selection
+    updateNode(nodeId, { runState: 'running', progress: 'Revamping Description…', error: undefined })
+    try {
+      const rewrite = await requestPromptRewrite(nodeId, provider, context.description, assetDescriptionRevampInstruction(context), model)
+      const currentGraph = promptGraphRef.current, current = currentGraph.nodes.find(node => node.id === nodeId)
+      if (!current || !rewrite.canApply(currentGraph.nodes) || assetDescriptionRevampContext(current, currentGraph.nodes, currentGraph.edges).fingerprint !== context.fingerprint) throw new DOMException('The asset Description context changed.', 'AbortError')
+      const referenceDescription = validateAssetDescriptionRevamp(context.description, rewrite.output, context.allowedTags)
+      updateNode(nodeId, { referenceDescription, referenceDescriptionMode: 'authored', assistantProvider: provider, assistantModelId: model, runState: source.data.runState || 'idle', progress: referenceDescription === context.description ? 'Description unchanged' : 'Description revamped', error: undefined }, rewrite.canApply)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        if (promptGraphRef.current.project === origin.project && promptGraphRef.current.canvas === origin.canvas && promptGraphRef.current.page === origin.page) setNodes(current => current.map(node => node.id === nodeId && node.data.progress === 'Revamping Description…' ? { ...node, data: { ...node.data, runState: source.data.runState || 'idle', progress: undefined } } : node))
+        return
+      }
+      updateNode(nodeId, { runState: source.data.runState || 'idle', progress: undefined, error: error instanceof Error ? error.message : String(error) })
+    }
+  }, [nodes, edges, availablePromptModels, requestPromptRewrite, updateNode, setNodes])
 
   const buildStylePrompt = useCallback(async (nodeId: string) => {
     const source = nodes.find((node) => node.id === nodeId && node.data.kind === 'style-reference')
@@ -3710,6 +3858,7 @@ export function App() {
       updateNode(nodeId, { error: !description ? 'Add the required short Style description before saving.' : 'Build the finalized reusable Style prompt before saving.' })
       return
     }
+    if (!resolvedAssetReferenceDescription(source, nodes, edges).trim()) { updateNode(nodeId, { error: 'Fill the Description before saving this asset.' }); return }
     try {
       const authority = source.data.semanticReplacementAuthority
       const intent = authority ? { mode: 'replace-existing' as const, ...authority } : { mode: 'create-new' as const }
@@ -3720,7 +3869,7 @@ export function App() {
       const saved = await Promise.all(promoted.map((asset) => window.prism.assets.updateMetadata(asset.id, {
         ...asset.metadata,
         assetName: name,
-        assetGenerationPrompt: localAssetGenerationPrompt(source.data),
+        assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
         prompt,
         styleDescription: description,
         provider: 'Prism Foundry',
@@ -3731,7 +3880,7 @@ export function App() {
     } catch (error) {
       updateNode(nodeId, { error: error instanceof Error ? error.message : String(error) })
     }
-  }, [nodes, updateNode])
+  }, [edges, nodes, updateNode])
 
   const importStoryboardPanel = useCallback(async (nodeId: string, panelId: string) => {
     const asset = await window.prism.assets.import(undefined, 'Storyboard')
@@ -4069,7 +4218,7 @@ export function App() {
       characterSheetPath: source.data.characterSheetPath,
       characterSheetUrl: source.data.characterSheetUrl,
       characterSheetViews: source.data.characterSheetViews,
-      assetGenerationPrompt: localAssetGenerationPrompt(source.data),
+      assetGenerationPrompt: localAssetGenerationPrompt(source.data), referenceDescription: resolvedAssetReferenceDescription(source, nodes, edges), referenceDescriptionMode: source.data.referenceDescriptionMode || (assetReferenceDescription(source.data).trim() ? 'authored' : 'auto'),
       prompt: undefined,
       characterRole: undefined,
       characterEditorOpen: false,
@@ -4104,6 +4253,8 @@ export function App() {
       ...(target.data.kind === 'wardrobe' ? { wardrobeInputMode: 'single' as const } : {}),
       ...hydration,
       assetGenerationPrompt: sourceNode ? localAssetGenerationPrompt(sourceNode.data) : hydration.assetGenerationPrompt,
+      referenceDescription: sourceNode ? assetReferenceDescription(sourceNode.data) : hydration.referenceDescription,
+      referenceDescriptionMode: sourceNode?.data.referenceDescriptionMode ?? hydration.referenceDescriptionMode,
       prompt: undefined,
       ...(target.data.kind === 'style-reference' ? { stylePrompt: prompt, styleDescription: description, stylePresetId: undefined, styleSavedAt: sourceAsset?.createdAt || sourceNode?.data.styleSavedAt || new Date().toISOString(), styleEditorOpen: false, runState: 'complete' as const } : { semanticEditorOpen: false }),
       progress: undefined,
@@ -4254,7 +4405,7 @@ export function App() {
     }
     const fishError = fishAvailabilityError(request, serviceModels.fish)
     if (fishError) requirementFailures.push(fishError)
-    if (node.data.falNative) {
+    if (node.data.falNative && !request.draftCompletion) {
       const view = falSchema(node.data.falNative.endpointId)
       if (view.error) requirementFailures.push(view.error)
       else if (view.loading || !view.contract) requirementFailures.push('load the selected model contract')
@@ -4282,9 +4433,9 @@ export function App() {
     const coldStartSeconds = estimatedGenerationSeconds({ ...node.data, learnedGenerationSeconds: undefined })
     const learnedSeconds = learnedGenerationSeconds(history, timingKey, coldStartSeconds)
     const runStartedAt = new Date().toISOString()
-    updateNode(id, { runState: 'queued', progress: 'Preparing request…', error: undefined, runStartedAt, learnedGenerationSeconds: learnedSeconds, ...(semanticAssetKind ? semanticAssetGenerationStartedPatch(node.data) : {}) })
+    patchGenerationNode({ runState: 'queued', progress: 'Preparing request…', error: undefined, runStartedAt, learnedGenerationSeconds: learnedSeconds, ...(semanticAssetKind ? semanticAssetGenerationStartedPatch(node.data) : {}) })
     try {
-      const batchSize = generationCallCount(Boolean(request.falNative || request.higgsfieldNative), node.data.quantity, isElementAsset ? 2 : 1, repeatNativeVideo)
+      const batchSize = request.draftCompletion ? 1 : generationCallCount(Boolean(request.falNative || request.higgsfieldNative), node.data.quantity, isElementAsset ? 2 : 1, repeatNativeVideo)
       const keepsGenerationHistory = ['image-generator', 'image-editor', 'upscaler', 'video-generator', 'voiceover', 'sound-effects', 'music-generator', 'output'].includes(node.data.kind)
       const batchGeneratedResults: NonNullable<StudioNodeData['generatedResults']> = []
       const sourceLabels = [...new Set([
@@ -4310,7 +4461,7 @@ export function App() {
           prompt: isElementAsset ? `Create the same reusable element consistently from a ${elementAngles[index]}. ${request.prompt || ''} Isolated readable presentation, identical design, materials, proportions, markings, and color across every angle. No unrelated objects.`.trim() : request.prompt,
         })
         lastResult = result
-        for (const media of generationResultMedia(result)) batchGeneratedResults.push({ id: crypto.randomUUID(), ...media, modelId: result.modelId, name: generatedResultName({ ...media, modelId: result.modelId }, node.data.title), createdAt: new Date().toISOString(), sourceLabels })
+        for (const media of generationResultMedia(result)) batchGeneratedResults.push({ id: crypto.randomUUID(), ...media, videoDraft: result.videoDraft, modelId: result.modelId, name: `${result.videoDraft ? result.videoDraft.status === 'draft' ? 'Draft 480p · ' : 'Final 1080p · ' : ''}${generatedResultName({ ...media, modelId: result.modelId }, node.data.title)}`, createdAt: new Date().toISOString(), sourceLabels })
         if (repeatNativeVideo && ownsServiceOperation()) {
           const liveData = graphAtOrigin(batchOrigin).nodes.find(candidate => candidate.id === id)?.data || node.data
           const generatedResults = mergeLiveGeneratedResults(liveData.generatedResults || [], batchGeneratedResults)
@@ -4331,7 +4482,9 @@ export function App() {
       const generatedResults = semanticGenerationPatch?.generatedResults || mergeLiveGeneratedResults(liveGeneratedResults, batchGeneratedResults)
       patchGenerationNode({
         runState: 'complete',
-        progress: `${batchGeneratedResults.length > 1 ? `${batchGeneratedResults.length} results complete` : 'Complete'} · ${providerModelDisplayName(lastResult.modelId)}`,
+        draftCompletionPath: request.draftCompletion?.outputPath,
+        videoDraftWarning: lastResult.videoDraftWarning,
+        progress: lastResult.videoDraftWarning || `${batchGeneratedResults.length > 1 ? `${batchGeneratedResults.length} results complete` : 'Complete'} · ${providerModelDisplayName(lastResult.modelId)}`,
         outputPath: lastResult.outputPath,
         outputUrl: lastResult.outputUrl,
         outputType: lastResult.outputType,
@@ -4367,6 +4520,29 @@ export function App() {
       if (request.higgsfieldNative && ownsServiceOperation()) void refreshHiggsfieldJobs()
     }
   }, [activeCanvasId, activePageId, graphAtOrigin, patchOriginNode, higgsfieldJobs, refreshHiggsfieldJobs, falSchema, higgsfieldSchema, loadFalContract, history, incomingValue, nodes, openProviderConnections, refreshServiceAccount, semanticGraphNodes, serviceAccounts, serviceConnections, mediaProviderAvailable, serviceModels, setEdges, setNodes, updateNode, higgsfieldPresets])
+
+  const recoverFalDraft = useCallback(async (node: StudioNode) => {
+    const endpointId = node.data.falNative?.endpointId
+    if (!endpointId || !supportsFalSeedanceDraft(endpointId)) return
+    const origin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
+    patchOriginNode(origin, node.id, { runState: 'running', progress: 'Recovering existing fal draft…', error: undefined })
+    try {
+      const result = await window.prism.generation.run({ nodeId: node.id, kind: 'video-generator', quantity: 1,
+        falDraftRecovery: { endpointId, requestId: node.data.falDraftRecoveryRequestId?.trim() || '' } })
+      const live = graphAtOrigin(origin).nodes.find(candidate => candidate.id === node.id)
+      if (!live) return
+      const recovered = { id: crypto.randomUUID(), path: result.outputPath, url: result.outputUrl, type: result.outputType, modelId: result.modelId, videoDraft: result.videoDraft, name: 'Draft 480p · Recovered', createdAt: new Date().toISOString() }
+      const generatedResults = mergeLiveGeneratedResults(live.data.generatedResults || [], [recovered])
+      patchOriginNode(origin, node.id, { runState: 'complete', progress: 'Draft recovered · no new generation', error: undefined,
+        outputPath: result.outputPath, outputUrl: result.outputUrl, outputType: result.outputType, modelId: result.modelId,
+        generatedResults, activeResultIndex: Math.max(0, generatedResults.findIndex(item => item.path === result.outputPath)),
+        falDraftRecoveryRequestId: undefined, videoDraftWarning: undefined })
+      userMutationArmed.current = true; mutationVersion.current += 1; saveLifecycle.current?.markDirty()
+      setHistory(await window.prism.history.list()); setAssets(await window.prism.assets.list())
+    } catch (error) {
+      patchOriginNode(origin, node.id, { runState: 'error', progress: undefined, error: error instanceof Error ? error.message : String(error) })
+    }
+  }, [activeCanvasId, activePageId, graphAtOrigin, patchOriginNode])
 
   const runSequence = useCallback(async () => {
     const origin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
@@ -5028,7 +5204,7 @@ export function App() {
     return query ? ORDERED_NODE_PALETTE.filter((item) => `${item.label} ${item.detail}`.toLowerCase().includes(query)) : ORDERED_NODE_PALETTE
   }, [paletteQuery])
 
-  const connectedReferenceTags = useCallback((nodeId: string) => recursiveUpstreamSemanticTags(nodeId, nodes, edges), [edges, nodes])
+  const connectedReferenceTags = useCallback((nodeId: string) => uniquePromptTags([...recursiveUpstreamSemanticTags(nodeId, nodes, edges), ...sharedPromptContext(nodeId, nodes, edges).tags]), [edges, nodes])
 
   const connectedInputRules = useCallback((nodeId: string) => {
     const target = nodes.find((node) => node.id === nodeId)
@@ -5059,13 +5235,13 @@ export function App() {
   const availablePromptTags = useCallback((nodeId: string) => {
     const target = nodes.find((node) => node.id === nodeId)
     if (!target) return []
-    return uniquePromptTags(nodes.flatMap((source) => {
+    return uniquePromptTags([...sharedPromptContext(nodeId, nodes, edges).tags, ...nodes.flatMap((source) => {
       if (source.id === target.id) return []
       const alreadyConnected = edges.some((edge) => edge.source === source.id && edge.target === target.id)
       return alreadyConnected || promptTagConnectionPlan(source, target, edges)
         ? [workflowTag(source.data, 'asset')]
         : []
-    }))
+    })])
   }, [edges, nodes, promptTagConnectionPlan])
 
   const connectPromptTags = useCallback((nodeId: string, prompt: string, previousPrompt = '') => {
@@ -5074,9 +5250,12 @@ export function App() {
     const previousTags = new Set(promptTagTokens(previousPrompt).map((tag) => tag.toLocaleLowerCase()))
     const newlyAuthoredTags = promptTagTokens(prompt).filter((tag) => !previousTags.has(tag.toLocaleLowerCase()))
     if (!newlyAuthoredTags.length) return
+    const sharedTags = new Set(sharedPromptContext(nodeId, nodes, edges).tags.map(tag => tag.toLocaleLowerCase()))
     let workingEdges = edges
     let nextVideoEngine: string | undefined
     for (const tag of newlyAuthoredTags) {
+      // Already bound at the shared destination; a mention must not create a reverse wire.
+      if (sharedTags.has(tag.toLocaleLowerCase())) continue
       const matches = nodes.filter((source) => source.id !== target.id && sourcePromptTags(source.data).some((candidate) => candidate.toLocaleLowerCase() === tag.toLocaleLowerCase()))
       if (matches.length > 1) {
         setConnectionErrorNotice(`${tag} matches more than one Canvas asset. Rename one before connecting by tag.`)
@@ -5279,6 +5458,11 @@ export function App() {
     })
     if (viewableIds.length) setGeneratedMediaViewer({ kind: 'assets', assetIds: viewableIds, index: Math.min(Math.max(index, 0), viewableIds.length - 1) })
   }, [assets, missingAssetIds])
+  const renameGeneratedMedia = useCallback(async (nodeId: string, index: number, name: string, expectedPath: string) => {
+    const asset = generatedAssetAt(nodeId, index)
+    // A deleted/replaced batch result must not rename a different row at this index.
+    if (asset?.path === expectedPath) await renameAssetTo(asset.id, name)
+  }, [generatedAssetAt, renameAssetTo])
   const revealGeneratedMedia = useCallback((nodeId: string, index: number) => {
     const result = generatedResultAt(nodeId, index)
     if (result) void window.prism.assets.revealPath(result.path)
@@ -5539,7 +5723,6 @@ export function App() {
     setNodes(collapsedNodes)
     const nextEdges = staticEdges(next.edges)
     setEdges(nextEdges)
-    lastSnapshot.current = JSON.stringify({ nodes: collapsedNodes, edges: nextEdges })
     window.setTimeout(() => fitView({ duration: 350, padding: 0.25 }), 30)
   }, [activePageId, edges, fitView, getViewport, nodes, pages, setEdges, setNodes])
 
@@ -5559,7 +5742,6 @@ export function App() {
     setNodes([])
     setEdges([])
     setAppView('canvas')
-    lastSnapshot.current = JSON.stringify({ nodes: [], edges: [] })
   }, [activePageId, edges, getViewport, nodes, pages.length, setEdges, setNodes])
 
   const deletePage = useCallback((pageId: string) => {
@@ -5574,7 +5756,6 @@ export function App() {
       setActivePageId(nextPage.id)
       setNodes(withCollapsedCharacterEditors(nextPage.nodes))
       setEdges(staticEdges(nextPage.edges))
-      lastSnapshot.current = JSON.stringify({ nodes: nextPage.nodes, edges: staticEdges(nextPage.edges) })
     }
   }, [activePageId, edges, getViewport, nodes, pages, setEdges, setNodes])
 
@@ -5592,7 +5773,6 @@ export function App() {
       setActivePageId(nextPage.id)
       setNodes(withCollapsedCharacterEditors(nextPage.nodes))
       setEdges(staticEdges(nextPage.edges))
-      lastSnapshot.current = JSON.stringify({ nodes: nextPage.nodes, edges: staticEdges(nextPage.edges) })
       window.setTimeout(() => fitView({ duration: 350, padding: 0.25 }), 30)
     }
     setAppView('canvas')
@@ -5610,7 +5790,6 @@ export function App() {
     setNodes([])
     setEdges([])
     setAppView('canvas')
-    lastSnapshot.current = JSON.stringify({ nodes: [], edges: [] })
   }, [activeCanvasId, activePageId, canvases.length, edges, getViewport, nodes, pages, setEdges, setNodes])
 
   const commitCanvasRename = useCallback((canvasId: string) => {
@@ -5632,7 +5811,7 @@ export function App() {
       const nodeIds = new Map(sourcePage.nodes.map((node) => [node.id, crypto.randomUUID()]))
       return {
         ...structuredClone(sourcePage), id: crypto.randomUUID(), updatedAt: new Date().toISOString(),
-        nodes: sourcePage.nodes.map((node) => ({ ...structuredClone(node), id: nodeIds.get(node.id)!, selected: false, data: { ...structuredClone(node.data), storyboardSourceId: node.data.storyboardSourceId ? nodeIds.get(node.data.storyboardSourceId) || node.data.storyboardSourceId : undefined } })),
+        nodes: remapCopiedNodeGroups(sourcePage.nodes.map((node) => ({ ...structuredClone(node), id: nodeIds.get(node.id)!, selected: false, data: { ...structuredClone(node.data), storyboardSourceId: node.data.storyboardSourceId ? nodeIds.get(node.data.storyboardSourceId) || node.data.storyboardSourceId : undefined } }))),
         edges: sourcePage.edges.map((edge) => ({ ...structuredClone(edge), id: crypto.randomUUID(), source: nodeIds.get(edge.source) || edge.source, target: nodeIds.get(edge.target) || edge.target, selected: false })),
       }
     })
@@ -5664,7 +5843,6 @@ export function App() {
       setActivePageId(nextPage.id)
       setNodes(withCollapsedCharacterEditors(nextPage.nodes))
       setEdges(staticEdges(nextPage.edges))
-      lastSnapshot.current = JSON.stringify({ nodes: nextPage.nodes, edges: staticEdges(nextPage.edges) })
     }
   }, [activeCanvasId, activePageId, canvases, edges, getViewport, nodes, pages, setEdges, setNodes])
 
@@ -5785,6 +5963,11 @@ export function App() {
 
   const availableModels = useCallback((provider: ServiceProvider) => mediaProviderAvailable(provider) ? serviceModels[provider]?.models || [] : [], [serviceModels, mediaProviderAvailable])
   const serviceAvailability = useCallback((provider: ServiceProvider) => serviceModels[provider], [serviceModels])
+  const refreshVoiceAvailability = useCallback(async (provider: 'elevenlabs' | 'fal') => {
+    const accepts = serviceResponseScope.current!.begin(provider, 'models')
+    const availability = await window.prism.services.models(provider)
+    if (accepts()) setServiceModels(current => ({...current,[provider]:availability}))
+  },[])
   const modelAvailabilityVerified = useCallback((provider: ServiceProvider) => Boolean(serviceModels[provider]?.verified), [serviceModels])
   const providerAccount = useCallback((provider: ServiceProvider) => serviceAccounts[provider], [serviceAccounts])
   const connectedStoryboardVideoFamily = useCallback((storyboardId: string) => {
@@ -5802,20 +5985,24 @@ export function App() {
 
   const videoPromptState = useCallback((nodeId: string) => {
     const node = nodes.find((candidate) => candidate.id === nodeId)
-    const connected = Boolean(node && edges.some((edge) => edge.target === nodeId && edge.targetHandle === 'storyboard-in'))
+    const storyboardConnected = edges.some((edge) => edge.target === nodeId && edge.targetHandle === 'storyboard-in')
+    const connected = Boolean(node && videoPromptInputsConnected(node, nodes, edges))
     if (!node || node.data.kind !== 'video-generator') return null
     if (node.data.higgsfieldNative && higgsfieldSourceOwnsTimeline(node.data.higgsfieldNative.endpointId)) {
       const prompt = node.data.manualPromptDraft ?? node.data.prompt ?? ''
       return { connected: false, mode: 'manual' as const, autoPrompt: '', manualPrompt: prompt, activePrompt: prompt, fingerprint: '', resetDisabled: true }
     }
-    const mode = activeVideoPromptMode(node.data, connected)
+    const mode = activeVideoPromptMode(node.data, storyboardConnected)
     let autoPrompt = ''
     let autoError: string | undefined
     if (connected) {
       try {
         const autoNode = { ...node, data: { ...node.data, promptMode: 'auto' as const } }
         const autoNodes = semanticGraphNodes.map((candidate) => candidate.id === node.id ? autoNode : candidate)
-        autoPrompt = visibleProviderPromptBody(buildGenerationRequest(autoNode, autoNodes, edges))
+        autoPrompt = visibleProviderPromptBody(buildGenerationPromptPreviewRequest(autoNode, autoNodes, edges))
+        // Readiness is separate from the immediately updated visible text.
+        try { buildGenerationRequest(autoNode, autoNodes, edges) }
+        catch (error) { autoError = error instanceof Error ? error.message : String(error) }
       } catch (error) { autoError = error instanceof Error ? error.message : String(error) }
     }
     const migratedManual = migrateVideoUserSeed(node, autoPrompt)
@@ -5851,13 +6038,13 @@ export function App() {
     const providerName = providerDisplayName(generationProvider)
     const failures: string[] = []
     failures.push(...higgsfieldJobReadinessFailures(nodeId, higgsfieldJobs(), Boolean(node.data.higgsfieldNative || Object.keys(node.data.higgsfieldNativePresets || {}).length)))
-    failures.push(...upstreamIncompleteSemanticReasons(nodeId, semanticGraphNodes, edges))
+    if (!node.data.draftCompletionPath) failures.push(...upstreamIncompleteSemanticReasons(nodeId, semanticGraphNodes, edges))
     const warnings = upstreamSemanticWarnings(nodeId, semanticGraphNodes, edges)
     if (!serviceConnections[generationProvider]) failures.push(`connect ${providerName} in Connections`)
     if (node.data.higgsfieldNative) {
       failures.push(...higgsfieldPresetReadinessFailures(node.data.higgsfieldNative, higgsfieldPresets()), ...higgsfieldInputReadinessFailures(node.data.higgsfieldNative, higgsfieldSchema(node.data.higgsfieldNative.endpointId)))
     }
-    if (node.data.falNative) {
+    if (node.data.falNative && !node.data.draftCompletionPath) {
       const view = falSchema(node.data.falNative.endpointId)
       if (view.error) failures.push(view.error)
       else if (view.loading || !view.contract) failures.push('load the selected model contract')
@@ -5884,6 +6071,7 @@ export function App() {
     }
     if (failures.length) return { disabled: true, tooltip: `Cannot run: ${formatRequirementList(failures)}.` }
     const warningSuffix = warnings.length ? ` Warning: ${formatRequirementList(warnings)}.` : ''
+    if (node.data.draftCompletionPath) return { disabled: false, tooltip: 'Render the selected draft at 1080p using its original take and account.' }
     return generationActionState(node.data) === 'rerun'
       ? { disabled: false, tooltip: `Rerun — generate again with the same inputs and settings.${warningSuffix}` }
       : { disabled: false, tooltip: `Run — all required inputs, settings, and provider access are ready.${warningSuffix}` }
@@ -5919,17 +6107,24 @@ export function App() {
     if (!node) return
     const incoming = edges.find((edge) => edge.target === nodeId && (edge.targetHandle === 'prompt' || edge.targetHandle === 'text-in'))
     const source = nodes.find((candidate) => candidate.id === incoming?.source)
-    const text = node.data.prompt || source?.data.assistantOutput || source?.data.prompt || ''
+    const assetPrompt = ['character', 'wardrobe', 'element', 'location', 'style-reference'].includes(node.data.kind)
+    if (node.data.runState === 'running' || node.data.runState === 'queued') return
+    const text = assetPrompt ? localAssetGenerationPrompt(node.data) : node.data.prompt || source?.data.assistantOutput || source?.data.prompt || ''
+    if (!text.trim()) { updateNode(nodeId, { error: 'Write a Prompt before revamping it.' }); return }
     const assistantCatalogs = Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, availablePromptModels(provider)])) as AssistantCatalogs
     const selection = resolveAssistantSelection(node.data.assistantProvider, node.data.assistantModelId, assistantCatalogs)
     if (!selection) { updateNode(nodeId, { error: 'Connect OmniRoute or a direct text provider and refresh its available models first.' }); return }
     const { provider, model } = selection
     updateNode(nodeId, { runState: 'running', progress: `Rewriting with ${model}…`, error: undefined })
     try {
-      const rewrite = await requestPromptRewrite(nodeId, provider, text, 'Rewrite this creative prompt to be clearer, more visual, production-ready, and faithful to the original intent.', model)
+      const rewrite = await requestPromptRewrite(nodeId, provider, text, assetPrompt ? `Improve only the supplied generation Prompt for this ${node.data.kind} asset. Preserve its authored intent, exact semantic @tags, subjects, actions and constraints. Do not infer unseen appearance or introduce an additional person, wardrobe owner, prop, location or camera action. The asset Description is reference-purpose context, not a request to change it. Return only the improved Prompt. Read-only asset context: ${JSON.stringify(assetDescriptionRevampContext(node, nodes, edges).definitions)}` : sharedPromptRewriteInstruction(sharedPromptContext(nodeId, nodes, edges)), model)
       const output = rewrite.output
       if (!rewrite.canApply(promptGraphRef.current.nodes)) throw new DOMException('The prompt context changed.','AbortError')
-      const patch:Partial<StudioNode['data']> = node.data.kind === 'prompt'
+      if (assetPrompt) validateAssetDescriptionRevamp(text, output, [...availablePromptTags(nodeId), ...assetDescriptionRevampContext(node, nodes, edges).allowedTags])
+      else validateSharedPromptRewrite(text, output, availablePromptTags(nodeId))
+      const patch:Partial<StudioNode['data']> = assetPrompt
+        ? { assetGenerationPrompt: output, prompt: undefined, runState: node.data.runState || 'idle', progress: 'Prompt revamped', assistantProvider: provider, assistantModelId: model }
+        : node.data.kind === 'prompt'
         ? { prompt: output, assistantOutput: undefined, runState: 'complete', progress: 'Prompt enhanced', assistantProvider: provider, assistantModelId: model }
         : { assistantOutput: output, runState: 'complete', progress: 'Prompt enhanced', assistantProvider: provider, assistantModelId: model }
       updateNode(nodeId,patch,rewrite.canApply)
@@ -5937,7 +6132,7 @@ export function App() {
       if(error instanceof DOMException && error.name==='AbortError')return
       updateNode(nodeId, { runState: 'error', error: error instanceof Error ? error.message : String(error) })
     }
-  }, [availablePromptModels, requestPromptRewrite, edges, nodes, updateNode])
+  }, [availablePromptModels, availablePromptTags, requestPromptRewrite, edges, nodes, updateNode])
 
   const nodeMediaLinkState = useCallback((nodeId: string) => {
     const node = nodes.find((candidate) => candidate.id === nodeId)
@@ -5990,12 +6185,19 @@ export function App() {
     semanticAssetAvailability: semanticAvailabilityForData,
     findOfflineAsset: relinkAsset,
     openGeneratedMedia,
+    renameGeneratedMedia,
     revealGeneratedMedia,
     copyGeneratedMedia,
     setGeneratedMediaFavorite,
     generatedMediaFavorite,
     trashGeneratedMedia,
     buildStylePrompt,
+    revampAssetDescription,
+    assetDescriptionValue,
+    assetDescriptionHint,
+    mediaDescriptionConnected,
+    mediaReferenceType,
+    availableDescriptionTags,
     completeCharacterSet,
     importCanvasAssetIntoView,
     completeElementSet,
@@ -6021,6 +6223,7 @@ export function App() {
     availablePromptModels,
     promptProviderAccount,
     serviceAvailability,
+    refreshVoiceAvailability,
     modelAvailabilityVerified,
     runAssistantNode,
     estimateNode,
@@ -6039,9 +6242,9 @@ export function App() {
     saveStoryboard,
     listBatchState,
     adjustListBatchQuantity,
-  }), [falSchema, higgsfieldSchema, loadHiggsfieldContract, selectFalModel, selectHiggsfieldModel, higgsfieldPresets, refreshHiggsfieldPresets, adjustListBatchQuantity, adjustVoiceoverQuantity, availableModels, availablePromptModels, promptProviderAccount, availablePromptTags, buildStylePrompt, characterLibrary, chooseAssetBatch, commitSemanticAssetResult, completeCharacterSet, completeElementSet, connectPromptTags, connectedInputMedia, connectedInputRules, connectedReferenceTags, connectedStoryboardVideo, connectedStoryboardVideoFamily, copyGeneratedMedia, copyNodeLink, deleteNode, deleteReusableAsset, duplicateNode, estimateNode, exportReusableAsset, focusNode, generatedMediaFavorite, importAsset, importCanvasAssetIntoView, importDroppedAssets, importStoryboardPanel, inspectAssetBatch, inspectPort, listBatchState, modelAvailabilityVerified, nodeMediaLinkState, openGeneratedMedia, openInputQuickConnect, openProviderConnections, openQuickConnect, providerAccount, relinkAsset, renameNodeAsset, resetManualPrompt, revealGeneratedMedia, rewriteStoryboardPanel, runAssistantNode, runFromNode, runNode, runReadiness, serviceAvailability, mediaProviderAvailable, saveAssetBatchRow, saveCharacterAsset, saveSemanticAsset, saveStoryboard, saveStylePreset, selectCharacter, selectSemanticAsset, semanticAvailabilityForData, semanticLibraries, serviceConnections, setGeneratedMediaFavorite, setInputFidelity, setReusableFavorite, setVideoPromptMode, stopNode, trashGeneratedMedia, updateNode, updatePrompt, videoPromptState])
+  }), [falSchema, higgsfieldSchema, loadHiggsfieldContract, selectFalModel, selectHiggsfieldModel, higgsfieldPresets, refreshHiggsfieldPresets, adjustListBatchQuantity, adjustVoiceoverQuantity, availableModels, availablePromptModels, promptProviderAccount, availablePromptTags, buildStylePrompt, revampAssetDescription, assetDescriptionValue, assetDescriptionHint, mediaDescriptionConnected, mediaReferenceType, availableDescriptionTags, characterLibrary, chooseAssetBatch, commitSemanticAssetResult, completeCharacterSet, completeElementSet, connectPromptTags, connectedInputMedia, connectedInputRules, connectedReferenceTags, connectedStoryboardVideo, connectedStoryboardVideoFamily, copyGeneratedMedia, copyNodeLink, deleteNode, deleteReusableAsset, duplicateNode, estimateNode, exportReusableAsset, focusNode, generatedMediaFavorite, importAsset, importCanvasAssetIntoView, importDroppedAssets, importStoryboardPanel, inspectAssetBatch, inspectPort, listBatchState, modelAvailabilityVerified, nodeMediaLinkState, openGeneratedMedia, renameGeneratedMedia, openInputQuickConnect, openProviderConnections, openQuickConnect, providerAccount, relinkAsset, renameNodeAsset, resetManualPrompt, revealGeneratedMedia, rewriteStoryboardPanel, runAssistantNode, runFromNode, runNode, runReadiness, serviceAvailability, refreshVoiceAvailability, mediaProviderAvailable, saveAssetBatchRow, saveCharacterAsset, saveSemanticAsset, saveStoryboard, saveStylePreset, selectCharacter, selectSemanticAsset, semanticAvailabilityForData, semanticLibraries, serviceConnections, setGeneratedMediaFavorite, setInputFidelity, setReusableFavorite, setVideoPromptMode, stopNode, trashGeneratedMedia, updateNode, updatePrompt, videoPromptState])
   const inspectorNode = inspectorNodeId ? nodes.find((node) => node.id === inspectorNodeId) : undefined
-  const inspectorPromptTags = inspectorNode ? [...new Set(connectedInputRules(inspectorNode.id).flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))] : []
+  const inspectorPromptTags = inspectorNode ? uniquePromptTags([...connectedReferenceTags(inspectorNode.id), ...connectedInputRules(inspectorNode.id).flatMap((rule) => [rule.tag, ...(rule.aliases || [])])]) : []
   const inspectorAvailablePromptTags = inspectorNode ? availablePromptTags(inspectorNode.id) : inspectorPromptTags
   const inspectorVideoModel = inspectorNode?.data.kind === 'video-generator' && !inspectorNode.data.higgsfieldNative ? resolveVideoModel(inspectorNode.data.videoEngine) : undefined
   const inspectorVideoGroups = inspectorNode?.data.kind === 'video-generator' ? videoModelGroups(serviceModels.fal, serviceModels.higgsfield, inspectorNode.data) : []
@@ -6407,7 +6610,7 @@ export function App() {
               <button onClick={() => setSemanticCreateKind('location')}><Mountain size={18} /><span>Location</span><small>Create a reusable environment</small><kbd>4</kbd></button>
               <button onClick={() => setSemanticCreateKind('wardrobe')}><Shirt size={18} /><span>Wardrobe</span><small>Create reusable wardrobe</small></button>
               <button onClick={() => setSemanticCreateKind('element')}><Box size={18} /><span>Element</span><small>Create 2–4 consistent angles</small><kbd>5</kbd></button>
-              <button onClick={() => addNode('storyboard')}><Clapperboard size={18} /><span>Storyboard</span><small>Plan shots with a required style</small><kbd>6</kbd></button>
+              <button onClick={() => addNode('storyboard')}><Clapperboard size={18} /><span>Storyboard</span><small>Plan shots and timing</small><kbd>6</kbd></button>
             </div>
             <button className="primary-action" onClick={() => setPaletteOpen(true)}><Plus size={16} /> Add Node <kbd>N</kbd></button>
           </section>
@@ -6532,6 +6735,7 @@ export function App() {
             {contextMenu.kind === 'asset' && contextAsset && <>
               <div className="context-asset-name"><strong>{assetDisplayName(contextAsset)}</strong><small>{missingAssetIds.includes(contextAsset.id) ? 'File is missing' : contextAsset.category || 'Media asset'}</small></div>
               <button className={missingAssetIds.includes(contextAsset.id) ? 'context-primary' : ''} onClick={() => { void relinkAsset(contextAsset.id); setContextMenu(null) }}><FolderOpen size={14} /><span>{missingAssetIds.includes(contextAsset.id) ? 'Find / relink asset' : 'Replace linked asset'}</span></button>
+              {/^(image|video)\//.test(contextAsset.mimeType) && <button onClick={() => void openPortraitDialog(contextAsset)}><Link2 size={14} /><span>Link BytePlus Asset</span></button>}
               {missingAssetIds.length > 0 && <button onClick={() => { void relinkAllMissing(); setContextMenu(null) }}><Search size={14} /><span>Search folder for all missing</span><em>{missingAssetIds.length}</em></button>}
             </>}
           </section>
@@ -6569,6 +6773,8 @@ export function App() {
             <button className="style-source-create" onClick={() => openCustomStyleForGenerator(styleChooserNodeId)}><Plus size={13} />Create Style</button>
           </section>
         )}
+
+        {portraitDialog && <BytePlusPortraitDialog key={`${portraitDialog.asset.id}:${portraitDialog.loading ? 'loading' : 'ready'}`} {...portraitDialog} onAssetChange={asset => void openPortraitDialog(asset, portraitDialog.assets)} onLink={request => void savePortraitLink(request)} onRevoke={() => void savePortraitLink()} onClose={closePortraitDialog} />}
 
         {assetIntake && (
           <div className="modal-backdrop asset-intake-backdrop" onMouseDown={() => setAssetIntake(null)}>
@@ -6693,6 +6899,7 @@ export function App() {
                     <button onClick={() => { void window.prism.assets.exportPackage(collection.assets[0].id); setAssetMenuId(null) }}><Upload size={14} />Export</button>
                     <button onClick={() => { setRenamingAssetId(collection.assets[0].id); setRenameDraft(collection.name); setAssetMenuId(null) }}><PencilLine size={14} />Rename</button>
                     <button onClick={() => { void relinkAsset(collection.assets[0].id); setAssetMenuId(null) }}><Link2 size={14} />Relink</button>
+                    {/^(image|video)\//.test(collection.assets[0].mimeType) && <button onClick={() => void openPortraitDialog(collection.assets[0], collection.assets)}><Link2 size={14} />Link BytePlus Asset</button>}
                   </div>}
                 </div>
                 <div className="asset-card-meta">{renamingAssetId === collection.assets[0].id ? <div className="asset-rename"><input autoFocus aria-label={`Rename ${collection.name}`} value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} onBlur={() => void renameSemanticAssetCollection(collection.assets)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); else if (event.key === 'Escape') { setRenamingAssetId(null); setRenameDraft('') } }} /></div> : <strong title="Double-click to rename this reusable asset" onDoubleClick={(event) => { event.stopPropagation(); setRenamingAssetId(collection.assets[0].id); setRenameDraft(collection.name) }}>{collection.name}</strong>}<small className="asset-source">{linkState === 'finding' ? `Finding${'.'.repeat(findingDots)}` : linkState === 'found' ? 'Found' : linkState === 'offline' ? 'Media Offline' : `${collection.origin === 'generated' ? 'Generated' : 'Imported'} ${collection.category[0].toUpperCase() + collection.category.slice(1)} Set`}</small><div className="asset-facts"><span>{collection.assets.length} view{collection.assets.length === 1 ? '' : 's'}</span><time>{new Date(collection.assets[0].createdAt).toLocaleDateString()}</time></div></div>
@@ -6721,6 +6928,7 @@ export function App() {
                     <button onClick={() => { void window.prism.assets.exportPackage(asset.id); setAssetMenuId(null) }}><Upload size={14} />Export</button>
                     <button onClick={() => { setRenamingAssetId(asset.id); setRenameDraft(mediaRenameStem(assetDisplayName(asset))); setAssetMenuId(null) }}><PencilLine size={14} />Rename</button>
                     <button onClick={() => { void relinkAsset(asset.id); setAssetMenuId(null) }}><Link2 size={14} />Relink</button>
+                    {/^(image|video)\//.test(asset.mimeType) && <button onClick={() => void openPortraitDialog(asset)}><Link2 size={14} />Link BytePlus Asset</button>}
                   </div>}
                 </div>
                 <div className="asset-card-meta">
@@ -6743,6 +6951,12 @@ export function App() {
         <aside className="node-inspector-panel">
           <header><div><input className="inspector-title-input" aria-label="Node Name" value={inspectorNode.data.title} onChange={(event) => updateNode(inspectorNode.id, { title: event.target.value })} /><small>{palette.find((item) => item.kind === inspectorNode.data.kind)?.label || inspectorNode.data.kind}</small></div><button title="Close Node Settings" aria-label="Close Node Settings" onClick={() => setInspectorNodeId(null)}><X size={17} /></button></header>
           <div className="inspector-scroll">
+            {inspectorNode.data.falNative && supportsFalSeedanceDraft(inspectorNode.data.falNative.endpointId) && (inspectorNode.data.runState === 'error' || inspectorNode.data.videoDraftWarning) && <section className="inspector-section inspector-grid">
+              <label className="inspector-wide"><span>Fal Draft Request ID</span><input aria-label="Fal Draft Request ID" placeholder="Original request ID from fal history" value={inspectorNode.data.falDraftRecoveryRequestId || ''} onChange={event => updateNode(inspectorNode.id, { falDraftRecoveryRequestId: event.target.value })} /></label>
+              <button className="inspector-wide" disabled={!inspectorNode.data.falDraftRecoveryRequestId?.trim() || inspectorNode.data.runState === 'running'} onClick={() => { void recoverFalDraft(inspectorNode) }}>Recover Draft</button>
+              <p className="inspector-wide">Reads the existing result from this project's fal account. No new generation.</p>
+            </section>}
+
             <section className="inspector-section inspector-routine-model">
               <label>MODEL</label>
               {['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind)

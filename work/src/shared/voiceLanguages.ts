@@ -93,3 +93,12 @@ export function normalizedElevenV3LanguageCode(value?: string): string {
   if (!value) return ''
   return LEGACY_ELEVEN_LANGUAGE_CODES[value] || value
 }
+
+/** Representative locale flag; language labels and provider values remain authoritative. */
+export function voiceLanguageFlag(language: string): string {
+  if (!language) return '🌐'
+  try {
+    const region = new Intl.Locale(language).maximize().region
+    return region && /^[A-Z]{2}$/.test(region) ? [...region].map(letter => String.fromCodePoint(0x1f1e6 + letter.charCodeAt(0) - 65)).join('') : '🌐'
+  } catch { return '🌐' }
+}

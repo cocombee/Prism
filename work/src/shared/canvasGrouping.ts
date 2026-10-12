@@ -1,6 +1,21 @@
 import type { NodeChange } from '@xyflow/react'
 import type { StudioNode } from './types'
 
+/** A copied selection owns its groups; it must never share them with the source. */
+export function remapCopiedNodeGroups(nodes: StudioNode[], createId: () => string = () => crypto.randomUUID()): StudioNode[] {
+  const counts = new Map<string, number>()
+  for (const node of nodes) {
+    const groupId = node.data.groupId
+    if (typeof groupId === 'string' && groupId) counts.set(groupId, (counts.get(groupId) || 0) + 1)
+  }
+  const copiedGroups = new Map([...counts].filter(([, count]) => count > 1).map(([groupId]) => [groupId, createId()]))
+  return nodes.map(node => {
+    const groupId = node.data.groupId
+    if (typeof groupId !== 'string' || !groupId) return node
+    return { ...node, data: { ...node.data, groupId: copiedGroups.get(groupId) } }
+  })
+}
+
 export function toggleNodeGroup(nodes: StudioNode[], nodeIds: string[], groupId: string = crypto.randomUUID()): StudioNode[] {
   const selected = new Set(nodeIds)
   const selectedNodes = nodes.filter((node) => selected.has(node.id))

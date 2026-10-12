@@ -26,7 +26,7 @@ export function providerMotionControlDiagnostic(model: VideoModelDefinition): Pr
     captureCadence,
     playbackCadence: 'not-separately-supported',
     shutter,
-    message: `Native ${unsupported} ${unsupported.includes(' and ') ? 'are' : 'is'} unverified for ${model.shortLabel}; filmic motion is semantic prompt intent only. Playback cadence is not a separate provider control.`,
+    message: `Native ${unsupported} ${unsupported.includes(' and ') || unsupported === 'shutter fields' ? 'are' : 'is'} unverified for ${model.shortLabel}; filmic motion is semantic prompt intent only. Playback cadence is not a separate provider control.`,
   }
 }
 

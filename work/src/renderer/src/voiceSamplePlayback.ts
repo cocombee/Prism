@@ -12,9 +12,11 @@ export type VoiceSampleState = 'idle' | 'loading' | 'playing' | 'error'
 
 /** Explicit-click preview only. Late play promises cannot revive an old voice. */
 export class VoiceSamplePlayback {
+  private static active?: VoiceSamplePlayback
   private audio?: VoiceSampleAudio
   constructor(private readonly createAudio: () => VoiceSampleAudio, private readonly changed: (state: VoiceSampleState) => void) {}
   stop(): void {
+    if (VoiceSamplePlayback.active === this) VoiceSamplePlayback.active = undefined
     const audio = this.audio
     this.audio = undefined
     if (audio) {
@@ -27,7 +29,9 @@ export class VoiceSamplePlayback {
     this.changed('idle')
   }
   async play(url: string): Promise<void> {
+    VoiceSamplePlayback.active?.stop()
     this.stop()
+    VoiceSamplePlayback.active = this
     const audio = this.createAudio()
     this.audio = audio
     audio.preload = 'none'

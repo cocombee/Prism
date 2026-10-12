@@ -11,10 +11,12 @@ type ReleaseCandidate<T extends ModelMenuOption> = { release: ModelMenuRelease<T
 type Generation<T extends ModelMenuOption> = { label: string; candidates: ReleaseCandidate<T>[]; version?: number[]; date: number; index: number }
 
 export type DeclaredReleaseAlias = { prefix: string; contains?: string }
-export type FeaturedFamilyPriority = { family: string; version?: string; company?: string; releaseAliases?: readonly DeclaredReleaseAlias[] }
+export type FeaturedFamilyPriority = { family: string; version?: string; company?: string; releaseAliases?: readonly DeclaredReleaseAlias[]; generationLimit?: number }
 export type FlatModelCatalogMenuPolicy = {
   /** Curated allowlist and All ordering, matched against declared release/company metadata. */
   approvedFamilyPriority?: readonly FeaturedFamilyPriority[]
+  /** Include other explicitly admitted families only for these serving catalogs. */
+  includeAdmittedProviderFamilies?: readonly string[]
   /** Featured is a short popular list, independent from the larger All allowlist. */
   featuredFamilyPriority?: readonly FeaturedFamilyPriority[]
   /** Limit retained generations independently for each serving provider and model family. */
@@ -27,10 +29,11 @@ export type FlatModelCatalogMenuPolicy = {
 
 /** User-curated families; the live admitted catalog owns their available versions and routes. */
 export const POPULAR_VIDEO_FEATURED_POLICY: FlatModelCatalogMenuPolicy = {
+  includeAdmittedProviderFamilies: ['Higgsfield'],
   approvedFamilyPriority: [
-    { family: 'Seedance' }, { family: 'Kling' }, { family: 'Gemini Omni Flash' },
+    { family: 'Seedance' }, { family: 'Kling' }, { family: 'Gemini Omni Flash', generationLimit: 1 },
     { family: 'Wan' }, { family: 'LTX' }, { family: 'MiniMax H', company: 'MiniMax', releaseAliases: [{ prefix: 'H3' }] }, { family: 'Hailuo', company: 'MiniMax', releaseAliases: [{ prefix: 'MiniMax Hailuo' }] },
-    { family: 'PixVerse' }, { family: 'Veo' },
+    { family: 'PixVerse' }, { family: 'Veo', generationLimit: 1 },
   ],
   featuredFamilyPriority: [
     { family: 'Seedance', version: '2.5' }, { family: 'Kling' },
@@ -175,7 +178,7 @@ function mainVideoCandidates<T extends ModelMenuOption>(candidates: ReleaseCandi
 function mainVideoLabel(option: ModelMenuOption): string {
   const mode = modelMenuMode(option)
   const release = option.label.split(' · ')[0]
-  return `${release} · ${mode === 'text' ? 'Text' : 'References'}`
+  return `${release} · ${mode === 'text' ? 'Text' : /^(?:image|image to video)$/.test(declaredMode(option)) ? 'References (Image)' : 'References'}`
 }
 
 function compareGeneration<T extends ModelMenuOption>(left: Generation<T>, right: Generation<T>): number {
@@ -316,15 +319,12 @@ function reducedFlatModelCatalogMenu<T extends ModelMenuOption>(
     if (!usable.length) continue
     const declaredFamily = normalizeFamilyName(release.family)
     const priorityIndex = approved ? approved.findIndex(priority => familyMatchesApproved(release, priority)) : -1
-    if (approved && priorityIndex < 0) continue
-    // Match Higgsfield's ordinary Kling family, rather than adding the separate
-    // O-series workflow to fal's counterpart list.
-    if (policy.ordinaryVideoInputsOnly && declaredFamily === 'klingo') continue
+    const service = release.service || release.options.find(option => option.catalog?.service)?.catalog?.service || provider.label
+    if (approved && priorityIndex < 0 && !policy.includeAdmittedProviderFamilies?.includes(service)) continue
     // Provider spelling (H3 versus MiniMax H3, MiniMax Hailuo versus Hailuo)
     // must not create additional generation budgets for the same admitted family.
-    const family = policy.ordinaryVideoInputsOnly && approved && priorityIndex >= 0
+    const family = policy.ordinaryVideoInputsOnly && declaredFamily !== 'klingo' && approved && priorityIndex >= 0
       ? normalizeFamilyName(approved[priorityIndex].family) : declaredFamily
-    const service = release.service || release.options.find(option => option.catalog?.service)?.catalog?.service || provider.label
     const key = JSON.stringify([service, release.company, family])
     let block = scoped.get(key)
     if (!block) {
@@ -349,7 +349,8 @@ function reducedFlatModelCatalogMenu<T extends ModelMenuOption>(
   const serviceByValue = new Map<string, string>()
   for (const block of scoped.values()) {
     block.generations.sort(compareGeneration)
-    if (generationLimit !== undefined) block.generations = block.generations.slice(0, generationLimit)
+    const familyLimit = approved?.[block.familyPriority]?.generationLimit ?? generationLimit
+    if (familyLimit !== undefined) block.generations = block.generations.slice(0, Math.max(0, Math.floor(familyLimit)))
     block.rowsByGeneration = block.generations.map(generation => (policy.ordinaryVideoInputsOnly ? mainVideoCandidates(generation.candidates, selectedValue) : generation.candidates).flatMap(candidate => {
       if (seenValues.has(candidate.option.value)) return []
       seenValues.add(candidate.option.value)
@@ -377,7 +378,7 @@ function reducedFlatModelCatalogMenu<T extends ModelMenuOption>(
       if (generationIndex < 0) return []
       const generation = block.generations[generationIndex]
       const rows = block.rowsByGeneration[generationIndex] || []
-      const row = rows.find(item => item.option.value === selectedValue) || rows[0]
+      const row = (policy.ordinaryVideoInputsOnly ? rows.find(item => modelMenuMode(item.option) === 'reference') : undefined) || rows.find(item => item.option.value === selectedValue) || rows[0]
       return generation && row ? [{ generation, row, index: block.index }] : []
     }).sort((left, right) => compareGeneration(left.generation, right.generation) || left.index - right.index)
     const selected = candidates[0]?.row

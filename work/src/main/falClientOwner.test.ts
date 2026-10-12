@@ -7,6 +7,18 @@ const accepted = (id: string) => new Response(JSON.stringify({ request_id: id, s
 const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } })
 
 describe('real SDK request client ownership', () => {
+  it('surfaces actual 422 fields and original request ID without credentials or echoed input values', async () => {
+    const secret = 'fixture-private-fal-credential'
+    const client = createOwnedFalClient(secret, async () => new Response(JSON.stringify({ detail: [{ loc: ['body', 'video_urls', 0], msg: `Reference is too long. https://private.example/video?token=secret Key ${secret}`, input: secret }], prompt: 'private authored input' }), { status: 422, headers: { 'Content-Type': 'application/json', 'x-fal-request-id': 'original-request-123' } }), () => undefined)
+    let result: unknown
+    try { await subscribeOwnedFalClient(client, 'bytedance/seedance-2.5/reference-to-video', { input: {} }) } catch (error) { result = error }
+    expect(result).toMatchObject({ status: 422, requestId: 'original-request-123' })
+    expect((result as Error).message).toContain('video_urls.0: Reference is too long.')
+    expect((result as Error).message).toContain('Request original-request-123')
+    expect(JSON.stringify(result)).not.toContain(secret)
+    expect(JSON.stringify(result)).not.toContain('private.example')
+    expect(JSON.stringify(result)).not.toContain('private authored input')
+  })
   it('retains separate credentials through concurrent requests from two account clients', async () => {
     const old = deferred<Response>(), entered = deferred<void>(), calls: Array<{ method: string; authorization: string | null }> = []
     const transport: typeof fetch = async (_input, init) => {

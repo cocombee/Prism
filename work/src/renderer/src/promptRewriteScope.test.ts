@@ -49,3 +49,20 @@ describe('late prompt reply ownership',()=>{
     const g=fixture(),s=g.scope.begin('target','anthropic');g.graph.nodes=g.graph.nodes.filter(n=>n.id!=='target');expect(()=>s.assertCurrent()).toThrow('no longer exists')
   })
 })
+
+
+describe('shared destination late Prompt reply ownership',()=>{
+  function sharedFixture(){
+    const f=fixture();f.graph.nodes.push({id:'video',type:'studio',position:{x:0,y:0},data:{kind:'video-generator',title:'Video',videoEngine:'bytedance/seedance-2.5/reference-to-video',duration:4}}as StudioNode,{id:'cat',type:'studio',position:{x:0,y:0},data:{kind:'upload',title:'Cat',outputType:'image',referenceTag:'@cat',referenceDescription:'Cat speaks.'}}as StudioNode)
+    f.graph.edges.push({id:'to-video',source:'target',target:'video',sourceHandle:'text-out',targetHandle:'text-in'},{id:'cat-video',source:'cat',target:'video',sourceHandle:'media-out',targetHandle:'reference-in'})
+    return f
+  }
+  it('discards a reply when a sibling Description, asset selection or destination setting changes',()=>{
+    for(const change of[(f:ReturnType<typeof sharedFixture>)=>{f.graph.nodes[4].data.referenceDescription='Changed speaker'},(f:ReturnType<typeof sharedFixture>)=>{f.graph.nodes[4].data.activeResultIndex=1},(f:ReturnType<typeof sharedFixture>)=>{f.graph.nodes[3].data.duration=8}]){const f=sharedFixture(),r=f.scope.begin('target','anthropic');change(f);expect(r.current()).toBe(false);expect(r.canApply(f.graph.nodes)).toBe(false)}
+  })
+  it('discards on disconnect or replaced sibling but ignores unrelated edits and transient status',()=>{
+    const f=sharedFixture(),r=f.scope.begin('target','anthropic');f.graph.nodes[4].position.x=200;f.graph.nodes[3].data.progress='Complete';f.graph.nodes[2].data.prompt='Other draft';expect(r.current()).toBe(true)
+    f.graph.edges=f.graph.edges.filter(e=>e.id!=='to-video');expect(r.current()).toBe(false)
+    const g=sharedFixture(),s=g.scope.begin('target','anthropic');g.graph.edges.find(e=>e.id==='cat-video')!.source='other';expect(s.current()).toBe(false)
+  })
+})

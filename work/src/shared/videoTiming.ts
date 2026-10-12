@@ -5,7 +5,7 @@ import type { FalRuntimeField } from './falRuntimeInputs'
 export type FalVideoTiming = { kind: 'seconds'; field: string; suffix?: 's'; source: 'provider-declaration' } | { kind: 'frames'; framesField: string; fpsField: string; source: 'provider-declaration' }
 
 /** Units must be explicitly declared, not inferred from an arbitrary future model ID. */
-export function inferFalVideoTiming(fields: FalRuntimeField[]): FalVideoTiming | undefined {
+export function inferFalVideoTiming(fields: FalRuntimeField[], videoOutputDeclared = false): FalVideoTiming | undefined {
   const descriptions = (field: FalRuntimeField): string => {
     const visit = (schema: FalRuntimeField['schema']): string[] => [schema.description || '', ...(schema.allOf || []).flatMap(visit), ...(schema.anyOf || []).flatMap(visit), ...(schema.oneOf || []).flatMap(visit)]
     return visit(field.schema).join(' ').slice(0, 8192)
@@ -20,7 +20,8 @@ export function inferFalVideoTiming(fields: FalRuntimeField[]): FalVideoTiming |
     const description = descriptions(field)
     const name = `${field.key} ${field.label}`.replace(/_/g, ' ')
     return /\b(?:duration|length)\b/i.test(name) && !/\b(?:max|min|maximum|minimum|offset|audio|transition|fade|reference)\b/i.test(name)
-      && /\b(?:video|clip|generation|generated)\b/i.test(description) && (/\bseconds\b/i.test(description) || suffixSeconds(field)) && !/\bmilliseconds\b/i.test(description)
+      && (/\b(?:video|clip|generation|generated)\b/i.test(description) || videoOutputDeclared && /\boutput\s+(?:duration|length)\b/i.test(description) && !/\b(?:audio|sound|speech|music)\b/i.test(description))
+      && (/\bseconds\b/i.test(description) || suffixSeconds(field)) && !/\bmilliseconds\b/i.test(description)
   })
   const frames = candidates.filter(field => /\b(?:video|generate|generated)\b/i.test(descriptions(field)) && /\b(?:number|count)\b.*\bframes\b/i.test(descriptions(field)) && !/interpolat/i.test(`${field.key} ${field.label}`))
   const rates = candidates.filter(field => /\bframes per second\b/i.test(descriptions(field)))
@@ -46,14 +47,14 @@ export function falVideoSeconds(binding: FalVideoTiming | undefined, values: Rec
   return frames !== undefined && Number.isSafeInteger(frames) && frames > 0 && fps !== undefined && fps > 0 ? frames / fps : undefined
 }
 /** Typed authoring only; never parse numbers from an approved Manual master. */
-export function authoredTimelineSeconds(request: Pick<GenerationRequest, 'kind' | 'storyboardShots' | 'multiPrompt'>): number | undefined {
+export function authoredTimelineSeconds(request: Pick<GenerationRequest, 'kind' | 'storyboardShots' | 'multiPrompt' | 'promptPreviewOnly'>): number | undefined {
   if (request.kind !== 'video-generator') return undefined
   const beats = request.storyboardShots?.length ? request.storyboardShots : request.multiPrompt?.length ? request.multiPrompt : undefined
   if (!beats) return undefined
   let total = 0
   for (const [index, beat] of beats.entries()) {
     const seconds = numericVideoSeconds(beat.duration)
-    if (seconds === undefined || seconds < STORYBOARD_MIN_PANEL_DURATION) throw new Error(`Storyboard panel ${index + 1} needs a finite duration of at least 1.0s.`)
+    if (seconds === undefined || seconds < STORYBOARD_MIN_PANEL_DURATION && !request.promptPreviewOnly) throw new Error(`Storyboard panel ${index + 1} needs a finite duration of at least 1.0s.`)
     total += seconds
   }
   if (!Number.isFinite(total) || total <= 0) throw new Error('Authored timeline needs a finite positive total duration.')

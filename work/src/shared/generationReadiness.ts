@@ -1,5 +1,6 @@
 import {higgsfieldStoryboardTimingFailures} from './higgsfieldVideoTiming'
 import { providerPromptOwnershipErrors } from './providerPromptOwnership'
+import { referenceDescriptionReadinessFailures } from './assetReferenceDescriptions'
 import { seedancePromptIntegrityFailures } from './seedancePromptIntegrity'
 import { videoDialogueAudioReadinessFailures } from './videoDialogueAudio'
 import { storyboardPhysicalCastReadinessFailures } from './storyboardPhysicalCast'
@@ -15,6 +16,7 @@ import { propScaleReadinessFailures } from './propScaleAuthority'
 import { compileElevenAudioRequest, isDirectElevenAudio } from './elevenLabsAudio'
 import { klingNativeStoryboardReadinessFailures } from './klingNativeStoryboard'
 import { falNativeFlowForKind } from './falNativeExecution'
+import { nativeVideoOutputFrameRate } from './videoCadenceSelection'
 
 function hasMedia(reference: NonNullable<GenerationRequest['references']>[number]): boolean {
   return Boolean(reference.path || reference.url)
@@ -26,7 +28,16 @@ function hasMedia(reference: NonNullable<GenerationRequest['references']>[number
  * validates the request again in Electron main.
  */
 export function generationRequirementFailures(request: GenerationRequest): string[] {
-  const failures: string[] = [...providerPromptOwnershipErrors(request), ...storyboardPhysicalCastReadinessFailures(request), ...videoDialogueAudioReadinessFailures(request), ...seedancePromptIntegrityFailures(request)]
+  if (request.promptPreviewOnly) return ['review the live controls; this request is a display-only prompt preview']
+  if (request.falDraftRecovery) return request.kind === 'video-generator' && request.quantity === 1 && typeof request.falDraftRecovery.requestId === 'string' && typeof request.falDraftRecovery.endpointId === 'string' ? [] : ['choose one original fal draft request']
+  if (request.draftCompletion) return request.kind === 'video-generator' && request.quantity === 1 && ['fal', 'byteplus'].includes(request.draftCompletion.provider) && typeof request.draftCompletion.outputPath === 'string' && request.draftCompletion.outputPath ? [] : ['choose one valid linked draft result']
+  const failures: string[] = [...providerPromptOwnershipErrors(request), ...referenceDescriptionReadinessFailures(request), ...storyboardPhysicalCastReadinessFailures(request), ...videoDialogueAudioReadinessFailures(request), ...seedancePromptIntegrityFailures(request)]
+  const nativeVideo = request.kind === 'video-generator' && (request.falNative || request.higgsfieldNative)
+  if (nativeVideo && request.motionCadence !== undefined) {
+    const fps = request.nativeOutputFrameRate === null ? undefined : nativeVideoOutputFrameRate(nativeVideo.endpointId, request.nativeOutputFrameRate)
+    if (fps === undefined) failures.push('verify native output FPS before using a custom Motion FPS, or select Native')
+    else if (request.motionCadence > fps) failures.push(`Motion FPS ${request.motionCadence} exceeds native output FPS ${fps}; choose a cadence at or below Native`)
+  }
   for (const source of request.offlineSemanticSources || []) failures.push(`relink ${source.title} (Media Offline)`)
   if (request.higgsfieldNative) {
     if (request.kind !== 'video-generator' || request.falNative) failures.push('choose one Higgsfield video route without another provider binding')

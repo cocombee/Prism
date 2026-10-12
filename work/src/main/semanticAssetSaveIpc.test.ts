@@ -10,14 +10,14 @@ const roots: string[] = []
 async function exists(path: string) { try { await stat(path); return true } catch { return false } }
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
 
-async function fixture() {
+async function fixture(readable = false) {
   const rootPath = await mkdtemp(join(tmpdir(), 'prism-semantic-ipc-')); roots.push(rootPath)
-  const canvas = join(rootPath, '05. Canvas'); const character = join(rootPath, '01. Characters', 'hero'); const generated = join(rootPath, 'Generated Assets')
+  const canvas = join(rootPath, readable ? 'Canvas' : '05. Canvas'); const character = join(rootPath, readable ? 'Characters' : '01. Characters', 'hero'); const generated = join(rootPath, 'Generated Assets')
   await Promise.all([mkdir(canvas, { recursive: true }), mkdir(character, { recursive: true }), mkdir(generated, { recursive: true })])
   const old = join(character, 'hero.png'); const one = join(generated, 'one.png'); const two = join(generated, 'two.png'); const external = join(rootPath, '..', `external-ipc-${Date.now()}.png`); roots.push(external)
   await Promise.all([writeFile(old, 'OLD'), writeFile(one, 'ONE'), writeFile(two, 'TWO'), writeFile(external, 'EXT')])
-  const workflowPath = join(canvas, 'workflow.json'); const assetsPath = join(canvas, 'assets.json'); const projectDocumentPath = join(rootPath, '00. Project', 'project.prismflow')
-  await mkdir(join(rootPath, '00. Project'), { recursive: true })
+  const workflowPath = join(canvas, 'workflow.json'); const assetsPath = join(canvas, 'assets.json'); const projectDocumentPath = join(rootPath, readable ? 'Project' : '00. Project', 'project.prismflow')
+  await mkdir(join(rootPath, readable ? 'Project' : '00. Project'), { recursive: true })
   const node = { id: 'character-node', type: 'studio', position: { x: 0, y: 0 }, data: { kind: 'character', title: 'hero', referenceTag: '@hero', semanticReplacementAuthority: { targetAssetId: 'saved', token: 'edit-token' }, referenceAssets: [{ id: 'saved', name: 'hero.png', path: old, mimeType: 'image/png', createdAt: '2026-08-26T01:00:00Z', origin: 'generated' }, { id: 'external', name: 'external.png', path: external, mimeType: 'image/png', createdAt: '2026-08-26T01:00:00Z', origin: 'imported' }], generatedResults: [{ id: 'one', path: one, url: 'one', type: 'image', modelId: 'm', createdAt: '2026-08-26T01:01:00Z' }, { id: 'two', path: two, url: 'two', type: 'image', modelId: 'm', createdAt: '2026-08-26T01:02:00Z' }], activeResultIndex: 0 } }
   const workflow = { schemaVersion: 1, id: 'w', name: 'w', createdAt: '', updatedAt: '', nodes: [node], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }
   const assets = node.data.referenceAssets
@@ -26,6 +26,22 @@ async function fixture() {
 }
 
 describe('actual semantic asset main/preload IPC boundary', () => {
+  it('commits a new semantic asset to the readable layout and reopens the exact canonical and portable paths', async () => {
+    const f = await fixture(true); const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    registerSemanticAssetSaveIpc({ handle: (channel, handler) => handlers.set(channel, handler) }, { currentProject: () => f })
+    const result = await handlers.get('assets:commit-semantic-result')!({}, { nodeId: 'character-node', selectedResultId: 'one', intent: { mode: 'create-new' } }) as { asset: { path: string; id: string } }
+    expect(result.asset.path).toBe(join(f.rootPath, 'Characters', 'hero-2', 'hero.png'))
+    expect(await readFile(result.asset.path, 'utf8')).toBe('ONE')
+    expect(await readFile(f.old, 'utf8')).toBe('OLD')
+    const canonical = JSON.parse(await readFile(f.workflowPath, 'utf8'))
+    const portable = JSON.parse(await readFile(f.projectDocumentPath, 'utf8'))
+    expect(canonical.nodes[0].data.outputPath).toBe(result.asset.path)
+    expect(portable.workflow.nodes[0].data.outputPath).toBe(result.asset.path)
+    expect(portable.assets.some((asset: { id: string }) => asset.id === result.asset.id)).toBe(true)
+    expect(await exists(join(f.rootPath, '05. Canvas'))).toBe(false)
+    expect(await exists(join(f.rootPath, '01. Characters'))).toBe(false)
+  })
+
   it('reads portable metadata after a queued profile change rather than replacing its new override', async () => {
     const f = await fixture(); const handlers = new Map<string, (...args: unknown[]) => unknown>()
     const commands = new ProjectCommandQueue(); const documents = new JsonMutationQueue()

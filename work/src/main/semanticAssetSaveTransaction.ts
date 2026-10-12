@@ -1,3 +1,4 @@
+import { projectFolderPath } from './projectFolders'
 import { constants as fsConstants } from 'node:fs'
 import { access, copyFile, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -148,7 +149,7 @@ async function removeEmptyJournalRoot(root: string) {
 
 export async function commitSemanticAssetSave(request: SemanticAssetSaveRequest, options: SemanticAssetSaveOptions = {}) {
   await validateRequest(request)
-  const journalRoot = join(resolve(request.managedRoot), '05. Canvas', '.prism-semantic-save')
+  const journalRoot = projectFolderPath(resolve(request.managedRoot), 'Canvas', '.prism-semantic-save')
   const transactionRoot = join(journalRoot, request.transactionId)
   if (await exists(transactionRoot)) throw new Error('A semantic asset transaction with this identity already exists.')
   const quarantineRoot = join(transactionRoot, 'quarantine')
@@ -249,7 +250,7 @@ async function validateRecoveryJournal(journal: SemanticAssetSaveJournal, journa
 }
 
 export async function recoverSemanticAssetTransactions(managedRoot: string): Promise<Array<{ transactionId: string; outcome: 'rolled-back' | 'completed' }>> {
-  const journalRoot = join(resolve(managedRoot), '05. Canvas', '.prism-semantic-save')
+  const journalRoot = projectFolderPath(resolve(managedRoot), 'Canvas', '.prism-semantic-save')
   if (!await exists(journalRoot)) return []
   const recovered: Array<{ transactionId: string; outcome: 'rolled-back' | 'completed' }> = []
   for (const name of (await readdir(journalRoot)).sort()) {

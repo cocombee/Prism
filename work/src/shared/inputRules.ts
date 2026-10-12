@@ -1,8 +1,9 @@
-import type { StudioNodeData } from './types'
+import type { GenerationRequest, StudioNodeData } from './types'
 import { activeMediaTag } from './generatedMedia'
+import { nodeInputPorts, unavailableInputPortLabel } from './nodePorts'
 
 export type InputFidelity = 'guide' | 'auto' | 'lock'
-export interface ConnectedInputRule { tag: string; aliases?: string[]; label: string; rule: string; mode?: InputFidelity; toggleable?: boolean; edgeId?: string }
+export interface ConnectedInputRule { referenceDescription?: string; tag: string; aliases?: string[]; label: string; rule: string; mode?: InputFidelity; toggleable?: boolean; edgeId?: string }
 
 /** Keep adjustable fidelity rows reachable before fixed hard-rule rows. */
 export function prioritizeConnectedInputRules(items: ConnectedInputRule[]): ConnectedInputRule[] {
@@ -46,6 +47,11 @@ function fidelityRule(mode: InputFidelity, guide: string, auto: string, lock: st
   return `AUTO RULE · ${auto}`
 }
 
+/** New reference modes never become the legacy planar-artwork placement workflow. */
+export function isLockedArtworkReference(reference: NonNullable<GenerationRequest['references']>[number]): boolean {
+  return !reference.mediaReferenceMode && reference.fidelity === 'lock' && reference.role === 'reference' && Boolean(reference.path) && (!reference.mediaType || reference.mediaType === 'image')
+}
+
 /** Re-evaluate Auto after all directly authored and upstream Prompt text has been assembled. */
 export function resolveAutoConnectedInputRule(rule: ConnectedInputRule, authoredPrompt?: string): ConnectedInputRule {
   if (rule.mode !== 'auto' || rule.label !== 'Image Reference') return rule
@@ -59,8 +65,29 @@ export function workflowTag(data: Pick<StudioNodeData, 'title'> & Partial<Pick<S
 export function connectedInputRule(source: StudioNodeData, target: StudioNodeData, targetHandle?: string | null, mode: InputFidelity = 'auto'): ConnectedInputRule {
   const handle = targetHandle || ''
   const tag = workflowTag(source, 'image-reference')
+  const generator = ['image-generator', 'video-generator'].includes(target.kind)
+  const native = target.falNative || target.higgsfieldNative
+  const binding = native?.media?.find(item => item.portId === handle)
+  const retiredPort = native?.retiredPorts?.find(port => port.id === handle)
+  const currentPort = retiredPort && nodeInputPorts(target).find(port => port.id === handle)
+  const retired = binding?.retired || retiredPort && (!currentPort || currentPort.maxConnections === 0)
+  if (retired) return { tag, label: unavailableInputPortLabel(binding?.label || retiredPort?.label || handle), rule: 'This saved connection needs repair before generation.' }
+  // Generators no longer consume the retired edge strength. Native frame/source roles remain schema-owned.
+  if (generator) mode = 'auto'
+  const referenceSocket = native ? Boolean(binding && ['reference-image', 'reference-video'].includes(binding.role)) : ['reference-in', 'reference', 'video-reference-in'].includes(handle)
+  if ((generator || target.kind === 'storyboard') && referenceSocket && ['upload', 'output', 'image-generator', 'video-generator'].includes(source.kind)) return {
+    tag, label: binding?.label || 'Media Reference', rule: 'Use only the roles and constraints explicitly assigned in the reference introduction and authored instructions. Other references retain their own assigned domains.',
+  }
+  if (generator && !native) {
+    if (handle === 'storyboard-in' || ['storyboard', 'storyboard-asset'].includes(source.kind)) return { tag: workflowTag(source, 'storyboard'), label: 'Storyboard', rule: 'HARD RULE · Execute the authored action intervals, durations and transition boundaries once, preserving the authored continuity.' }
+    if (handle === 'image-in' && target.kind === 'video-generator') return { tag: workflowTag(source, 'start-frame'), label: 'Starting Frame', rule: 'HARD RULE · Use the supplied frame as the opening visual state, then follow the authored action.' }
+    if (handle === 'end-image') return { tag: workflowTag(source, 'end-frame'), label: 'Ending Frame', rule: 'HARD RULE · End at the supplied frame and preserve the authored transition into that visual state.' }
+    if (handle === 'video-in') return { tag: workflowTag(source, 'source-video'), label: 'Video To Extend', rule: 'HARD RULE · Continue from the existing source video’s final state, preserving source timing and continuity.' }
+  }
+  const fidelity = !generator && supportsInputFidelity(source, targetHandle) ? { mode, toggleable: true } : {}
+  const storyboardRule = (): ConnectedInputRule => ({ tag: workflowTag(source, 'storyboard'), label: 'Storyboard', rule: fidelityRule(mode, 'Use this storyboard as loose structural guidance; preserve its story intent while allowing reframing, retiming, and stronger transitions.', 'Preserve the storyboard’s subjects, shot order, timing intent, and continuity, while automatically improving weak framing, detail, transitions, or image quality.', 'Follow this storyboard exactly once as the locked shot plan, timing, framing, movement, and continuity structure.'), ...fidelity })
+  if (handle === 'storyboard-in') return storyboardRule()
   if (target.higgsfieldNative) {
-    const retired = target.higgsfieldNative.retiredPorts?.find(port => port.id === handle)
     const binding = target.higgsfieldNative.media?.find(item => item.portId === handle)
     if (binding && target.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) {
       const rules = {
@@ -71,19 +98,17 @@ export function connectedInputRule(source: StudioNodeData, target: StudioNodeDat
         'reference-video': 'Use this video for the authored motion, camera or performance guidance. Do not automatically copy its subjects, appearance or audio.',
         'reference-audio': 'Use this audio for the authored audio-reference role. It does not supply visual identity or camera instructions.',
       }
-      return { tag: workflowTag(source, binding.role), label: binding.retired || retired ? `Unavailable · ${binding.label}` : binding.label,
-        rule: binding.retired || retired ? 'This saved connection needs repair before generation.' : rules[binding.role] }
+      return { tag: workflowTag(source, binding.role), label: binding.retired ? unavailableInputPortLabel(binding.label) : binding.label,
+        rule: binding.retired ? 'This saved connection needs repair before generation.' : rules[binding.role] }
     }
     // Native Seedance retains the established Prompt, Storyboard, Style and semantic-asset rules below.
     if (!target.higgsfieldNative.endpointId.startsWith('bytedance/seedance-2.5/')) {
-    const label = retired ? `Unavailable · ${retired.label}` : handle === 'video-in' ? 'Source Video' : handle === 'text-in' ? 'Prompt' : `${handle === 'character-in' ? 'Character' : handle === 'element-in' ? 'Element' : handle === 'location-in' ? 'Location' : 'Image'} Reference`
-    return { tag: workflowTag(source, handle === 'video-in' ? 'source-video' : 'image-reference'), label, rule: retired ? 'This saved connection needs repair before generation.' : 'Bound directly to the selected Higgsfield model input. The authored prompt and source video control the transformation.' }
+    const label = handle === 'video-in' ? 'Source Video' : handle === 'text-in' ? 'Prompt' : `${handle === 'character-in' ? 'Character' : handle === 'element-in' ? 'Element' : handle === 'location-in' ? 'Location' : 'Image'} Reference`
+    return { tag: workflowTag(source, handle === 'video-in' ? 'source-video' : 'image-reference'), label, rule: 'Bound directly to the selected Higgsfield model input. The authored prompt and source video control the transformation.' }
     }
-    if (retired) return { tag, label: `Unavailable · ${retired.label}`, rule: 'This saved connection needs repair before generation.' }
   }
-  const imageReferenceRule = (guide: string, auto: string, lock: string) => fidelityRule(mode, guide, auto, lock, target.prompt, tag)
-  const fidelity = supportsInputFidelity(source, targetHandle) ? { mode, toggleable: true } : {}
-  if (handle === 'storyboard-in' || source.kind === 'storyboard' || source.kind === 'storyboard-asset') return { tag: workflowTag(source, 'storyboard'), label: 'Storyboard', rule: fidelityRule(mode, 'Use this storyboard as loose structural guidance; preserve its story intent while allowing reframing, retiming, and stronger transitions.', 'Preserve the storyboard’s subjects, shot order, timing intent, and continuity, while automatically improving weak framing, detail, transitions, or image quality.', 'Follow this storyboard exactly once as the locked shot plan, timing, framing, movement, and continuity structure.'), ...fidelity }
+  const imageReferenceRule = (guide: string, auto: string, lock: string) => fidelityRule(mode, guide, auto, lock, generator ? undefined : target.prompt, tag)
+  if (source.kind === 'storyboard' || source.kind === 'storyboard-asset') return storyboardRule()
   if (handle === 'text-in' || handle === 'prompt' || source.kind === 'prompt' || source.kind === 'assistant') return { tag: workflowTag(source, 'prompt'), label: source.kind === 'list' ? 'Text List' : 'Prompt', rule: 'HARD RULE · Apply this connected text exactly once as the primary written instruction. Do not ask the user to repeat it or duplicate it.' }
   if (handle === 'style-in' || source.kind === 'style-reference') return { tag: workflowTag(source, 'style'), label: 'Style', rule: 'HARD RULE · Apply this style as the visual-language authority without copying depicted subjects. When text and a reference image disagree, prioritize the image for visibly provable medium, rendering, palette, lighting, texture, lens, and finish; retain text intent for anything the image cannot prove. Keep it consistent across every output.' }
   if (source.kind === 'character') return { tag: workflowTag(source, 'character'), label: 'Character Identity', rule: 'HARD RULE · Preserve this exact character identity across every shot; never merge, replace, or reinterpret it as another person. Narrative prominence comes only from the written shot prompt.' }

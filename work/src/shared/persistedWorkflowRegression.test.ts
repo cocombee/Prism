@@ -169,3 +169,17 @@ describe('persisted Misi Delivery prompt regression', () => {
     expect(buildGenerationRequest(video, customNodes, fixture.edges).stylePrompt).toBe(customText)
   })
 })
+
+
+describe('connected provider reference tag coverage', () => {
+  it('includes video, audio and sheet references routed through Storyboard, while ignoring unrelated media', () => {
+    const node = (id: string, kind: StudioNode['data']['kind'], outputType?: 'image' | 'video' | 'audio'): StudioNode => ({ id, type: 'studio', position: { x: 0, y: 0 }, data: { kind, title: id, referenceTag: '@' + id, ...(outputType ? { outputType, assetPath: '/fixture/' + id } : {}) } })
+    const video = node('generator', 'video-generator'), board = node('story', 'storyboard'), motion = node('blender-camera-reference', 'upload', 'video'), audio = node('audio-reference', 'upload', 'audio'), sheet = node('sheet-reference', 'upload', 'image'), unrelated = node('unrelated', 'upload', 'video')
+    const edge = (source: string, target: string, targetHandle: string) => ({ id: source + target, source, target, sourceHandle: 'media-out', targetHandle })
+    const tags = recursiveUpstreamSemanticTags(video.id, [video, board, motion, audio, sheet, unrelated], [edge(motion.id, board.id, 'video-reference-in'), edge(audio.id, board.id, 'audio-reference-in'), edge(sheet.id, board.id, 'reference-in'), edge(board.id, video.id, 'storyboard-in')])
+    expect(tags).toContain('@blender-camera-reference')
+    expect(tags).toContain('@audio-reference')
+    expect(tags).toContain('@sheet-reference')
+    expect(tags).not.toContain('@unrelated')
+  })
+})

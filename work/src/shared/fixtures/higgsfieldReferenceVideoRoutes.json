@@ -1,0 +1,779 @@
+{
+  "kling-video/v3.0/std/image-to-video": {
+    "label": "Kling 3.0 Standard \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 3.0",
+    "media": [
+      "image_url",
+      "last_image_url"
+    ],
+    "omittedControls": [
+      "elements",
+      "multi_prompt"
+    ]
+  },
+  "kling-video/v2.6/pro/image-to-video": {
+    "label": "Kling 2.6 Pro \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 2.6",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": []
+  },
+  "minimax/h3/reference-to-video": {
+    "label": "MiniMax H3 \u00b7 Reference to Video",
+    "company": "MiniMax",
+    "release": "MiniMax H3",
+    "media": [
+      "image_urls",
+      "video_urls",
+      "audio_urls"
+    ],
+    "omittedControls": []
+  },
+  "minimax/hailuo-2.3/standard/image-to-video": {
+    "label": "Hailuo 2.3 Standard \u00b7 Image to Video",
+    "company": "MiniMax",
+    "release": "Hailuo 2.3",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": []
+  },
+  "lightricks/ltx-2.5/image-to-video/pro": {
+    "label": "LTX 2.5 Pro \u00b7 Image to Video",
+    "company": "Lightricks",
+    "release": "LTX 2.5",
+    "media": [
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": []
+  },
+  "pixverse/v6/image-to-video": {
+    "label": "PixVerse V6 \u00b7 Image to Video",
+    "company": "PixVerse",
+    "release": "PixVerse V6",
+    "media": [
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": []
+  },
+  "wan/v2.7/reference-to-video": {
+    "label": "Wan 2.7 \u00b7 Reference to Video",
+    "company": "Alibaba",
+    "release": "Wan 2.7",
+    "media": [
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": []
+  },
+  "alibaba/wan-3.0/image-to-video": {
+    "label": "Wan 3.0 \u00b7 Image to Video",
+    "company": "Alibaba",
+    "release": "Wan 3.0",
+    "media": [
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": []
+  },
+  "higgsfield/cinema-studio/4.0": {
+    "label": "Cinema Studio 4.0 \u00b7 Reference to Video",
+    "company": "Higgsfield",
+    "release": "Cinema Studio 4.0",
+    "media": [
+      "audio_urls",
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/higgsfield/cinema-studio/4.0/llms.txt",
+    "documentSha256": "6a8c71088de4facfc641e3817d69682fbee12130bff1e5198181d1d9969f7307",
+    "schemaSha256": "6bf495a1e349610f3deb0e54cfbcd1d8c5af2fe585c937e3810cec775de19fac",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "xai/grok-imagine-video/v1.5/reference-to-video": {
+    "label": "Grok Imagine Video 1.5 \u00b7 Reference to Video",
+    "company": "xAI",
+    "release": "Grok Imagine Video 1.5",
+    "media": [
+      "audio_url",
+      "image_url",
+      "image_urls"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/xai/grok-imagine-video/v1.5/reference-to-video/llms.txt",
+    "documentSha256": "3d35034d298c4726a1756103d6379ca6a85e069665a43dedab1b2ae658c7eea9",
+    "schemaSha256": "2c095b91557729d324e436451b6208a0cd6be48a4951a225cd885609d2b914da",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/o3/first-last-frame": {
+    "label": "Kling O3 \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling O3",
+    "media": [
+      "last_frame_url",
+      "first_frame_url"
+    ],
+    "omittedControls": [
+      "multi_prompt"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/o3/first-last-frame/llms.txt",
+    "documentSha256": "4fbe00318cafa640b551e1784d8126640be318f6aa46ca68df8cfb4f86376ee2",
+    "schemaSha256": "661b9f9dc38b0e1d84fdc187a86e0d123db2634f681ab5aca4f51a58734f4dd7",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/omni/first-last-frame": {
+    "label": "Kling O1 Omni \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling O1",
+    "media": [
+      "last_frame_url",
+      "first_frame_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/omni/first-last-frame/llms.txt",
+    "documentSha256": "2f12d29f31634ddd13b735a096bffebfd03f659250263c159b8e91a9161de08c",
+    "schemaSha256": "ebf5bc4f095c957f78e75dc51c84b0d8d6599ac80495bd127b5f2c97188ecf9f",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "wan/v2.6/text-to-video": {
+    "label": "Wan 2.6 \u00b7 Text to Video",
+    "company": "Alibaba",
+    "release": "Wan 2.6",
+    "media": [
+      "audio_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/wan/v2.6/text-to-video/llms.txt",
+    "documentSha256": "1bef6d428cdffa2b9a9e016c46e2810eff38105c2f1baafa42bca39c664f8904",
+    "schemaSha256": "47e0b895a3fd2da47e95e943204df565a283898680f474c7e5d2db0af9bf3bda",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/v2.5-turbo/standard/image-to-video": {
+    "label": "Kling 2.5 Turbo Standard \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 2.5",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v2.5-turbo/standard/image-to-video/llms.txt",
+    "documentSha256": "7d399680ae32ce985a5ab030cb44524d6abf5bfbe04689bf0c515bd3bc56d187",
+    "schemaSha256": "2753a3a5b7e169deb9acb356ff08dd7e050b6a323bf2e13d3ff42744c9e24960",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/wan-3.0-prime/image-to-video": {
+    "label": "Wan 3.0 Prime \u00b7 Image to Video",
+    "company": "Alibaba",
+    "release": "Wan 3.0",
+    "media": [
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0-prime/image-to-video/llms.txt",
+    "documentSha256": "6b28a90b0c4fe56bdfdb374c001bb9905f12ae6f655fe811e092040f49aa04db",
+    "schemaSha256": "1ca137c3169d84146a988ebd3a397ab3d707085c93395d15620cc283e4263d84",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/wan-3.0-prime/reference-to-video": {
+    "label": "Wan 3.0 Prime \u00b7 Reference to Video",
+    "company": "Alibaba",
+    "release": "Wan 3.0",
+    "media": [
+      "audio_urls",
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": [
+      "file_url",
+      "link_url"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0-prime/reference-to-video/llms.txt",
+    "documentSha256": "dde02e3999aa0e0867f2194de2e4118c859c1f9e0768c7da9babb0d0ae3a58e3",
+    "schemaSha256": "0c5b5954b1169d1060caa9da1e1aa6cae6d922934f678aef6cec95945eaf1cac",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/wan-3.0/reference-to-video": {
+    "label": "Wan 3.0 \u00b7 Reference to Video",
+    "company": "Alibaba",
+    "release": "Wan 3.0",
+    "media": [
+      "audio_urls",
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": [
+      "file_url",
+      "link_url"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/wan-3.0/reference-to-video/llms.txt",
+    "documentSha256": "9d165df3f0943683c2ec397ffa34a50f8eac55987a9d738298914b8a19d2a4f3",
+    "schemaSha256": "3c3bc32baab04528bd4c9888a10efe5a4e56dff7668ecd932eb8ad53414ede92",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "wan/v2.7/image-to-video": {
+    "label": "Wan 2.7 \u00b7 Image to Video",
+    "company": "Alibaba",
+    "release": "Wan 2.7",
+    "media": [
+      "audio_url",
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/wan/v2.7/image-to-video/llms.txt",
+    "documentSha256": "f9a571858a15722476e3c5a809b0c75df5498367f388a3723eebae8777028265",
+    "schemaSha256": "83337a61c0380cde3262ccfefe2e2e7cf6db83f43ceb6d175c7e028283b2b02a",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/happy-horse/v1.1/image-to-video": {
+    "label": "Happy Horse 1.1 \u00b7 Image to Video",
+    "company": "Alibaba",
+    "release": "Happy Horse 1.1",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/v1.1/image-to-video/llms.txt",
+    "documentSha256": "6d18bd58b3536225d730639cef1875ac5c600f8aa07d0b05941fabf44bbb87c8",
+    "schemaSha256": "4e590334dc331a598521eaa221423319cc229b8ae08c01c5fad9d2fffbe47326",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/happy-horse/v1.1/reference-to-video": {
+    "label": "Happy Horse 1.1 \u00b7 Reference to Video",
+    "company": "Alibaba",
+    "release": "Happy Horse 1.1",
+    "media": [
+      "image_urls"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/v1.1/reference-to-video/llms.txt",
+    "documentSha256": "91df7bfac46a194831bebc0b49d1c6e531c9f774b1392cc403161415f0b2f188",
+    "schemaSha256": "d7f8c7c2d1c0e9d1c9414cd00865f95e9449bd287d5f649a7e68784fe6ddf62d",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/happy-horse/image-to-video": {
+    "label": "Happy Horse 1.0 \u00b7 Image to Video",
+    "company": "Alibaba",
+    "release": "Happy Horse 1.0",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/image-to-video/llms.txt",
+    "documentSha256": "f1f2d168e1cb21626d2008eea6ba15fa9070ca74247740c564a1d53e88347bea",
+    "schemaSha256": "d6f451ba29a729cd6e4ed1d0acc62236514ff06019c749141aa1cdc345ea387f",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "alibaba/happy-horse/reference-to-video": {
+    "label": "Happy Horse 1.0 \u00b7 Reference to Video",
+    "company": "Alibaba",
+    "release": "Happy Horse 1.0",
+    "media": [
+      "image_urls"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/alibaba/happy-horse/reference-to-video/llms.txt",
+    "documentSha256": "ac35680f9cf1517c36e92e68cb7abdb9506a0efe8f04c7dcd765f3eef1a312ac",
+    "schemaSha256": "b1dae22b2407168a93a41667f50701b9c876bcfe4f79e7c2746b42a445e76d6e",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "wan/v2.6/image-to-video": {
+    "label": "Wan 2.6 \u00b7 Image to Video",
+    "company": "Alibaba",
+    "release": "Wan 2.6",
+    "media": [
+      "audio_url",
+      "image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/wan/v2.6/image-to-video/llms.txt",
+    "documentSha256": "5cbb632530815445340ed209f79922b08b607e115e7cc37dda422460dfa1dcfe",
+    "schemaSha256": "388b62f4699c56ed0c2085d9d2b010f4b9eda4a8a2fea6ff74af2d71f8a8c921",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "wan/v2.6/reference-to-video": {
+    "label": "Wan 2.6 \u00b7 Reference to Video",
+    "company": "Alibaba",
+    "release": "Wan 2.6",
+    "media": [
+      "video_urls"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/wan/v2.6/reference-to-video/llms.txt",
+    "documentSha256": "1b55f24c988b6828bb67d7688e4d1d0e56edb4c26a0d981ed582d3f0d594ca0b",
+    "schemaSha256": "c3b665a4982bf8758222d44aeecb9d01b654ac544a8c618de3b48c80d8872d83",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "bytedance/seedance-2.0/image-to-video": {
+    "label": "Seedance 2.0 \u00b7 Image to Video",
+    "company": "ByteDance",
+    "release": "Seedance 2.0",
+    "media": [
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/bytedance/seedance-2.0/image-to-video/llms.txt",
+    "documentSha256": "c7d4a767c9e18ad7ac4e9a2ed59c82f2ac41df89f05a2c6020cc398dcf2940ef",
+    "schemaSha256": "79751ee7a1822bdf97f5c549f03e5d19eb089f2ec45a8a04265d2cc8386b855e",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "bytedance/seedance-2.0/reference-to-video": {
+    "label": "Seedance 2.0 \u00b7 Reference to Video",
+    "company": "ByteDance",
+    "release": "Seedance 2.0",
+    "media": [
+      "audio_urls",
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/bytedance/seedance-2.0/reference-to-video/llms.txt",
+    "documentSha256": "89be3b7fff1f8efc7c05bf3df6e77835e4968c4ccc470ac7551de576c653d3a4",
+    "schemaSha256": "80b2e0ddaaf515966b47eed8465a328418cb88ae5ae4ba9df93eeff8e8fe3782",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "lightricks/ltx-2.5/image-to-video/fast": {
+    "label": "LTX 2.5 Fast \u00b7 Image to Video",
+    "company": "Lightricks",
+    "release": "LTX 2.5",
+    "media": [
+      "image_url",
+      "end_image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/lightricks/ltx-2.5/image-to-video/fast/llms.txt",
+    "documentSha256": "94129368c276edfcec5fe777453a14dc27db9b12861b5cecbad269d08c38025f",
+    "schemaSha256": "4f1d7a8eb5548e3a132ea474a46f0e2541af4921ac74451f4da8bafe2ed9ddf2",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/v3.0/pro/image-to-video": {
+    "label": "Kling 3.0 Pro \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 3.0",
+    "media": [
+      "image_url",
+      "last_image_url"
+    ],
+    "omittedControls": [
+      "elements",
+      "multi_prompt"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/pro/image-to-video/llms.txt",
+    "documentSha256": "90e33066273df50abdd07d877e288cdc5bc189cab05208915d2c3ef3e384d3df",
+    "schemaSha256": "5ef820fbab3c2f53d21723fe27f38ec910c2c81930ec408a5ae5f08aa738e4cc",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/v3.0/4k/image-to-video": {
+    "label": "Kling 3.0 4K \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 3.0",
+    "media": [
+      "image_url",
+      "last_image_url"
+    ],
+    "omittedControls": [
+      "elements",
+      "multi_prompt"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0/4k/image-to-video/llms.txt",
+    "documentSha256": "69183fd52d8912f2025b292d207feabfc404d2a4b48e6705f855527d5eaa29c5",
+    "schemaSha256": "5ef820fbab3c2f53d21723fe27f38ec910c2c81930ec408a5ae5f08aa738e4cc",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/v3.0-turbo/image-to-video": {
+    "label": "Kling 3.0 Turbo \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 3.0",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v3.0-turbo/image-to-video/llms.txt",
+    "documentSha256": "741d119707f82cb8be5582706aa4fe3f963a25db4d603afb3b8086f5f7e42221",
+    "schemaSha256": "251a47988f1b35a54def35fa2249c78c0634e156a241d594be499ca77be5965b",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/o3/image-reference": {
+    "label": "Kling O3 \u00b7 Reference to Video",
+    "company": "Kling",
+    "release": "Kling O3",
+    "media": [
+      "image_urls",
+      "last_frame_url",
+      "first_frame_url"
+    ],
+    "omittedControls": [
+      "elements",
+      "multi_prompt"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/o3/image-reference/llms.txt",
+    "documentSha256": "a4ee1185d5d5d881842a1ed364fe2539f9c606c1513ecce8349bf46cbe27a295",
+    "schemaSha256": "7122394c23e09a2f6a7f421e154c4075b8d0691cce92e5af8b87c7f785b8edac",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/o3/video-reference": {
+    "label": "Kling O3 \u00b7 Reference to Video",
+    "company": "Kling",
+    "release": "Kling O3",
+    "media": [
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": [
+      "elements"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/o3/video-reference/llms.txt",
+    "documentSha256": "d74c528d43254e2a7d603fecf3339775e7409a6b1a24b996d21713c212a7f351",
+    "schemaSha256": "ddbfa97b6ded8f1d87bae98cb3c44e442ad471169710188dcdc30965ace11dd7",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/omni/image-reference": {
+    "label": "Kling O1 Omni \u00b7 Reference to Video",
+    "company": "Kling",
+    "release": "Kling O1",
+    "media": [
+      "image_urls"
+    ],
+    "omittedControls": [
+      "elements"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/omni/image-reference/llms.txt",
+    "documentSha256": "e70f8900f5ac30f4ee10dfdd910afedf2ff1174777517d0f9d5b36313fc7d6eb",
+    "schemaSha256": "f398275cf9064e8a0882f0701aa100354abf7676a4aa244ca03e63e1723dcb3c",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/omni/video-reference": {
+    "label": "Kling O1 Omni \u00b7 Reference to Video",
+    "company": "Kling",
+    "release": "Kling O1",
+    "media": [
+      "image_urls",
+      "video_urls"
+    ],
+    "omittedControls": [
+      "elements"
+    ],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/omni/video-reference/llms.txt",
+    "documentSha256": "b5c13fb11be00b2279910214f02b90a1c2242f21d342c5724394eb7c0cc4779d",
+    "schemaSha256": "673222412e832d9bb479ebde9468a268c1f8752e21afdaac0c5f904f6380226c",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  },
+  "kling-video/v2.5-turbo/pro/image-to-video": {
+    "label": "Kling 2.5 Turbo Pro \u00b7 Image to Video",
+    "company": "Kling",
+    "release": "Kling 2.5",
+    "media": [
+      "image_url"
+    ],
+    "omittedControls": [],
+    "sourceUrl": "https://dash.higgsfield.ai/models/kling-video/v2.5-turbo/pro/image-to-video/llms.txt",
+    "documentSha256": "574e35b7f65db8872b5c28c1c57540ff60c7bed4185df2f575615d19a6158729",
+    "schemaSha256": "2753a3a5b7e169deb9acb356ff08dd7e050b6a323bf2e13d3ff42744c9e24960",
+    "outputContract": {
+      "completedStatus": "completed",
+      "required": [
+        "status",
+        "request_id",
+        "video"
+      ],
+      "fileProperty": "video",
+      "fileRequired": true,
+      "fileUrlProperty": "url",
+      "fileUrlFormat": "uri"
+    }
+  }
+}

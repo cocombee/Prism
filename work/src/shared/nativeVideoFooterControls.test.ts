@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { compileFalSchemaContract } from './falSchemaBinding'
-import { projectFalNativeVideoFooterControls, projectNativeVideoFooterFields } from './nativeVideoFooterControls'
+import { projectFalNativeVideoFooterControls, projectNativeVideoFooterFields, nativeVideoSoundChoice } from './nativeVideoFooterControls'
 import { describeFalRuntimeInputs } from './falRuntimeInputs'
 import { editNativeInputValue } from './nativeInputValue'
 
@@ -44,7 +44,7 @@ describe('native video footer schema projection', () => {
     const duration = controls.find(control => control.key === 'duration')!
     const resolution = controls.find(control => control.key === 'resolution')!
     const audio = controls.find(control => control.key === 'generate_audio')!
-    expect(ratio.options.filter(option => option.kind === 'value').map(option => option.value)).toEqual(contract.input.properties?.aspect_ratio.enum)
+    expect(ratio.options.filter(option => option.kind === 'value').map(option => option.value)).toEqual(contract.input.properties?.aspect_ratio.enum?.filter(value => value !== 'auto'))
     expect(duration.defaultValue).toBe(contract.input.properties?.duration.default)
     expect(duration.options.filter(option => option.kind === 'value').map(option => [option.value, option.label])).toEqual(
       contract.input.properties?.duration.enum?.map(value => [value, value === 'auto' ? 'Auto' : `${value}s`]),
@@ -183,5 +183,35 @@ describe('native video footer schema projection', () => {
       duration: { anyOf: [{ type: 'integer' as const, minimum: 2, maximum: 5 }, { type: 'integer' as const, minimum: 10, maximum: 30 }, { type: 'null' as const }] },
     } } }
     expect(projectFalNativeVideoFooterControls(ambiguous, { values: { duration: 12 } })).toEqual([])
+  })
+})
+
+ describe('provider sound field aliases', () => {
+  it.each(['audio', 'generate_audio', 'sound'])('uses declared boolean %s for both toggle directions', key => {
+    const fields=describeFalRuntimeInputs({...contract,input:{type:'object',properties:{[key]:{type:'boolean',default:true}}}}).fields
+    for (const value of [false,true]) {
+      const state={values:{[key]:value,seed:7}}
+      const controls=projectNativeVideoFooterFields(fields,state)
+      expect(controls).toHaveLength(1)
+      const control=controls[0]
+      expect(control.fieldKey || control.key).toBe(key)
+      const sound=nativeVideoSoundChoice(control,state)
+      expect(sound.active).toBe(value)
+      expect(sound.next?.value).toBe(!value)
+    }
+  })
+ })
+
+describe('explicit aspect ratio choices', () => {
+  it('removes Auto/default Auto while honestly retaining an authored Auto value', () => {
+    const fields=describeFalRuntimeInputs({...contract,input:{type:'object',properties:{aspect_ratio:{type:'string',enum:['auto','16:9','1:1'],default:'auto'}}}}).fields
+    const [ratio]=projectNativeVideoFooterFields(fields,{values:{aspect_ratio:'auto'}})
+    expect(ratio.options.filter(option=>!option.disabled).map(option=>option.value)).toEqual(['16:9','1:1'])
+    expect(ratio.options.find(option=>option.token===ratio.selectedToken)).toMatchObject({kind:'unavailable',value:'auto',disabled:true})
+  })
+  it('retains source-owned Auto where the provider owns the original video framing', () => {
+    const fields=describeFalRuntimeInputs({...contract,input:{type:'object',properties:{aspect_ratio:{type:'string',enum:['auto','16:9'],default:'auto'}}}}).fields
+    const [ratio]=projectNativeVideoFooterFields(fields,{values:{aspect_ratio:'auto'}},{},true)
+    expect(ratio.options).toContainEqual(expect.objectContaining({value:'auto',kind:'value'}))
   })
 })

@@ -54,12 +54,12 @@ describe('Higgsfield per-route graph and saved current controls', () => {
     const ports = nodeInputPorts({kind:'video-generator',higgsfieldNative:next})
     expect(ports.find(port => port.id === higgsfieldFieldPortId('end_image_url'))!.maxConnections).toBe(0)
   })
-  it('reset uses the current native defaults but keeps saved connections and outer prompt', () => {
+  it('reset uses the current minimum duration but keeps saved connections and outer prompt', () => {
     const endpoint = root + 'text-to-video', state = selected(endpoint), schema = higgsfieldSeedanceSchema(endpoint)
     schema.properties!.duration.default = 8; state.values.duration = 10; state.drafts = {duration:'-'}
     state.retiredPorts = [{id:'old',label:'Old',signal:'image'}]
     const reset = resetHiggsfieldBinding(state, describeHiggsfieldInputContract(endpoint, schema, 'current'))
-    expect(reset.values.duration).toBe(8); expect(reset.values).not.toHaveProperty('prompt')
+    expect(reset.values.duration).toBe(4); expect(reset.values).not.toHaveProperty('prompt')
     expect(reset.retiredPorts).toEqual(state.retiredPorts); expect(reset.drafts).toEqual({})
   })
   it('retains overloaded graph edges for repair instead of silently pruning them', () => {
@@ -73,8 +73,8 @@ describe('Higgsfield per-route graph and saved current controls', () => {
     const source = {kind:'upload' as const,title:'Clip',outputType:'video' as const}
     const target = {kind:'video-generator' as const,title:'Generator',higgsfieldNative:selected(root+'reference-to-video')}
     const rule = connectedInputRule(source,target,higgsfieldFieldPortId('video_urls'))
-    expect(rule.label).toBe('Video References'); expect(rule.rule).toMatch(/motion, camera or performance/)
-    expect(rule.rule).toMatch(/Do not automatically copy/)
+    expect(rule.label).toBe('Video References'); expect(rule.rule).toMatch(/roles and constraints explicitly assigned/)
+    expect(rule.rule).toMatch(/Other references retain/);expect(rule.toggleable).toBeUndefined();expect(rule.mode).toBeUndefined()
     const extended = {...target,higgsfieldNative:selected(root+'video-extend')}
     expect(connectedInputRule(source,extended,higgsfieldFieldPortId('video_url')).rule).toMatch(/separate from the generated extension/)
     const audio = {...source,outputType:'audio' as const}
@@ -91,7 +91,7 @@ describe('current Higgsfield input review', () => {
     expect(state.values).toEqual({})
     schema.properties!.duration.default = 8
     const contract = describeHiggsfieldInputContract(state.endpointId, schema, 'a'.repeat(64))
-    expect(reconcileHiggsfieldNodeBinding(state, contract).values.duration).toBe(8)
+    expect(reconcileHiggsfieldNodeBinding(state, contract).values.duration).toBe(4)
     expect(reconcileHiggsfieldNodeBinding({ ...state, values: { duration: 5 } }, contract).values.duration).toBe(5)
   })
   it('requires an owned current contract and exposes lookup, draft and unsupported repairs', () => {

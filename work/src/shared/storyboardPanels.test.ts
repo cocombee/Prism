@@ -36,4 +36,21 @@ describe('Storyboard 2–20 panel collection', () => {
     expect(canAppendStoryboardPanel(panels(3), 1)).toBe(true)
     expect(canAppendStoryboardPanel(panels(3), 0.99)).toBe(false)
   })
+
+  it.each([1, 1.5, 2.25, 8])('fits only the new panel into %ss of available time on the half-second grid', (available) => {
+    const before = panels(2).map(panel => ({ ...panel, duration: 2, locked: true }))
+    const result = appendStoryboardPanel(before, () => 'new', available)
+    expect(result.added).toBe(true)
+    expect(result.panels.at(-1)?.duration).toBe(Math.min(5, Math.floor(available * 2) / 2))
+    expect(result.panels.slice(0, -1)).toEqual(before)
+    expect(result.panels[0]).toBe(before[0])
+    expect(result.focusPanelId).toBe('new')
+  })
+
+  it.each([0.5, 0, -1])('refuses an append with only %ss available without creating an ID or changing panels', (available) => {
+    const before = panels(2)
+    const result = appendStoryboardPanel(before, () => { throw new Error('No ID should be created') }, available)
+    expect(result).toEqual({ panels: before, added: false })
+    expect(result.panels).toBe(before)
+  })
 })

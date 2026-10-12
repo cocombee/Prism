@@ -304,7 +304,29 @@ describe('approved flat media catalog', () => {
     expect(menu.rows.filter(row => row.family === 'hailuo')).toHaveLength(4)
     expect(menu.rows.some(row => row.option.catalog.release === 'MiniMax Hailuo 01')).toBe(false)
     expect(menu.rows.some(row => row.option.value === 'MiniMax H3/Reference to Video')).toBe(true)
-    expect(menu.rows.every(row => / · (?:Text|References)$/.test(row.label))).toBe(true)
+    expect(menu.rows.every(row => / · (?:Text|References(?: \(Image\))?)$/.test(row.label))).toBe(true)
+    expect(input).toEqual(before)
+  })
+
+  it('keeps compact main choices, features References, admits Kling O and limits extra Fal families to latest', () => {
+    const route = (release: string, mode: string) => ({ value: `${release}/${mode}`, label: `${release} · ${mode}`, catalog: { service: 'fal.ai', company: release.startsWith('Kling') ? 'Kling' : 'Google', release, mode } })
+    const input = [
+      route('Kling V3 Pro', 'Text to Video'), route('Kling V3 Standard', 'Text to Video'),
+      route('Kling V3 Pro', 'Image to Video'), route('Kling V3 Standard', 'Image to Video'),
+      route('Kling O3 Pro', 'Reference to Video'), route('Kling O3 Standard', 'Reference to Video'),
+      route('Kling O1 Pro', 'Reference to Video'),
+      ...['1.1', '1.0'].flatMap(v => ['Text to Video', 'Reference to Video'].map(m => route(`Gemini Omni Flash ${v}`, m))),
+      ...['3.1', '3.0'].flatMap(v => ['Text to Video', 'Reference to Video'].map(m => route(`Veo ${v}`, m))),
+    ]
+    const before = structuredClone(input)
+    const menu = flatModelCatalogMenu(admittedModelCatalogMenu([{label: 'fal.ai',options: input}]), input[0].value, 5, POPULAR_VIDEO_FEATURED_POLICY)
+    expect(menu.featured.find(r => r.family === 'kling')?.option.catalog.mode).toBe('Image to Video')
+    expect(menu.rows.filter(r => r.family === 'kling')).toHaveLength(2)
+    expect(menu.rows.filter(r => r.family === 'klingo')).toHaveLength(2)
+    expect(menu.rows.some(r => r.option.value === 'Kling O3 Pro/Reference to Video')).toBe(true)
+    expect(menu.rows.filter(r => r.option.catalog.release.startsWith('Gemini Omni'))).toHaveLength(2)
+    expect(menu.rows.filter(r => r.option.catalog.release.startsWith('Veo'))).toHaveLength(2)
+    expect(menu.rows.some(r => /Omni Flash 1.0|Veo 3.0/.test(r.option.catalog.release))).toBe(false)
     expect(input).toEqual(before)
   })
 

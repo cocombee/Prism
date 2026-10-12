@@ -1,4 +1,5 @@
-import { createContext, useContext, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
+import { createContext, useContext, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
+import { usePortOcclusion } from './nodePortOcclusion'
 import { Handle, Position, useConnection, useNodeConnections, useNodeId, useStore } from '@xyflow/react'
 import { nodeConnectionError, type ConnectionSignal } from '../../shared/nodeConnections'
 import type { StudioNodeData } from '../../shared/types'
@@ -53,6 +54,9 @@ export function NodePort({ id, type, signal, label, icon, position = type === 't
   available?: boolean
   nodeId?: string
 }) {
+  const handleRef = useRef<HTMLDivElement>(null)
+  const railRef = useRef<HTMLSpanElement>(null)
+  usePortOcclusion(handleRef, railRef)
   const contextNodeId = useNodeId()
   const nodeId = explicitNodeId || contextNodeId
   const activeRoute = useContext(PortRouteContext)
@@ -107,8 +111,9 @@ export function NodePort({ id, type, signal, label, icon, position = type === 't
     {/* A real nodrag descendant owns the continuous side-hover area. A pseudo-
         element on React Flow's node wrapper would hit-test as the draggable
         node itself and steal pointer-down from every Handle below it. */}
-    <span className={`node-port-hover-rail node-port-hover-rail-${position} nodrag nopan`} aria-hidden="true" />
+    <span ref={railRef} className={`node-port-hover-rail node-port-hover-rail-${position} nodrag nopan`} aria-hidden="true" />
     <Handle
+      ref={handleRef}
       id={id}
       type={type}
       position={position}

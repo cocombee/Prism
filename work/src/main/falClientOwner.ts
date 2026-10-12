@@ -3,12 +3,26 @@ import { createFalClient, type FalClient } from '@fal-ai/client'
 /** A generation owns its SDK instance and original credentials, including cancellation. */
 export function createOwnedFalClient(credentials: string, transport: typeof fetch, assertSubmission: () => void): FalClient {
   if (!credentials.trim()) throw new Error('Connect a fal account before submitting.')
-  return createFalClient({ credentials, fetch: (input, init) => {
+  return createFalClient({ credentials, fetch: async (input, init) => {
     const method = init?.method || (input instanceof Request ? input.method : 'GET')
     // SDK preparation can await uploads after the caller's preflight. Validate
     // again at the actual new POST, but allow polling/cancellation of owned work.
     if (method.toUpperCase() === 'POST') assertSubmission()
-    return transport(input, init)
+    const response = await transport(input, init)
+    if (response.status !== 422) return response
+    // Preserve actionable validation text; never send provider input/body dumps to UI.
+    try {
+      const body = await response.clone().json() as { detail?: unknown }
+      const redact = (text: string) => text.replaceAll(credentials, '[redacted]').replace(/https?:\/\/\S+/g, '[reference URL]').replace(/\b(?:Bearer|Key)\s+\S+/gi, '[redacted]').slice(0, 400)
+      const raw = typeof body.detail === 'string' ? [{ loc: ['body'], msg: body.detail }] : Array.isArray(body.detail) ? body.detail : []
+      const detail = raw.slice(0, 5).flatMap(entry => {
+        if (!entry || typeof entry !== 'object' || typeof entry.msg !== 'string') return []
+        const loc = Array.isArray(entry.loc) ? entry.loc.filter((part: unknown) => typeof part === 'number' || typeof part === 'string' && /^[a-zA-Z_][\w-]{0,50}$/.test(part)) : ['body']
+        return [{ loc, msg: redact(entry.msg), type: 'value_error' }]
+      })
+      const summary = detail.map(entry => `${entry.loc.join('.')}: ${entry.msg}`).join('; ') || 'Review the model inputs.'
+      return new Response(JSON.stringify({ message: `fal.ai HTTP 422: ${summary}`, detail }), { status: response.status, statusText: response.statusText, headers: response.headers })
+    } catch { return response }
   } })
 }
 
@@ -36,6 +50,13 @@ export async function subscribeOwnedFalClient(client: FalClient, endpointId: str
         options.onEnqueue?.(id)
       },
     })
+  } catch (error) {
+    const owned = error as { status?: number; requestId?: string; message?: string }
+    const id = owned.requestId || requestId
+    if (owned.status === 422 && typeof id === 'string' && /^[a-zA-Z0-9-]{1,80}$/.test(id) && error instanceof Error) {
+      error.message += ` · Request ${id}`
+    }
+    throw error
   } finally {
     signal?.removeEventListener('abort', cancel)
     await cancellation

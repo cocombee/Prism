@@ -30,6 +30,7 @@ export interface BytePlusSeedanceInput {
 }
 
 export type BytePlusContentItem =
+  | { type: 'draft_task'; draft_task: { id: string } }
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string }; role: 'first_frame' | 'last_frame' | 'reference_image' }
   | { type: 'video_url'; video_url: { url: string }; role: 'reference_video' }
@@ -40,7 +41,8 @@ export interface BytePlusCreatePayload {
   content: BytePlusContentItem[]
   ratio?: string
   resolution?: string
-  duration: number
+  duration?: number
+  draft?: boolean
   generate_audio?: boolean
   watermark: false
   seed?: number

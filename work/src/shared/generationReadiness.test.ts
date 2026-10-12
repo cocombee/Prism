@@ -5,6 +5,14 @@ import { assertGenerationRequirements, formatRequirementList, generationRequirem
 const request = (kind: GenerationRequest['kind'], patch: Partial<GenerationRequest> = {}): GenerationRequest => ({ nodeId: 'test', kind, ...patch })
 
 describe('node-specific Play readiness', () => {
+  it('guards a native custom cadence at the known capture ceiling and requires evidence for an unknown ceiling', () => {
+    const native = request('video-generator', { prompt: 'A bird turns.', falNative: { endpointId: 'fictional/native', flow: 'video', fingerprint: 'a'.repeat(64), promptField: 'prompt', values: { prompt: 'A bird turns.' }, media: {} } })
+    expect(generationRequirementFailures({ ...native, nativeOutputFrameRate: null, motionCadence: 16 })).toContain('verify native output FPS before using a custom Motion FPS, or select Native')
+    expect(generationRequirementFailures({ ...native, nativeOutputFrameRate: 24, motionCadence: 35 })).toContain('Motion FPS 35 exceeds native output FPS 24; choose a cadence at or below Native')
+    expect(generationRequirementFailures({ ...native, nativeOutputFrameRate: 24, motionCadence: 24 })).toEqual([])
+    expect(generationRequirementFailures({ ...native, nativeOutputFrameRate: null })).toEqual([])
+    expect(() => assertGenerationRequirements({ ...native, nativeOutputFrameRate: null, motionCadence: 16 })).toThrow(/verify native output FPS/)
+  })
   it('blocks an unsupported saved video model before main can dispatch a different route', () => {
     const unsupported = request('video-generator', { prompt: 'Follow this motion.', videoEngine: 'higgsfield/genjutsu/motion-transfer/v1.0' })
     expect(generationReadinessTooltip(unsupported).disabled).toBe(true)
@@ -29,7 +37,7 @@ describe('node-specific Play readiness', () => {
     expect(generationRequirementFailures(request('video-generator', {
       prompt: 'Match the dialogue timing.',
       videoEngine: 'bytedance/seedance-2.0/reference-to-video',
-      references: [{ role: 'reference', path: '/project/dialogue.wav', mediaType: 'audio', slot: 'reference' }],
+      references: [{ referenceDescription: 'Authored fixture reference purpose.', role: 'reference', path: '/project/dialogue.wav', mediaType: 'audio', slot: 'reference' }],
     }))).toContain('connect at least one image or video alongside the audio reference')
   })
 
@@ -63,10 +71,10 @@ describe('node-specific Play readiness', () => {
   })
 
   it('uses the selected image model reference budget instead of a universal cap', () => {
-    const references = Array.from({ length: 15 }, (_, index) => ({ role: 'reference' as const, path: `/project/view-${index}.png`, mediaType: 'image' as const }))
+    const references = Array.from({ length: 15 }, (_, index) => ({ referenceDescription: 'Authored fixture reference purpose.', role: 'reference' as const, path: `/project/view-${index}.png`, mediaType: 'image' as const }))
     expect(generationRequirementFailures(request('image-generator', { prompt: 'Preserve the character.', imageProvider: 'openai', imageModelId: 'gpt-image-2', references }))).toEqual([])
     expect(generationRequirementFailures(request('image-generator', { prompt: 'Preserve the character.', imageProvider: 'google', imageModelId: 'gemini-3.1-flash-image', references }))).toContain('remove 1 image reference (maximum 14 for the selected model)')
-    expect(generationRequirementFailures(request('image-generator', { prompt: 'Preserve the character.', imageProvider: 'openai', imageModelId: 'gpt-image-2', references: [...references, { role: 'reference', path: '/project/view-15.png', mediaType: 'image' }, { role: 'reference', path: '/project/view-16.png', mediaType: 'image' }] }))).toContain('remove 1 image reference (maximum 16 for the selected model)')
+    expect(generationRequirementFailures(request('image-generator', { prompt: 'Preserve the character.', imageProvider: 'openai', imageModelId: 'gpt-image-2', references: [...references, { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', path: '/project/view-15.png', mediaType: 'image' }, { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', path: '/project/view-16.png', mediaType: 'image' }] }))).toContain('remove 1 image reference (maximum 16 for the selected model)')
   })
 
   it('normalizes provider punctuation when several missing requirements are combined', () => {

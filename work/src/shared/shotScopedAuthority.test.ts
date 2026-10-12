@@ -9,7 +9,7 @@ describe('shot-local reference authority and mandatory authored prompt fields', 
     const ledger = buildContinuityLedger(request); expect(ledger.global.identities).toContain('@mara'); expect(ledger.shots[0].activeCharacterTags).not.toContain('@mara'); expect(ledger.shots[1].activeCharacterTags).toContain('@mara')
     const authority = seedanceShotSpecSections(request).find(section => section.heading === 'REFERENCE AUTHORITY')!.text
     expect(authority).toContain('@mara'); expect(authority).not.toContain('No external reference authority')
-    const payload = providerSeedancePayloadCompilation(request).text; expect(payload).toContain('[Image1]'); expect(payload).not.toContain('@mara'); expect(request.references).toHaveLength(1)
+    const payload = providerSeedancePayloadCompilation(request).text; expect(payload).toContain('@Image1'); expect(payload).not.toContain('@mara'); expect(request.references).toHaveLength(1)
   })
   it('keeps a prior identity when the final shot explicitly excludes its visual presence', () => {
     const request = make(); request.storyboardShots!.reverse()

@@ -54,7 +54,7 @@ describe('filmic motion semantics', () => {
     const result = filmicMotionSemantics({ authoredText: '', captureFps: 24, selectedAngle: 180, motionFps: 16, playback: { mode: 'normal' } })
     expect(result.shutterSentence).toContain('1/48-second')
     expect(result.shutterSentence).not.toContain('1/32-second')
-    expect(result.motionCadenceSentence).toBe('Visual Motion FPS intent: 16fps; capture and playback remain 24fps at normal speed.')
+    expect(result.motionCadenceSentence).toContain('uniform 1/16-second intervals')
   })
 
   it('keeps normal-speed and future conformed-slow-motion representations distinct', () => {
@@ -113,3 +113,33 @@ describe('filmic motion semantics', () => {
     expect(longExposure.positive).not.toContain('slow motion')
   })
 })
+
+ describe('deliberately low visual cadence', () => {
+  it.each([12, 14, 16, 20, 23])('uses uniform held-pose timing at %sfps without prohibiting required holds', motionFps => {
+    const result = filmicMotionSemantics({ authoredText: '', captureFps: 24, selectedAngle: 180, motionFps, playback: { mode: 'normal' } })
+    expect(result.positive).toContain(`uniform 1/${motionFps}-second intervals`)
+    expect(result.positive).toContain('Hold each pose unchanged')
+    expect(result.positive).toContain('no smooth interpolation or motion blur between poses')
+    expect(result.positive).not.toContain('natural directional exposure blur')
+    for (const term of ['hard photographic cadence', 'disconnected still frames', 'slideshow motion', 'stop-motion cadence', 'frame skipping', 'frame duplication']) expect(result.negative).not.toContain(term)
+    expect(result.negative).toContain('cadence jitter')
+    expect(result.capturePlaybackSentence).toContain('24fps at normal speed')
+    expect(result.exposureSeconds).toBeCloseTo(1 / 48)
+  })
+  it.each([23.796, 23.976, 24, 25, 30, 60])('retains cinematic blur at %sfps rather than imposing pose holds', motionFps => {
+    const result = filmicMotionSemantics({ authoredText: '', captureFps: 24, selectedAngle: 180, motionFps, playback: { mode: 'normal' } })
+    expect(result.positive).toContain('natural directional exposure blur')
+    expect(result.positive).not.toContain('Hold each pose unchanged')
+    expect(result.negative).toContain('frame duplication')
+  })
+  it('keeps authored speed ramps and exposure while prohibiting only between-pose smoothing', () => {
+    const authoredText = 'Capture at 120fps with 90-degree shutter angle. Slow motion then return to real time.'
+    const result = filmicMotionSemantics({ authoredText, captureFps: 24, selectedAngle: 180, motionFps: 16, playback: { mode: 'authored', deliveryFps: 24 } })
+    expect(result.authoredText).toBe(authoredText)
+    expect(result.positive).toContain('uniform 1/16-second intervals')
+    expect(result.positive).toContain('authored capture cadence, playback speed and ramp intervals')
+    expect(result.shutterAngle).toBe(90)
+    expect(result.exposureSeconds).toBeCloseTo(1 / 480)
+    expect(result.positive).not.toContain('natural directional exposure blur')
+  })
+ })

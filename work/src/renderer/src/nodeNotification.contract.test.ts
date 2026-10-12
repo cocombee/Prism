@@ -21,7 +21,7 @@ describe('active next-generation notification categories', () => {
     expect(app).toContain('!current.data.error')
   })
 
-  it('maps generic active nodes to shared running, transient and persistent error rows', () => {
+  it('maps generic active nodes to shared running, transient and bounded failed-attempt error rows', () => {
     expect(nodeCard).toContain('const notificationCategory = nodeNotificationCategory({')
     expect(nodeCard).toContain('aria-busy={running || undefined}')
     expect(nodeCard).toContain('node-lifecycle-row node-status')
@@ -30,8 +30,8 @@ describe('active next-generation notification categories', () => {
   })
 
   it('maps Storyboard and Assistant to the same lifecycle contract while leaving the helper separate', () => {
-    expect(utility).toContain('const storyboardNotificationCategory = nodeNotificationCategory(data)')
-    expect(utility).toContain('const assistantNotificationCategory = nodeNotificationCategory(data)')
+    expect(utility).toContain('const storyboardNotificationCategory = nodeNotificationCategory({ ...data, error: storyboardError })')
+    expect(utility).toContain('const assistantNotificationCategory = nodeNotificationCategory({ ...data, error: assistantError })')
     expect(utility).toContain('node-lifecycle-row storyboard-status')
     expect(utility).toContain('node-lifecycle-row assistant-status')
     expect(utility).toContain('disabled={assistantBusy || blocked')

@@ -86,16 +86,16 @@ describe('video model aspect-ratio capabilities', () => {
   })
 
   it('keeps visual Motion Cadence separate from encoded Output FPS', () => {
-    expect(MOTION_CADENCES).toEqual([12, 16, 24, 25, 35, 50, 60])
-    expect(motionCadenceOptions(resolveVideoModel('fal-ai/veo3.1'))).toEqual([12, 16])
-    expect(motionCadenceOptions(resolveVideoModel('wan-controlled'), 60)).toEqual([12, 16, 24, 25, 35, 50])
+    expect(MOTION_CADENCES).toEqual([12, 16, 24, 35, 50, 60])
+    expect(motionCadenceOptions(resolveVideoModel('fal-ai/veo3.1'))).toEqual([12, 16, 24])
+    expect(motionCadenceOptions(resolveVideoModel('wan-controlled'), 60)).toEqual([12, 16, 24, 35, 50, 60])
     expect(motionCadenceOptions(resolveVideoModel('wan-controlled'), 25)).toEqual([12, 16, 24])
-    expect(motionCadenceOptions(resolveVideoModel('bytedance/seedance-2.0/text-to-video'))).toEqual([12, 16, 24, 25, 35, 50, 60])
-    expect(normalizedMotionCadence(resolveVideoModel('fal-ai/veo3.1'), undefined, 24)).toBe(16)
+    expect(motionCadenceOptions(resolveVideoModel('bytedance/seedance-2.0/text-to-video'))).toEqual([12, 16, 24, 35, 50, 60])
+    expect(normalizedMotionCadence(resolveVideoModel('fal-ai/veo3.1'), undefined, 24)).toBe(24)
     expect(normalizedMotionCadence(resolveVideoModel('fal-ai/veo3.1'), undefined, 16)).toBe(16)
     expect(normalizedMotionCadence(resolveVideoModel('bytedance/seedance-2.0/text-to-video'))).toBe(24)
     expect(normalizedMotionCadence(resolveVideoModel('wan-controlled'), 25)).toBe(24)
-    expect(normalizedMotionCadence(resolveVideoModel('wan-controlled'), 16)).toBe(12)
+    expect(normalizedMotionCadence(resolveVideoModel('wan-controlled'), 16)).toBe(16)
     expect(effectiveOutputFrameRate(resolveVideoModel('wan-controlled'), 24)).toBe(24)
     expect(effectiveOutputFrameRate(resolveVideoModel('fal-ai/veo3.1'))).toBe(24)
     expect(effectiveOutputFrameRate(resolveVideoModel('bytedance/seedance-2.0/text-to-video'))).toBe(24)
@@ -176,3 +176,21 @@ describe('video model aspect-ratio capabilities', () => {
     expect(referenceCapableVideoEngine('fal-ai/veo3.1')).toBe('fal-ai/veo3.1/reference-to-video')
   })
 })
+
+ it('retains provider Native25 while replacing deprecated visual25 with the existing24 default', () => {
+   const model = resolveVideoModel('wan-controlled')
+   expect(model.frameRates).toContain(25)
+   expect(effectiveOutputFrameRate(model, 25)).toBe(25)
+   expect(motionCadenceOptions(model, 60)).not.toContain(25)
+   expect(normalizedMotionCadence(model, 60, 25)).toBe(24)
+ })
+
+ it('keeps a native24 cinematic cadence selectable, not capped at16',()=>{
+   const model=resolveVideoModel('fal-ai/veo3.1')
+   expect(motionCadenceOptions(model)).toContain(24)
+   expect(normalizedMotionCadence(model)).toBe(24)
+   for(const candidate of VIDEO_MODELS) {
+     const rates=candidate.frameRates.length?candidate.frameRates:[candidate.fixedFrameRate]
+     for(const rate of rates) if(rate)expect(motionCadenceOptions(candidate,rate).every(fps=>fps<=rate)).toBe(true)
+   }
+ })

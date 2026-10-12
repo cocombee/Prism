@@ -5,7 +5,7 @@ import { assertGenerationRequirements, generationRequirementFailures } from './g
 import { providerSeedancePayloadCompilation } from './referenceInstructions'
 
 type Reference = NonNullable<GenerationRequest['references']>[number]
-const refs = (count: number, mediaType: 'image' | 'video' | 'audio' = 'image'): Reference[] => Array.from({ length: count }, (_, i) => ({ role: 'reference', mediaType, path: `/fixture/${mediaType}-${i}`, tag: `@${mediaType}-${i}` }))
+const refs = (count: number, mediaType: 'image' | 'video' | 'audio' = 'image'): Reference[] => Array.from({ length: count }, (_, i) => ({ referenceDescription: 'Authored fixture reference purpose.', role: 'reference', mediaType, path: `/fixture/${mediaType}-${i}`, tag: `@${mediaType}-${i}` }))
 const request = (references: Reference[], patch: Partial<GenerationRequest> = {}): GenerationRequest => ({ kind: 'video-generator', nodeId: 'video', videoEngine: 'bytedance/seedance-2.5/reference-to-video', prompt: 'Keep every assigned identity.', providerPromptOverride: 'Use @image-0 and @video-0.', references, ...patch })
 
 describe('physical reference capacity before provider preparation', () => {
@@ -40,19 +40,19 @@ describe('physical reference capacity before provider preparation', () => {
     expect(() => assertGenerationRequirements({ ...duplicate, inputPath: '/fixture/new-image' })).toThrow(/connected 31/)
     const video = request(refs(1), { inputPath: '/fixture/source.mp4', inputRole: 'source-video', inputTag: '@motion', providerPromptOverride: 'Match @motion.' })
     expect(seedanceReferenceCandidates(video)[0]).toMatchObject({ mediaType: 'video', slot: 'reference', tag: '@motion' })
-    expect(providerSeedancePayloadCompilation(video).text).toBe('Match [Video1].')
+    expect(providerSeedancePayloadCompilation(video).text).toBe('Match @Video1.')
   })
 
   it('counts separate views individually and a compiled sheet as one physical file', () => {
     const views = refs(9).map((reference, i) => ({ ...reference, role: 'character' as const, tag: '@hero', view: (['front', 'profile', 'back'] as const)[i % 3] }))
     expect(seedanceReferenceCandidates(request(views))).toHaveLength(9)
-    const sheet: Reference = { role: 'character', path: '/fixture/sheet.png', tag: '@hero' }
+    const sheet: Reference = { referenceDescription: 'Authored fixture reference purpose.', role: 'character', path: '/fixture/sheet.png', tag: '@hero' }
     expect(seedanceReferenceCandidates(request([sheet]))).toEqual([sheet])
   })
 
   it('suppresses only explicit body-authority redundancy, retaining physical records with shared paths', () => {
-    const character: Reference = { role: 'character', path: '/fixture/hero.png', tag: '@hero', characterAuthorityMode: 'complete-dressed-body' }
-    const layer: Reference = { role: 'wardrobe', path: '/fixture/coat.png', tag: '@coat', boundCharacterTag: '@hero', appearanceScope: 'wardrobe', appearanceSelection: 'redundant' }
+    const character: Reference = { referenceDescription: 'Authored fixture reference purpose.', role: 'character', path: '/fixture/hero.png', tag: '@hero', characterAuthorityMode: 'complete-dressed-body' }
+    const layer: Reference = { referenceDescription: 'Authored fixture reference purpose.', role: 'wardrobe', path: '/fixture/coat.png', tag: '@coat', boundCharacterTag: '@hero', appearanceScope: 'wardrobe', appearanceSelection: 'redundant' }
     const draft = request([...refs(29), character, layer])
     expect(seedanceReferenceCandidates(draft)).toHaveLength(30)
     expect(generationRequirementFailures(draft)).toEqual([])

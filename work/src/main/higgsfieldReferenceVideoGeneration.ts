@@ -11,6 +11,7 @@ import type {
   HiggsfieldSeedancePreparedMedia,
   HiggsfieldSeedancePreparationDependencies,
 } from './higgsfieldSeedancePreparation'
+import {supportsHiggsfieldLocalSource,higgsfieldLocalDerivativeBound,prepareHiggsfieldInspectedMedia} from './higgsfieldSeedancePreparation'
 import { HIGGSFIELD_RESOURCE_LIMITS } from './higgsfieldResourceLimits'
 import type { HiggsfieldApi } from './higgsfieldApi'
 import type { HiggsfieldNativeRequest } from '../shared/higgsfieldNative'
@@ -23,15 +24,9 @@ export const HIGGSFIELD_REFERENCE_VIDEO_LOCAL_BUDGET = Object.freeze({
   totalBytes: 512 * 1024 * 1024,
 })
 
-const uploadTypes = Object.freeze({
-  image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
-  video: ['video/mp4'],
-  audio: ['audio/wav', 'audio/x-wav'],
-})
-
 export type HiggsfieldReferenceVideoInspection = HiggsfieldSeedanceInspection
 export type HiggsfieldReferenceVideoPreparedMedia = HiggsfieldSeedancePreparedMedia
-export type HiggsfieldReferenceVideoManagedMediaDependencies = Pick<HiggsfieldSeedancePreparationDependencies, 'assertCurrent' | 'inspect' | 'read' | 'validate'>
+export type HiggsfieldReferenceVideoManagedMediaDependencies = Pick<HiggsfieldSeedancePreparationDependencies, 'assertCurrent' | 'inspect' | 'read' | 'validate' | 'prepareAudio'>
 
 export interface HiggsfieldReferenceVideoGenerationDependencies extends HiggsfieldReferenceVideoManagedMediaDependencies {
   /** Fresh input schema returned by the trusted main current-contract owner. */
@@ -63,20 +58,19 @@ async function prepareManagedMedia(plan: HiggsfieldReferenceVideoInputPlan, depe
     if (inspected.source.mediaType !== source.mediaType || inspected.source.path !== source.path || inspected.source.url !== undefined) throw new Error('Higgsfield Reference inspected media changed its type or managed path.')
     const maximum = HIGGSFIELD_REFERENCE_VIDEO_LOCAL_BUDGET[`${source.mediaType}Bytes`]
     if (!Number.isSafeInteger(inspected.byteLength) || inspected.byteLength < 1 || inspected.byteLength > maximum) throw new Error('Higgsfield Reference media exceeds Prism’s local file-size bound; the source was preserved.')
-    if (!(uploadTypes[source.mediaType] as readonly string[]).includes(inspected.contentType)) throw new Error('Higgsfield Reference needs a locally supported upload format; no conversion was performed.')
+    if (!supportsHiggsfieldLocalSource(inspected,dependencies)) throw new Error('Higgsfield Reference needs a locally supported upload format; no conversion was performed.')
     totalBytes += inspected.byteLength
     if (totalBytes > HIGGSFIELD_REFERENCE_VIDEO_LOCAL_BUDGET.totalBytes) throw new Error('Higgsfield Reference media exceeds Prism’s aggregate local-memory bound; no files were read or uploaded.')
     inspections.set(key, Object.freeze({ ...inspected, source: Object.freeze({ ...inspected.source }) }))
   }
+  if([...inspections.values()].some(i=>i.source.mediaType==='audio'&&i.contentType==='audio/mpeg')&&higgsfieldLocalDerivativeBound(totalBytes)<44)throw Error('Higgsfield Reference aggregate local memory cannot retain decoded audio; no files were read or uploaded.')
 
   const preparedByIdentity = new Map<Identity, HiggsfieldReferenceVideoPreparedMedia>()
+  let derivativeBytes=0
   for (const [key, inspection] of inspections) {
     assertCurrent()
-    const bytes = await dependencies.read(inspection, signal)
-    assertCurrent()
-    if (!(bytes instanceof Uint8Array) || bytes.byteLength !== inspection.byteLength) throw new Error('Higgsfield Reference media changed during local preparation.')
-    const media: HiggsfieldReferenceVideoPreparedMedia = Object.freeze({ source: inspection.source, bytes, contentType: inspection.contentType })
-    await dependencies.validate(media, signal)
+    const media=await prepareHiggsfieldInspectedMedia(inspection,dependencies,signal,higgsfieldLocalDerivativeBound(totalBytes,derivativeBytes))
+    if(inspection.source.mediaType==='audio'&&inspection.contentType==='audio/mpeg')derivativeBytes+=media.bytes!.byteLength
     assertCurrent()
     preparedByIdentity.set(key, media)
   }

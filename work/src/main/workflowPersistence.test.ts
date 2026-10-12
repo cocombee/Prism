@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile, rename, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
@@ -10,6 +10,8 @@ import { loadOwnedWorkflow, saveOwnedWorkflow } from './workflowPersistence'
 import { workflowSaveOwnerKey, type WorkflowSaveOwner } from '../shared/workflowSaveOwnership'
 import type { WorkflowDocument } from '../shared/types'
 import { withProjectServiceProfileOverride } from '../shared/serviceProfiles'
+import { mediaDescriptionConnectedToGenerator } from '../shared/assetReferenceDescriptions'
+import { recoverCompletedGenerationNodes, pruneMissingGeneratedResults } from '../shared/workflowRunRecovery'
 const roots: string[] = []
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root,{recursive:true,force:true}) })
 const source = ts.createSourceFile('index.ts',readFileSync(new URL('index.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true)
@@ -31,6 +33,39 @@ async function fixture() {
   return{A,B,queue,deps,document,writes,current:()=>current,switchTo:(owner:WorkflowSaveOwner)=>{current=owner},io}
 }
 describe('actual atomic storage with owned workflow command queue',()=>{
+  it.each([['upload','image'],['upload','video'],['upload','audio'],['image-generator','image'],['image-editor','image'],['upscaler','image'],['video-generator','video'],['voiceover','audio'],['sound-effects','audio']] as const)('retains %s %s Description after disconnect, project reopen and fresh main-loader recovery, then restores it on reconnect', async (kind, type) => {
+    const x = await fixture(), description = '@reference supplies the exact assigned role.\nPreserve this authored override.'
+    const mediaPath = join(x.A.rootPath, `reference.${type}`)
+    await writeFile(mediaPath, 'isolated materialized result fixture')
+    const mode = type === 'image' ? 'composition' : type === 'video' ? 'blocking' : 'lip-sync'
+    x.document.nodes = [
+      { id: 'reference', type: 'studio', position: { x: 0, y: 0 }, data: { kind, title: 'Reference', assetPath: kind === 'upload' ? mediaPath : undefined, generatedResults: kind === 'upload' ? undefined : [{ path: mediaPath, url: '', type, modelId: 'fixture' }], outputType: type, mediaReferenceMode: mode, referenceDescription: description, referenceDescriptionMode: 'authored' } },
+      { id: 'video', type: 'studio', position: { x: 400, y: 0 }, data: { kind: 'video-generator', title: 'Video', videoEngine: 'bytedance/seedance-2.5/reference-to-video' } },
+    ]
+    const connection = { id: 'reference-video', source: 'reference', target: 'video', sourceHandle: 'media-out', targetHandle: type === 'image' ? 'reference-in' : type === 'video' ? 'video-reference-in' : 'audio-reference-in' }
+    x.document.edges = [connection]
+    await saveOwnedWorkflow(x.document, x.A, x.deps)
+    x.document.edges = []
+    await saveOwnedWorkflow(x.document, x.A, x.deps)
+    // Fresh actual main-loader state reads disk and runs the production result-recovery owners.
+    const loader = actual<{ loadWorkflowDocument(): Promise<WorkflowDocument> }>(['loadWorkflowDocument'], {
+      currentProject: { rootPath: x.A.rootPath }, workflowPath: () => join(x.A.rootPath, '05. Canvas', 'workflow.json'),
+      historyPath: () => join(x.A.rootPath, '04. History', 'history.json'), resolve, sep, stat,
+      readStrictJson: async (path: string) => JSON.parse(await readFile(path, 'utf8')),
+      readJson: async () => [], pruneMissingGeneratedResults, recoverCompletedGenerationNodes,
+      isMissingFileError: (error: { code?: string }) => error.code === 'ENOENT',
+    })
+    const freshQueue = new ProjectCommandQueue()
+    const reopened = await loadOwnedWorkflow(x.A, { currentOwner: () => x.A, runForOwner: (key, action) => freshQueue.runForOwner(key, () => workflowSaveOwnerKey(x.A), action), load: loader.loadWorkflowDocument })
+    expect(reopened!.nodes[0].data.referenceDescription).toBe(description)
+    expect(reopened!.nodes[0].data.referenceDescriptionMode).toBe('authored')
+    expect(reopened!.nodes[0].data.mediaReferenceMode).toBe(mode)
+    expect(mediaDescriptionConnectedToGenerator('reference', reopened!.nodes, reopened!.edges)).toBe(false)
+    expect(JSON.parse(await readFile(x.A.documentPath, 'utf8')).workflow.nodes[0].data.referenceDescription).toBe(description)
+    reopened!.edges = [connection]
+    expect(mediaDescriptionConnectedToGenerator('reference', reopened!.nodes, reopened!.edges)).toBe(true)
+    expect(reopened!.nodes[0].data.referenceDescription).toBe(description)
+  })
   it('keeps the explicit document owner in the actual account-selection response',async()=>{
     const x=await fixture(),project={schemaVersion:1,id:x.A.projectId,name:'Fictional Project',rootPath:x.A.rootPath,createdAt:'fictional',updatedAt:'fictional'},writes:unknown[]=[]
     const action=actual<{selectCurrentProjectServiceProfile(provider:string):Promise<typeof project & {documentPath:string}>}>(['selectCurrentProjectServiceProfile'],{

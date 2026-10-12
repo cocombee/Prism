@@ -6,6 +6,8 @@ Every entry below is populated. This file is a readable routing inventory, not a
 
 ## Root routing and change-impact records
 
+- `Asset Reference Descriptions Change Impact.md`
+
 - `CHANGE-IMPACT-ASSET-SELECTION-BATCH-FOLLOWUP-2026-08-22.md`
 - `CHANGE-IMPACT-DIRECTOR-FILMIC-MOTION-PARITY-2026-08-26.md`
 - `CHANGE-IMPACT-FAL-SERVICE-PROFILES-2026-08-22.md`
@@ -33,6 +35,7 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `Selector And Model Contracts Change Impact.md`
 - `DOCUMENT-OWNERSHIP.md`
 - `MIGRATION-CLAUSE-MAP.md`
+- `Provider Reference Section Ordering Change Impact.md`
 - `README.md`
 - `SKILL-SECTION-MAP.md`
 - `change-impact-remove-abandoned-3d-camera-20260930.md`
@@ -133,4 +136,4 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `testing/flight-tester-release-gate.md`
 - `testing/regression-firewall.md`
 
-Populated Markdown files excluding this map: **87**.
+Populated Markdown files excluding this map: **89**.

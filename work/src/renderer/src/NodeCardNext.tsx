@@ -1,3 +1,11 @@
+import { VoicePicker } from './VoiceBrowser'
+import { AudioPlayer, type AudioPlayerProps } from './AudioPlayer'
+import { MediaReferenceModes } from './MediaReferenceModes'
+import { mediaReferenceModePatch, effectiveMediaReferenceMode, type ReferenceMediaType } from '../../shared/mediaReferenceModes'
+import { AssetDescriptionField, AssetPromptFields, PlacedMediaDescription, showsAssetDescription } from './AssetPromptFields'
+import { assetDescriptionPlaceholder } from '../../shared/assetReferenceDescriptions'
+import type { FalNativeVideoFooterOption } from '../../shared/nativeVideoFooterControls'
+import { videoDraftProvider, selectedVideoDraft, supportsFalSeedanceDraft, videoDraftResolutionLabel } from '../../shared/videoDraft'
 import { generatorVideoDurationLimits, videoMaximumLabel } from '../../shared/videoDurationLimits'
 import { higgsfieldRecoveryActionDisabled } from '../../shared/higgsfieldJobs'
 import { ProviderAvailabilityContext } from './ProviderAvailabilityContext'
@@ -12,7 +20,7 @@ import { fishSampleRateOptions, fishBitrateOptions, fishNumberOptions } from '..
 import { isElevenDialogue, elevenSupportsDialogue, elevenSpeechModePatch, ELEVEN_DIALOGUE_MAX_CHARACTERS, type ElevenDialogueTurn } from '../../shared/elevenDialogue'
 import { ElevenVoiceSampleButton } from './ElevenVoiceSampleButton'
 import { SelectorLeadingIcon } from './SelectorLeadingIcon'
-import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Position, type NodeProps } from '@xyflow/react'
 import { GeneratedMediaOverlay } from './GeneratedMediaOverlay'
@@ -47,6 +55,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  WandSparkles,
   Trash2,
   Maximize2,
   Mountain,
@@ -81,7 +90,8 @@ import { falFlowMenuOptions, type FalProductionFlow } from '../../shared/falMode
 import { falNativeFlowForKind } from '../../shared/falNativeExecution'
 import { preserveFalNativeSelection, type FalNativeNodeState } from '../../shared/falNodeBinding'
 import type { FalSchemaContract, FalJson } from '../../shared/falSchemaBinding'
-import { nativeVideoMotionCadenceOptions, normalizedNativeVideoMotionCadence, projectFalNativeVideoFooterControls, projectNativeVideoFooterFields, type FalNativeVideoFooterControl } from '../../shared/nativeVideoFooterControls'
+import { nativeFpsLabel, nativeVideoOutputFrameRate } from '../../shared/videoCadenceSelection'
+import { nativeVideoSoundChoice, nativeVideoMotionCadenceOptions, normalizedNativeVideoMotionCadence, projectFalNativeVideoFooterControls, projectNativeVideoFooterFields, type FalNativeVideoFooterControl } from '../../shared/nativeVideoFooterControls'
 import { nativeVideoQuantityAvailable } from '../../shared/generationResultMedia'
 import { NodePort } from './NodePort'
 import { prioritizeConnectedInputRules, workflowTag, type ConnectedInputRule, type InputFidelity } from '../../shared/inputRules'
@@ -91,13 +101,14 @@ import { previewFocalPosition } from '../../shared/previewFocus'
 import { FAL_IMAGE_MODELS, FAL_REFERENCE_IMAGE_MODELS, imageModelSelectionPatch, imageResolutionOptions } from '../../shared/imageModels'
 import { compactProviderError, providerDisplayName } from '../../shared/providerErrors'
 import { audioGenerationLabel, elevenSpeechModelsByVersion, directElevenLanguageOptions, elevenSupportsSpeed, ELEVEN_DIRECT_OUTPUT_FORMATS, voiceModelSelectionPatch } from '../../shared/elevenLabsAudio'
+import { useNodeErrorNotice } from './useNodeErrorNotice'
 import { nodeNotificationCategory } from '../../shared/nodeNotificationCategory'
 import { activeMediaName, generatedResultName } from '../../shared/generatedMedia'
 import { ELEVEN_AUDIO_OUTPUT_FORMATS, ELEVEN_V3_BUILT_IN_VOICES, FISH_AUDIO_FORMATS } from '../../shared/providerOptions'
 import { ELEVEN_V3_LANGUAGES, normalizedElevenV3LanguageCode } from '../../shared/voiceLanguages'
 import { ELEMENT_ANCHOR_VIEW, ELEMENT_VIEWS, missingElementViews } from '../../shared/elementViews'
 import { incompleteSemanticReason } from '../../shared/semanticReadiness'
-import { localAssetGenerationPrompt } from '../../shared/semanticAssetPromptBoundary'
+import { assetReferenceDescription, localAssetGenerationPrompt } from '../../shared/semanticAssetPromptBoundary'
 import { balancedSemanticPreview, characterAssetsForMode, characterSemanticPreview } from '../../shared/semanticAssetCollections'
 import { TaggedPromptTextarea } from './TaggedPromptTextarea'
 import { modelDisplayName } from '../../shared/modelNames'
@@ -134,7 +145,7 @@ import ltxBrandmark from './assets/model-brands/ltx-favicon-256x256.png'
 import pixverseBrandmark from './assets/model-brands/pixverse-mark-mask.svg'
 
 export type ModelCompany = 'higgsfield' | 'fal' | 'byteplus' | 'omniroute' | 'openai' | 'google' | 'anthropic' | 'deepseek' | 'moonshot' | 'meta' | 'black-forest-labs' | 'alibaba' | 'bytedance' | 'kuaishou' | 'elevenlabs' | 'fish' | 'minimax' | 'hailuo' | 'lightricks' | 'pixverse'
-export type GroupedMenuOption = { value: string; label: string; iconPath?: string; provider?: ModelCompany; service?: ServiceProvider; aspectRatioPreview?: string; aliases?: readonly string[]; disabled?: boolean; catalog?: ModelMenuMetadata }
+export type GroupedMenuOption = { value: string; label: string; iconPath?: string; iconText?: string; provider?: ModelCompany; service?: ServiceProvider; aspectRatioPreview?: string; aliases?: readonly string[]; disabled?: boolean; catalog?: ModelMenuMetadata }
 export type GroupedMenuGroup = { label: string; service?: ServiceProvider; options: GroupedMenuOption[] }
 
 export function GeneratorInputIcon({ id, signal, kind }: { id: string; signal: ReturnType<typeof nodeInputPorts>[number]['signal']; kind: StudioNodeData['kind'] }) {
@@ -162,7 +173,7 @@ export function generatorInputLabel(id: string, fallback: string): string {
 }
 
 export function SemanticCreateToggle({ label, onClick, disabled = false }: { label: string; onClick(): void; disabled?: boolean }) {
-  return <button type="button" className="style-create-toggle" onClick={onClick} disabled={disabled}><Plus size={12} aria-hidden="true" />{label}</button>
+  return <button type="button" className="style-create-toggle" aria-label={label} onClick={onClick} disabled={disabled}><Plus size={12} aria-hidden="true" />{label}</button>
 }
 
 function audioFormatLabel(format: string): string {
@@ -254,12 +265,19 @@ function useRetainedSelectorState<Key extends 'open' | 'search' | 'active' | 'ex
   }]
 }
 
+export function AssetRenamePopover({ value, onChange, onCommit, onCancel }: { value: string; onChange(value: string): void; onCommit(): void; onCancel(): void }) {
+  return <div className="asset-save-name-popover node-rename-name-popover nodrag">
+    <input autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="Asset name" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onCommit() } if (event.key === 'Escape') { event.preventDefault(); onCancel() } }} />
+    <button onClick={onCommit} disabled={!value.trim()}><Check size={11} />Rename</button>
+  </div>
+}
+
 export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ariaDescribedBy, accessibleLabel: requestedAccessibleLabel, title, disabled = false, className = '', menuClassName = '', displayLabel, compactLabel: requestedCompactLabel, defaultLabel: requestedDefaultLabel, fillTrack = false, catalog = false, flatCatalog: requestedFlatCatalog = false, catalogFlow, promptCatalog = false, searchable = false, onChange }: {
   value: string
   groups: GroupedMenuGroup[]
   catalog?: boolean
   flatCatalog?: boolean
-  catalogFlow?: 'image' | 'video'
+  catalogFlow?: 'image' | 'video' | 'audio'
   promptCatalog?: boolean
   searchable?: boolean
   ariaLabel: string
@@ -302,7 +320,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
     const company = option.provider || modelCompanyFor(option.value, option.label)
     return { ...option, catalog: option.catalog || { service: group.label, company: company && companyNames[company] || group.label, release: option.label } }
   }) })))
-  const mediaMenuPolicy = promptCatalog ? LATEST_TEXT_MODEL_MENU_POLICY : catalogFlow === 'video' || /^video model$/i.test(ariaLabel) ? POPULAR_VIDEO_FEATURED_POLICY : POPULAR_IMAGE_MODEL_POLICY
+  const mediaMenuPolicy = promptCatalog ? LATEST_TEXT_MODEL_MENU_POLICY : catalogFlow === 'audio' ? { groupByProvider: true } : catalogFlow === 'video' || /^video model$/i.test(ariaLabel) ? POPULAR_VIDEO_FEATURED_POLICY : POPULAR_IMAGE_MODEL_POLICY
   const projectedCatalog = flatModelCatalogMenu(catalogProviders, value, 5, flatCatalog ? mediaMenuPolicy : {})
   // Latest text families and their discovered effort order are already admitted.
   // Media predecessor promotion must never split a text family's thinking choices.
@@ -343,7 +361,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
     setFittedWidth(current => current === width ? current : width)
   }, [fillTrack, selectedLabel, defaultLabel, selectedCompany])
   const equalizedLabels = groups.flatMap((group) => group.options).map((option) => option.label)
-  const hasEqualizedLeadingMark = groups.some((group) => group.options.some((option) => option.provider || option.iconPath || modelCompanyFor(option.value, option.label)))
+  const hasEqualizedLeadingMark = groups.some((group) => group.options.some((option) => option.provider || option.iconPath || option.iconText || modelCompanyFor(option.value, option.label)))
 
   const ratioPreview = (ratio?: string) => {
     if (!ratio || ratio === 'auto' || ratio === 'fixed') return null
@@ -510,12 +528,12 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   }
   const renderOption = (option: GroupedMenuOption, modeLabel: string | false = false, isNew = false) => {
     const company = catalogModelCompany(option)
-    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu(); buttonRef.current?.focus() }}>{company ? <CompanyIcon provider={company} /> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || (catalog || groups.some(group => group.options.some(item => item.aspectRatioPreview || item.provider || item.iconPath)) ? <span className="model-company-logo-placeholder" aria-hidden="true" /> : null)}<span className="selector-option-label">{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
+    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu(); buttonRef.current?.focus() }}>{company ? <CompanyIcon provider={company} /> : option.iconText ? <span className="selector-flag-icon" aria-hidden="true">{option.iconText}</span> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || (catalog || groups.some(group => group.options.some(item => item.aspectRatioPreview || item.provider || item.iconPath || item.iconText)) ? <span className="model-company-logo-placeholder" aria-hidden="true" /> : null)}<span className="selector-option-label">{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
   }
 
   return <>
-    <button ref={buttonRef} type="button" className={`grouped-menu-select ${className}`} data-equalized-options={fillTrack ? JSON.stringify(equalizedLabels) : undefined} data-equalized-default={fillTrack ? defaultLabel : undefined} data-equalized-full={fillTrack ? selectedLabel : undefined} data-equalized-compact={fillTrack ? compactLabel : undefined} data-equalized-leading={fillTrack && hasEqualizedLeadingMark ? 'true' : undefined} style={fillTrack ? { width: '100%', minWidth: 0, maxWidth: '100%' } : { width: fittedWidth ?? 'max-content', minWidth: 0, maxWidth: '100%' }} aria-label={ariaLabel} aria-describedby={ariaDescribedBy} aria-description={accessibleLabel} aria-haspopup="listbox" aria-expanded={open} title={title ? `${title} · ${accessibleLabel}` : accessibleLabel} disabled={disabled} onClick={toggle}>
-      {(selectedCompany || selected?.iconPath) && <SelectorLeadingIcon identity={selectedCompany || selected!.iconPath!}>{selectedCompany ? <CompanyIcon provider={selectedCompany} /> : <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={selected!.iconPath} /></svg>}</SelectorLeadingIcon>}<span className="selected-label"><span className="selected-label-full">{selectedLabel}</span><span className="selected-label-compact" aria-hidden="true">{compactLabel}</span></span><ChevronDown size={10} />
+    <button ref={buttonRef} type="button" className={`grouped-menu-select ${className}`} data-equalized-options={fillTrack ? JSON.stringify(equalizedLabels) : undefined} data-equalized-default={fillTrack ? defaultLabel : undefined} data-equalized-full={fillTrack ? selectedLabel : undefined} data-equalized-compact={fillTrack ? compactLabel : undefined} data-equalized-leading={fillTrack && hasEqualizedLeadingMark ? 'true' : undefined} style={fillTrack ? { width: '100%', minWidth: 0, maxWidth: '100%' } : { width: fittedWidth ?? 'max-content', minWidth: 0, maxWidth: '100%' }} aria-label={ariaLabel} aria-describedby={ariaDescribedBy} aria-description={accessibleLabel} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={toggle}>
+      {(selectedCompany || selected?.iconPath || selected?.iconText) && <SelectorLeadingIcon identity={selectedCompany || selected!.iconText || selected!.iconPath!}>{selectedCompany ? <CompanyIcon provider={selectedCompany} /> : selected?.iconText ? <span className="selector-flag-icon">{selected.iconText}</span> : <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={selected!.iconPath} /></svg>}</SelectorLeadingIcon>}<span className="selected-label"><span className="selected-label-full">{selectedLabel}</span><span className="selected-label-compact" aria-hidden="true">{compactLabel}</span></span><ChevronDown size={10} />
     </button>
     {open && position && createPortal(<div className={`grouped-menu-select-menu ${menuClassName} ${catalog ? 'model-catalog-menu' : ''} ${flatCatalog ? 'is-flat-catalog' : ''} nodrag`} style={{ left: position.left, bottom: position.bottom, top: position.top, maxHeight: position.maxHeight, width: position.width, '--floating-menu-font-size': `${position.fontSize}px` } as CSSProperties} onKeyDown={handleMenuKeyDown}>
       {(catalog || searchable || searchQuery) && <div className="selector-search-row"><input ref={inputRef} value={searchQuery} placeholder={catalog ? 'Search models and modes' : searchable ? 'Search voices' : undefined} aria-label={`Search ${ariaLabel} options`} aria-controls={listboxId} aria-activedescendant={activeValue ? `${listboxId}-${activeValue}` : undefined} onChange={(event) => { const next = event.target.value; if (!next) hideSearch(); else setSearchQuery(next) }} /><button type="button" aria-label="Clear selector search" onClick={hideSearch}>×</button></div>}
@@ -556,13 +574,14 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   </>
 }
 
-export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, displayLabel, title, disabled = false, className = '', menuClassName = '', defaultLabel, fillTrack = false, searchable = false, service, onChange }: {
+export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, displayLabel, compactLabel, title, disabled = false, className = '', menuClassName = '', defaultLabel, fillTrack = false, searchable = false, service, onChange }: {
   value: string | undefined
   service?: ServiceProvider
   options: GroupedMenuOption[]
   ariaLabel: string
   accessibleLabel?: string
   displayLabel?: string
+  compactLabel?: string
   title?: string
   disabled?: boolean
   className?: string
@@ -578,6 +597,7 @@ export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, d
     ariaLabel={ariaLabel}
     accessibleLabel={accessibleLabel}
     displayLabel={displayLabel}
+    compactLabel={compactLabel}
     title={title}
     disabled={disabled}
     className={`simple-menu-select ${className}`}
@@ -1107,7 +1127,7 @@ export function VoiceModelSelect({ data, models, onChange, className = '', falAv
   const value = data.voiceEngine === 'fish-audio' ? `fish-audio::${data.fishModel || 's2-pro'}` : data.voiceEngine === 'elevenlabs-direct' ? `elevenlabs-direct::${data.voiceModelId || ''}` : 'elevenlabs'
   const label = data.voiceEngine === 'elevenlabs-direct' ? models.find((model) => model.id === data.voiceModelId)?.label || data.voiceModelId || 'Choose ElevenLabs model' : data.voiceEngine === 'fish-audio' ? fishAvailability?.models.find(model => model.id === (data.fishModel || 's2-pro'))?.label || `Fish Audio ${data.fishModel || 's2-pro'}` : 'ElevenLabs Eleven v3'
   const groups = falAvailability ? liveFalModelGroups('voice', falAvailability, voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined), data.falNative) : voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined)
-  return <GroupedMenuSelect catalog className={className} ariaLabel="Voice provider and model" defaultLabel={data.voiceEngine === 'fish-audio' ? label : "ElevenLabs Eleven v3"} displayLabel={data.falNative?.label || label} fillTrack value={data.falNative ? `fal-native::${data.falNative.endpointId}` : value} groups={groups} onChange={(selection) => { if (selection.startsWith('fal-native::')) { onFalSelect?.(selection.slice(12)); return } const patch = voiceModelSelectionPatch(selection, data, models, fishAvailability?.catalogStale ? [] : fishAvailability?.models || []); if (patch) onChange({ ...preserveFalNativeSelection(data), ...patch }) }} />
+  return <GroupedMenuSelect catalog flatCatalog catalogFlow="audio" className={className} ariaLabel="Voice provider and model" defaultLabel={data.voiceEngine === 'fish-audio' ? label : "ElevenLabs Eleven v3"} displayLabel={data.falNative?.label || label} fillTrack value={data.falNative ? `fal-native::${data.falNative.endpointId}` : value} groups={groups} onChange={(selection) => { if (selection.startsWith('fal-native::')) { onFalSelect?.(selection.slice(12)); return } const patch = voiceModelSelectionPatch(selection, data, models, fishAvailability?.catalogStale ? [] : fishAvailability?.models || []); if (patch) onChange({ ...preserveFalNativeSelection(data), ...patch }) }} />
 }
 
 export function SoundModelSelect({ data, onChange, className = '', falAvailability, onFalSelect }: { data: StudioNodeData; onChange(patch: Partial<StudioNodeData>): void; className?: string; falAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
@@ -1115,7 +1135,7 @@ export function SoundModelSelect({ data, onChange, className = '', falAvailabili
     { label: 'ElevenLabs · Direct', service: 'elevenlabs', options: [{ value: 'elevenlabs', label: 'Sound Effects v2', provider: 'elevenlabs' }] },
     { label: 'fal.ai', service: 'fal', options: [{ value: 'fal', label: 'ElevenLabs Sound Effects v2', provider: 'elevenlabs' }] },
   ]
-  return <GroupedMenuSelect catalog className={className} ariaLabel="Sound effect provider and model" defaultLabel="Sound Effects v2" value={data.falNative ? `fal-native::${data.falNative.endpointId}` : data.audioProvider || 'fal'} displayLabel={data.falNative?.label} groups={falAvailability ? liveFalModelGroups('effects', falAvailability, legacy, data.falNative) : legacy} onChange={(provider) => { if (provider.startsWith('fal-native::')) onFalSelect?.(provider.slice(12)); else if (provider === 'elevenlabs' || provider === 'fal') onChange({ ...preserveFalNativeSelection(data), audioProvider: provider, error: undefined }) }} />
+  return <GroupedMenuSelect catalog flatCatalog catalogFlow="audio" className={className} ariaLabel="Sound effect provider and model" defaultLabel="Sound Effects v2" value={data.falNative ? `fal-native::${data.falNative.endpointId}` : data.audioProvider || 'fal'} displayLabel={data.falNative?.label} groups={falAvailability ? liveFalModelGroups('effects', falAvailability, legacy, data.falNative) : legacy} onChange={(provider) => { if (provider.startsWith('fal-native::')) onFalSelect?.(provider.slice(12)); else if (provider === 'elevenlabs' || provider === 'fal') onChange({ ...preserveFalNativeSelection(data), audioProvider: provider, error: undefined }) }} />
 }
 
 export function directAudioFormatLabel(format: string): string {
@@ -1123,9 +1143,8 @@ export function directAudioFormatLabel(format: string): string {
 }
 
 export function DirectElevenVoiceSelect({ data, availability, onChange, ariaLabel = 'ElevenLabs voice ID' }: { ariaLabel?: string; data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void }) {
-  const voices = availability?.voices || []
-  const savedVoice = voices.some((voice) => voice.id === data.voice)
-  return <SimpleMenuSelect className="voice-primary-voice" searchable ariaLabel={ariaLabel} defaultLabel="Adam" fillTrack value={savedVoice ? data.voice : '__manual'} options={[...voices.map((voice) => ({ value: voice.id, label: voice.label })), { value: '__manual', label: 'Enter voice ID' }]} onChange={(voice) => onChange({ voice: voice === '__manual' ? '' : voice, error: undefined })} />
+  const runtime = useContext(NodeRuntimeContext)
+  return <VoicePicker Selector={SimpleMenuSelect} ariaLabel={ariaLabel} provider="elevenlabs" availability={availability} value={data.voice || ''} onRefresh={runtime?.refreshVoiceAvailability ? () => runtime.refreshVoiceAvailability!('elevenlabs') : undefined} onChange={voice => onChange({voice:voice.id,error:undefined})}/>
 }
 
 export function DirectElevenLanguageSelect({ data, availability, onChange }: { data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void }) {
@@ -1135,26 +1154,32 @@ export function DirectElevenLanguageSelect({ data, availability, onChange }: { d
   return <SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" defaultLabel="Auto" fillTrack value={data.languageCode || ''} options={options} onChange={(languageCode) => onChange({ languageCode: languageCode || undefined })} />
 }
 
-export function DirectElevenVoiceControls({ data, availability, onChange, falAvailability, fishAvailability, onFalSelect }: { data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+export function DirectElevenVoiceControls({ data, availability, onChange, falAvailability, fishAvailability, onFalSelect, footer = false, quantityControl }: { footer?: boolean; quantityControl?: ReactNode; data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
   const model = availability?.models.find((item) => item.id === data.voiceModelId)
   const settingOptions = (selected: number) => {
     const values = Array.from({ length: 21 }, (_, index) => index / 20)
     if (!values.includes(selected)) values.push(selected)
     return values.map((value) => ({ value: String(value), label: String(Number.isFinite(value) ? value.toFixed(2) : value), disabled: !Number.isFinite(value) || value < 0 || value > 1 }))
   }
-  return <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
-    {availability?.catalogError && <label className="voice-primary-custom" title={availability.catalogError}><span role="alert">Could not load models · check Connections</span></label>}
-    <FluidControlGroup className="voice-primary-row voice-primary-row-two" ariaLabel="Voice Model And Voice Controls" gap={7} allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }} recalculationKey={`${data.voiceModelId}:${data.voice}:${data.elevenSpeechMode}`} controls={[
+  const modelControls: FluidGroupControl<string>[] = [
       { id: 'model', kind: 'selector', defaultLabel: model?.label || 'Choose ElevenLabs model', fullLabel: model?.label || 'Choose ElevenLabs model', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} models={availability?.models || []} onChange={onChange} falAvailability={falAvailability} fishAvailability={fishAvailability} onFalSelect={onFalSelect} /></label> },
       { id: 'mode', kind: 'selector', intrinsicWidth: 100, node: <label><span>Mode</span><SimpleMenuSelect ariaLabel="ElevenLabs speech mode" fillTrack value={data.elevenSpeechMode || 'speech'} options={[{ value: 'speech', label: 'Speech' }, { value: 'dialogue', label: 'Dialogue', disabled: !elevenSupportsDialogue(data.voiceModelId, model) }]} onChange={value => onChange(elevenSpeechModePatch(data, value as 'speech' | 'dialogue', () => crypto.randomUUID()))} /></label> },
-      ...(!isElevenDialogue(data) ? [{ id: 'voice', kind: 'selector' as const, intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><DirectElevenVoiceSelect data={data} availability={availability} onChange={onChange} /></label> }] : []),
-    ] as FluidGroupControl<'model' | 'mode' | 'voice'>[]} />
-    {!isElevenDialogue(data) && !availability?.voices?.some((voice) => voice.id === data.voice) && <label className="voice-primary-custom"><span>{availability?.voiceCatalogError ? 'Voices unavailable · enter voice ID' : 'Voice ID'}</span><input className="voice-primary-input" aria-label="ElevenLabs voice ID" value={data.voice || ''} onChange={(event) => onChange({ voice: event.target.value, error: undefined })} placeholder="Voice ID (required)" /></label>}
-    <FluidControlGroup className="voice-primary-row" ariaLabel="Voice Stability Similarity And Sample Controls" recalculationKey={`${data.voiceModelId}:${data.stability}:${data.similarityBoost}:${data.voice}:${data.elevenSpeechMode}`} gap={7} allocation={{ minRows: 1, maxRows: 2 }} controls={[
+      ...(!footer && !isElevenDialogue(data) ? [{ id: 'voice', kind: 'selector' as const, intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><DirectElevenVoiceSelect data={data} availability={availability} onChange={onChange} /></label> }] : []),
+    ]
+  const settingControls: FluidGroupControl<string>[] = [
       { id: 'stability', kind: 'selector', intrinsicWidth: 72, node: <label><span>Stability</span><SimpleMenuSelect ariaLabel="ElevenLabs stability" defaultLabel="0.50" fillTrack value={String(data.stability ?? 0.5)} options={settingOptions(data.stability ?? 0.5)} onChange={(value) => onChange({ stability: Number(value) })} /></label> },
       { id: 'similarity', kind: 'selector', intrinsicWidth: 72, node: <label><span>Similarity</span><SimpleMenuSelect ariaLabel="ElevenLabs similarity" defaultLabel="0.75" fillTrack value={String(data.similarityBoost ?? 0.75)} options={settingOptions(data.similarityBoost ?? 0.75)} onChange={(value) => onChange({ similarityBoost: Number(value) })} /></label> },
-      ...(!isElevenDialogue(data) ? [{ id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <label><span>Test</span><ElevenVoiceSampleButton voice={availability?.voices?.find((voice) => voice.id === data.voice)} availability={availability} /></label> }] : []),
-    ]} />
+      ...(quantityControl ? [{ id: 'quantity', kind: 'bounded-elastic' as const, intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: quantityControl }] : []),
+      ...(!footer && !isElevenDialogue(data) ? [{ id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <label><span>Test</span><ElevenVoiceSampleButton voice={availability?.voices?.find((voice) => voice.id === data.voice)} availability={availability} /></label> }] : []),
+    ]
+  const key = `${data.voiceModelId}:${data.stability}:${data.similarityBoost}:${data.voice}:${data.elevenSpeechMode}:${data.quantity}`
+  return <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
+    {availability?.catalogError && <label className="voice-primary-custom" title={availability.catalogError}><span role="alert">Could not load models · check Connections</span></label>}
+    {footer ? <FluidControlGroup className="voice-primary-row" ariaLabel="Voice Footer Fields" recalculationKey={key} gap={7} allocation={{ maxRows: modelControls.length + settingControls.length, enforceBalancedRows: true }} controls={[...modelControls,...settingControls]} /> : <>
+      <FluidControlGroup className="voice-primary-row voice-primary-row-two" ariaLabel="Voice Model And Voice Controls" gap={7} allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }} recalculationKey={key} controls={modelControls}/>
+      {!isElevenDialogue(data) && !availability?.voices?.some((voice) => voice.id === data.voice) && <label className="voice-primary-custom"><span>{availability?.voiceCatalogError ? 'Voices unavailable · enter voice ID' : 'Voice ID'}</span><input className="voice-primary-input" aria-label="ElevenLabs voice ID" value={data.voice || ''} onChange={(event) => onChange({ voice: event.target.value, error: undefined })} placeholder="Voice ID (required)" /></label>}
+      <FluidControlGroup className="voice-primary-row" ariaLabel="Voice Stability Similarity And Sample Controls" recalculationKey={key} gap={7} allocation={{ minRows: 1, maxRows: 2 }} controls={settingControls}/>
+    </>}
   </div>
 }
 
@@ -1174,7 +1199,7 @@ export function ElevenDialogueEditor({ data, availability, onChange }: { data: S
         ]} />
         {!availability?.voices?.some(voice => voice.id === turn.voiceId) && <label className="voice-primary-custom"><span>Voice ID</span><input className="voice-primary-input" aria-label={`Speaker ${index + 1} voice ID`} value={turn.voiceId} onChange={event => patchTurn(turn.id, { voiceId: event.target.value })} /></label>}
       </div>
-      <TaggedPromptTextarea className="node-prompt nodrag" aria-label={`Turn ${index + 1} speech text`} value={turn.text} connectedTags={[]} availableTags={[]} placeholder="Enter this speaker’s words and delivery tags…" onValueChange={text => patchTurn(turn.id, { text })} />
+      <TaggedPromptTextarea className="node-prompt media-generator-prompt nodrag" aria-label={`Turn ${index + 1} speech text`} value={turn.text} connectedTags={[]} availableTags={[]} placeholder="Enter this speaker’s words and delivery tags…" onValueChange={text => patchTurn(turn.id, { text })} />
     </div>)}
     <div className="voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Dialogue Turn Actions" gap={7} allocation={{ minRows: 1, maxRows: 1 }} recalculationKey={String(turns.length)} controls={[
       { id: 'add', kind: 'fixed-action', intrinsicWidth: 28, node: <label><span>Add</span><button type="button" className="compact-settings compact-options" aria-label="Add dialogue turn" disabled={turns.length >= ELEVEN_DIALOGUE_MAX_CHARACTERS} onClick={() => onChange({ elevenDialogueTurns: [...turns, { id: crypto.randomUUID(), voiceId: data.voice || '', text: '' }], error: undefined })}><Plus size={14} /></button></label> },
@@ -1238,13 +1263,13 @@ export function HiggsfieldFields({ state, view, inputView, placement, onChange, 
   const presetOptions = (view?.presets || []).map(item => ({ value: item.id, label: item.name }))
   if (preset && !presetOptions.some(option => option.value === preset)) presetOptions.unshift({ value: preset, label: `Unavailable (${preset})` })
   const presetField = <label><span>Style preset</span><GroupedMenuSelect searchable ariaLabel="Higgsfield style preset" fillTrack value={preset} displayLabel={presetOptions.find(option => option.value === preset)?.label || (view?.loading ? 'Loading presets…' : 'Choose preset')} groups={[{ label: 'Genjutsu presets', options: presetOptions.map(option => ({ ...option, disabled: !view?.presets?.some(item => item.id === option.value) })) }]} onChange={value => onChange({ ...state, values: { ...state.values, preset_id: value } })} /></label>
-  if (placement === 'advanced') return <section className="inspector-grid">
+  if (placement === 'advanced') return <section className="inspector-section"><div className="inspector-grid">
     {resolutionField}{restyle && presetField}
     {restyle && <label><span>Presets</span><button type="button" className="compact-settings compact-options" aria-label="Refresh Higgsfield presets" disabled={view?.loading} onClick={onRefresh}><RefreshCcw size={14} /></button></label>}
     <label className="inspector-wide inspector-switch"><input type="checkbox" aria-label="Allow source trimming to 30 seconds" checked={state.allowSourceTrimming === true} onChange={event => onChange({ ...state, allowSourceTrimming: event.target.checked })} /><span>Allow source trimming to 30 seconds</span></label>
     <p className="reference-budget inspector-wide">The source video supplies timing, cuts and audio. Import a local video for duration checks; a remote video needs trimming consent.</p>
     {view?.error && restyle && <p className="reference-budget inspector-wide" role="alert">{view.error}</p>}
-  </section>
+  </div></section>
   const controls = [{ id: 'resolution', kind: 'selector' as const, intrinsicWidth: 72, minimumWidth: 64, node: resolutionField }, ...(restyle ? [{ id: 'preset', kind: 'selector' as const, intrinsicWidth: 112, minimumWidth: 80, node: presetField }] : [])]
   return <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Primary Higgsfield Fields" gap={7} allocation={{ minRows: 1, maxRows: controls.length }} recalculationKey={`${state.endpointId}:${resolution}:${preset}:${view?.loading}:${view?.presets?.length}`} controls={controls} /></div>
 }
@@ -1280,11 +1305,46 @@ function nativeVideoFooterOptionLabel(control: FalNativeVideoFooterControl, opti
   return formatValue(value) || option.label
 }
 
-function NativeVideoFooterField<T extends NativeVideoFooterState>({ control, state, onChange, running = false }: {
+function VideoDraftResolutionSelect({ data, value, displayLabel, options, onPatch, regularPatch, disabled = false }: {
+  data: StudioNodeData; value: string; displayLabel: string
+  options: Array<{ value: string; label: string; disabled?: boolean }>
+  onPatch(patch: Partial<StudioNodeData>): void
+  regularPatch(value: string): Partial<StudioNodeData>
+  disabled?: boolean
+}) {
+  const draft = selectedVideoDraft(data), selected = data.generatedResults?.[data.activeResultIndex || 0]
+  const sourcePath = selected?.videoDraft?.status === 'final' ? selected.videoDraft.sourcePath : selected?.path
+  const drafting = data.falNative ? data.falNative.values.draft === true : data.videoDraft === true
+  const fromDraft = Boolean(data.draftCompletionPath)
+  const selectedValue = fromDraft ? '@from-draft' : drafting ? '@draft' : value
+  const uniqueOptions = options.filter((option, index) => options.findIndex(candidate => candidate.label === option.label) === index)
+  const choices = [{ value: '@draft', label: 'Draft · 480p' }, ...uniqueOptions,
+    ...(draft || fromDraft ? [{ value: '@from-draft', label: '1080p from Draft', disabled: !draft || fromDraft && data.draftCompletionPath !== sourcePath }] : [])]
+  const patchForMode = (draftMode: boolean, resolution: '480p' | '1080p'): Partial<StudioNodeData> => data.falNative
+    ? { falNative: { ...data.falNative, values: { ...data.falNative.values, draft: draftMode, resolution } } }
+    : { videoDraft: draftMode, resolution }
+  return <SimpleMenuSelect className="compact-resolution" ariaLabel="Video Resolution" accessibleLabel={`Video Resolution: ${fromDraft ? '1080p from Draft' : drafting ? 'Draft · 480p' : displayLabel}`} defaultLabel={displayLabel} compactLabel={fromDraft ? '1080p' : drafting ? 'Draft' : displayLabel} displayLabel={fromDraft ? '1080p' : drafting ? 'Draft' : displayLabel} fillTrack value={selectedValue} options={choices} disabled={disabled} onChange={token => {
+    if (token === '@draft') onPatch({ ...patchForMode(true, '480p'), draftCompletionPath: undefined })
+    else if (token === '@from-draft' && draft && selected) {
+      const settings = draft.settings, patch = patchForMode(false, '1080p')
+      if (patch.falNative && settings) patch.falNative.values = { ...patch.falNative.values, ...(settings.duration !== undefined ? { duration: settings.duration } : {}), ...(settings.aspectRatio !== undefined ? { aspect_ratio: settings.aspectRatio } : {}), ...(settings.generateAudio !== undefined ? { generate_audio: settings.generateAudio } : {}) }
+      else if (settings) { if (typeof settings.duration === 'number') patch.duration = settings.duration; if (settings.aspectRatio !== undefined) patch.aspectRatio = settings.aspectRatio; if (settings.generateAudio !== undefined) patch.generateAudio = settings.generateAudio }
+      onPatch({ ...patch, draftCompletionPath: sourcePath, quantity: 1 })
+    }
+    else {
+      const patch = regularPatch(token), native = patch.falNative || data.falNative
+      onPatch({ ...patch, ...(native ? { falNative: { ...native, values: { ...native.values, draft: false } } } : { videoDraft: false }), draftCompletionPath: undefined })
+    }
+  }} />
+}
+
+function NativeVideoFooterField<T extends NativeVideoFooterState>({ control, state, onChange, running = false, draftNode, onDraftPatch }: {
   control: FalNativeVideoFooterControl
   state: T
   onChange(next: T): void
   running?: boolean
+  draftNode?: StudioNodeData
+  onDraftPatch?(patch: Partial<StudioNodeData>): void
 }) {
   const accessibleLabel = control.key === 'fps' ? 'Native FPS'
     : control.key === 'aspect_ratio' ? 'Video Aspect Ratio'
@@ -1294,11 +1354,7 @@ function NativeVideoFooterField<T extends NativeVideoFooterState>({ control, sta
   const title = control.key === 'duration' ? 'Duration in seconds' : control.label
   const fieldKey=control.fieldKey || control.key
   if (control.key === 'sound' || control.key === 'generate_audio') {
-    const current = Object.prototype.hasOwnProperty.call(state.values, control.key) ? state.values[control.key] : control.hasDefault ? control.defaultValue : undefined
-    const active = control.key === 'generate_audio' ? current === true : typeof current === 'string' && current.toLowerCase() === 'on'
-    const onOption = control.options.find(option => option.kind === 'value' && (control.key === 'generate_audio' ? option.value === true : typeof option.value === 'string' && option.value.toLowerCase() === 'on'))
-    const offOption = control.options.find(option => option.kind === 'value' && (control.key === 'generate_audio' ? option.value === false : typeof option.value === 'string' && option.value.toLowerCase() === 'off'))
-    const next = active ? offOption : onOption
+    const { active, next } = nativeVideoSoundChoice(control, state)
     return <button type="button" className={`compact-settings compact-options compact-sound ${active ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={active} title={title} disabled={running || !next || next.value === undefined} onClick={() => { if (next?.value !== undefined) onChange(updateNativeFooterChoice(state, fieldKey, next.token)) }}><Volume2 size={14} /></button>
   }
 
@@ -1308,21 +1364,32 @@ function NativeVideoFooterField<T extends NativeVideoFooterState>({ control, sta
     return <input className="voice-primary-input" aria-label={accessibleLabel} title={title} type={control.control === 'number' ? 'number' : 'text'} step={control.schema.multipleOf || (control.schema.type === 'integer' ? 1 : 'any')} value={value} placeholder={placeholder} disabled={running} onChange={event => onChange(editNativeInputValue(state, fieldKey, event.target.value, control.control === 'number' ? 'number' : 'text'))} />
   }
 
-  const options = control.options.map(option => ({ value: option.token, label: nativeVideoFooterOptionLabel(control, option), disabled: option.disabled }))
+  const endpointId = 'endpointId' in state && typeof state.endpointId === 'string' ? state.endpointId : ''
+  const optionLabel = (option: FalNativeVideoFooterOption) => control.key === 'resolution' ? videoDraftResolutionLabel(endpointId, option.kind === 'default' ? control.defaultValue : option.value) || nativeVideoFooterOptionLabel(control, option) : nativeVideoFooterOptionLabel(control, option)
+  // An omitted provider default and its explicit enum value are one visible choice.
+  // Keep the selected token, preserving field absence on untouched nodes.
+  const visibleOptions = control.options.filter(option => {
+    const equivalent = control.options.filter(candidate => candidate.kind === 'default' && option.kind === 'value' && JSON.stringify(control.defaultValue) === JSON.stringify(option.value) || candidate.kind === 'value' && option.kind === 'default' && JSON.stringify(candidate.value) === JSON.stringify(control.defaultValue))
+    if (!equivalent.length) return true
+    if (option.token === control.selectedToken) return true
+    if (equivalent.some(candidate => candidate.token === control.selectedToken)) return false
+    return option.kind === 'default'
+  })
+  const options = visibleOptions.map(option => ({ value: option.token, label: optionLabel(option), disabled: option.disabled }))
   if (!options.some(option => option.value === control.selectedToken)) options.push({ value: control.selectedToken, label: control.selectedToken === '@missing' ? 'Missing · required' : 'Unavailable · review', disabled: true })
   const selected = control.options.find(option => option.token === control.selectedToken)
   const displayLabel = control.selectedToken === '@default'
-    ? nativeVideoFooterOptionLabel(control, { token: control.selectedToken, kind: 'default', label: '', value: control.defaultValue })
-    : selected ? nativeVideoFooterOptionLabel(control, selected) : control.selectedToken === '@missing' ? 'Missing' : 'Unavailable · review'
-  return <SimpleMenuSelect className={control.key === 'resolution' ? 'compact-resolution' : control.key === 'fps' ? 'compact-fps' : ''} ariaLabel={accessibleLabel} accessibleLabel={`${accessibleLabel}: ${displayLabel}`} title={title} defaultLabel={control.hasDefault ? displayLabel : control.options[0]?.label || control.label} displayLabel={displayLabel} fillTrack value={control.selectedToken} options={options} onChange={token => onChange(updateNativeFooterChoice(state, fieldKey, token))} />
+    ? optionLabel({ token: control.selectedToken, kind: 'default', label: '', value: control.defaultValue })
+    : selected ? optionLabel(selected) : control.selectedToken === '@missing' ? 'Missing' : 'Unavailable · review'
+  if (control.key === 'resolution' && draftNode && onDraftPatch) return <VideoDraftResolutionSelect data={draftNode} value={control.selectedToken} displayLabel={displayLabel} options={options} disabled={running} onPatch={onDraftPatch} regularPatch={token => ({ falNative: updateNativeFooterChoice(draftNode.falNative!, fieldKey, token) })} />
+  return <SimpleMenuSelect disabled={running} className={control.key === 'resolution' ? 'compact-resolution' : control.key === 'fps' ? 'compact-fps' : ''} ariaLabel={accessibleLabel} accessibleLabel={`${accessibleLabel}: ${displayLabel}`} title={title} defaultLabel={control.hasDefault ? displayLabel : control.options[0]?.label || control.label} displayLabel={displayLabel} fillTrack value={control.selectedToken} options={options} onChange={token => onChange(updateNativeFooterChoice(state, fieldKey, token))} />
 }
 
-function nativeVideoOutputFrameRate(controls: readonly FalNativeVideoFooterControl[]): number | undefined {
+function nativeVideoFooterFrameRate(controls: readonly FalNativeVideoFooterControl[]): number | undefined {
   const control = controls.find(item => item.key === 'fps')
   if (!control) return undefined
   const value = control.hasValue ? control.value : control.hasDefault ? control.defaultValue : undefined
-  const fps = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN
-  return Number.isFinite(fps) && fps > 0 ? fps : undefined
+  return nativeVideoOutputFrameRate('', value)
 }
 
 function nativeVideoFooterControlsWithOneSound(controls: readonly FalNativeVideoFooterControl[]): FalNativeVideoFooterControl[] {
@@ -1330,7 +1397,7 @@ function nativeVideoFooterControlsWithOneSound(controls: readonly FalNativeVideo
   return controls.filter(control => control.key !== 'sound' && control.key !== 'generate_audio' || control === sound)
 }
 
-function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts?: Record<string, string> }>(state: T, fields: FalRuntimeField[], onChange: (state: T) => void, footerFieldKeys?: ReadonlySet<string>) {
+function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts?: Record<string, string> }>(state: T, fields: FalRuntimeField[], onChange: (state: T) => void, footerFieldKeys?: ReadonlySet<string>, voiceAvailability?: ServiceModelAvailability) {
   return fields.filter(field => !footerFieldKeys?.has(field.key)).map(field => {
     const value = state.values[field.key]
     const optional = !field.required ? [{ value: '@unset', label: 'Default' }] : []
@@ -1348,7 +1415,9 @@ function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts
       : field.control === 'unsupported' ? <input className="voice-primary-input" aria-label={`Model ${field.label}`} readOnly disabled value="Requires supported adapter" />
       : field.control === 'json' ? <textarea aria-label={`Model ${field.label}`} rows={3} value={state.drafts?.[field.key] ?? (value === undefined ? '' : JSON.stringify(value, null, 2))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, 'json'))} />
       : <input className="voice-primary-input" aria-label={`Model ${field.label}`} type={field.control === 'number' ? 'number' : 'text'} step={field.schema.multipleOf || (field.schema.type === 'integer' ? 1 : 'any')} value={state.drafts?.[field.key] ?? (value === undefined || value === null ? '' : String(value))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, field.control === 'number' ? 'number' : 'text'))} />
-    return { id: field.key, kind: 'selector' as const, intrinsicWidth: 112, minimumWidth: 72, node: <label key={field.key} title={field.schema.description}><span>{field.label}</span>{input}</label> }
+    const voiceMatches = field.key === 'voice' && typeof value === 'string' ? voiceAvailability?.voices?.filter(voice => voice.id === value || voice.label.toLocaleLowerCase() === value.toLocaleLowerCase()) || [] : []
+    const voiceSample = field.key === 'voice' && voiceAvailability ? <ElevenVoiceSampleButton voice={voiceMatches.length === 1 ? voiceMatches[0] : undefined} availability={voiceAvailability} /> : undefined
+    return { id: field.key, kind: 'selector' as const, intrinsicWidth: voiceSample ? 147 : 112, minimumWidth: voiceSample ? 107 : 72, node: <label key={field.key} title={field.schema.description}><span>{field.label}</span>{voiceSample ? <div className="voice-field-with-sample">{input}{voiceSample}</div> : input}</label> }
   })
 }
 
@@ -1357,31 +1426,31 @@ function HiggsfieldSeedanceFields({ state, view, placement, onChange, onRefresh,
   const controls = nativeFieldControls(state, (contract?.fields || []).filter(field => field.placement === placement && field.key !== 'prompt' && field.control !== 'media'), onChange, placement === 'primary' ? footerFieldKeys : undefined)
   if (placement === 'advanced') {
     const removed = Object.entries(state.values).filter(([key]) => contract && !contract.fields.some(field => field.key === key && field.control !== 'media' && field.key !== 'prompt'))
-    return <section className="inspector-grid">
+    return <section className="inspector-section"><div className="inspector-grid">
       {controls.map(control => control.node)}
       <label><span>Model inputs</span><button type="button" className="compact-settings compact-options" aria-label="Refresh Higgsfield model inputs" disabled={view?.loading} onClick={onRefresh}><RefreshCcw size={14} /></button></label>
-      {Boolean(state.repairs?.length) && <label title={state.repairs!.join(' ')}><span>Changed inputs</span><SimpleMenuSelect ariaLabel="Review changed Higgsfield inputs" value="@pending" options={[{ value: '@pending', label: 'Review required', disabled: true }, { value: '@reviewed', label: 'I reviewed the saved values and connections' }]} onChange={() => onChange({ ...state, reviewedFingerprint: state.fingerprint, repairs: [] })} /></label>}
-      {removed.map(([key, value]) => <label key={key}><span>{key} · preserved</span><SimpleMenuSelect ariaLabel={`Preserved ${key}`} value="@saved" displayLabel={String(typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 80)} options={[{ value: '@saved', label: 'Preserved value', disabled: true }, { value: '@discard', label: 'Remove saved value' }]} onChange={() => { const values = { ...state.values }, drafts = { ...state.drafts }; delete values[key]; delete drafts[key]; onChange({ ...state, values, drafts, reviewedFingerprint: undefined }) }} /></label>)}
+      {Boolean(state.repairs?.length) && <label title={state.repairs!.join(' ')}><span>Changed inputs</span><SimpleMenuSelect fillTrack ariaLabel="Review changed Higgsfield inputs" value="@pending" options={[{ value: '@pending', label: 'Review required', disabled: true }, { value: '@reviewed', label: 'I reviewed the saved values and connections' }]} onChange={() => onChange({ ...state, reviewedFingerprint: state.fingerprint, repairs: [] })} /></label>}
+      {removed.map(([key, value]) => <label key={key}><span>{key} · preserved</span><SimpleMenuSelect fillTrack ariaLabel={`Preserved ${key}`} value="@saved" displayLabel={String(typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 80)} options={[{ value: '@saved', label: 'Preserved value', disabled: true }, { value: '@discard', label: 'Remove saved value' }]} onChange={() => { const values = { ...state.values }, drafts = { ...state.drafts }; delete values[key]; delete drafts[key]; onChange({ ...state, values, drafts, reviewedFingerprint: undefined }) }} /></label>)}
       {(!contract || view?.loading || view?.error) && <p className="reference-budget inspector-wide" role={view?.error ? 'alert' : 'status'}>{view?.error || 'Loading current model inputs…'}</p>}
       {contract?.unsupportedInputs.map(item => <p key={item.key} className="reference-budget inspector-wide" role="alert">{item.reason}</p>)}
-    </section>
+    </div></section>
   }
   if (!controls.length) return null
   return <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Primary Higgsfield Fields" gap={7} allocation={{ minRows: 1, maxRows: controls.length }} recalculationKey={`${state.endpointId}:${state.fingerprint}:${JSON.stringify(state.values)}`} controls={controls} /></div>
 }
 
-export function FalNativeFields({ state, contract, placement, onChange, footerFieldKeys }: { state: FalNativeNodeState; contract?: FalSchemaContract; placement: 'primary' | 'advanced'; onChange(state: FalNativeNodeState): void; footerFieldKeys?: ReadonlySet<string> }) {
-  const fields = (contract?.runtime?.fields || []).filter(field => field.placement === placement && field.key !== state.promptField && field.control !== 'media')
-  const controls = nativeFieldControls(state, fields, onChange, placement === 'primary' ? footerFieldKeys : undefined)
+export function FalNativeFields({ state, contract, placement, onChange, footerFieldKeys, voiceAvailability }: { state: FalNativeNodeState; contract?: FalSchemaContract; placement: 'primary' | 'advanced'; onChange(state: FalNativeNodeState): void; footerFieldKeys?: ReadonlySet<string>; voiceAvailability?: ServiceModelAvailability }) {
+  const fields = (contract?.runtime?.fields || []).filter(field => field.placement === placement && field.key !== state.promptField && field.control !== 'media' && !(field.key === 'draft' && supportsFalSeedanceDraft(state.endpointId)))
+  const controls = nativeFieldControls(state, fields, onChange, placement === 'primary' ? footerFieldKeys : undefined, placement === 'primary' && state.flow === 'voice' && /(?:^|\/)elevenlabs\//.test(state.endpointId) ? voiceAvailability : undefined)
   if (placement === 'advanced') {
     const textFields = contract?.runtime?.fields.filter(field => field.control === 'text') || []
     const removed = Object.entries(state.values).filter(([key]) => contract && !contract.runtime?.fields.some(field => field.key === key))
-    return <section className="inspector-grid">
-      <label><span>Prompt field</span><SimpleMenuSelect ariaLabel="Final prompt field" value={state.promptField || '@none'} options={[{ value: '@none', label: 'None' }, ...textFields.map(field => ({ value: field.key, label: field.label })), ...(state.promptField && !textFields.some(field => field.key === state.promptField) ? [{ value: state.promptField, label: `Unavailable (${state.promptField})`, disabled: true }] : [])]} onChange={key => onChange({ ...state, promptField: key === '@none' ? null : key })} /></label>
+    return <section className="inspector-section"><div className="inspector-grid">
+      <label><span>Prompt field</span><SimpleMenuSelect fillTrack ariaLabel="Final prompt field" value={state.promptField || '@none'} options={[{ value: '@none', label: 'None' }, ...textFields.map(field => ({ value: field.key, label: field.label })), ...(state.promptField && !textFields.some(field => field.key === state.promptField) ? [{ value: state.promptField, label: `Unavailable (${state.promptField})`, disabled: true }] : [])]} onChange={key => onChange({ ...state, promptField: key === '@none' ? null : key })} /></label>
       {controls.map(control => control.node)}
-      {Boolean(state.repairs?.length) && <label title={state.repairs!.join(" ")}><span>Changed inputs</span><SimpleMenuSelect ariaLabel="Review changed inputs" value="@pending" options={[{ value: "@pending", label: "Review required", disabled: true }, { value: "@reviewed", label: "I reviewed the saved values and connections" }]} onChange={() => onChange({ ...state, reviewedFingerprint: state.fingerprint, repairs: [] })} /></label>}
-      {removed.map(([key, value]) => <label key={key}><span>{key} · preserved</span><SimpleMenuSelect ariaLabel={`Preserved ${key}`} value="@saved" displayLabel={String(typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 80)} options={[{ value: '@saved', label: 'Preserved value', disabled: true }, { value: '@discard', label: 'Remove saved value' }]} onChange={() => { const values = { ...state.values }, drafts = { ...state.drafts }; delete values[key]; delete drafts[key]; onChange({ ...state, values, drafts }) }} /></label>)}
-    </section>
+      {Boolean(state.repairs?.length) && <label title={state.repairs!.join(" ")}><span>Changed inputs</span><SimpleMenuSelect fillTrack ariaLabel="Review changed inputs" value="@pending" options={[{ value: "@pending", label: "Review required", disabled: true }, { value: "@reviewed", label: "I reviewed the saved values and connections" }]} onChange={() => onChange({ ...state, reviewedFingerprint: state.fingerprint, repairs: [] })} /></label>}
+      {removed.map(([key, value]) => <label key={key}><span>{key} · preserved</span><SimpleMenuSelect fillTrack ariaLabel={`Preserved ${key}`} value="@saved" displayLabel={String(typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 80)} options={[{ value: '@saved', label: 'Preserved value', disabled: true }, { value: '@discard', label: 'Remove saved value' }]} onChange={() => { const values = { ...state.values }, drafts = { ...state.drafts }; delete values[key]; delete drafts[key]; onChange({ ...state, values, drafts }) }} /></label>)}
+    </div></section>
   }
   if (!controls.length) return null
   return <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag"><FluidControlGroup className="voice-primary-row" ariaLabel="Primary Model Fields" gap={7} allocation={{ minRows: 1, maxRows: Math.max(1, controls.length) }} recalculationKey={`${state.endpointId}:${state.fingerprint}:${JSON.stringify(state.values)}`} controls={controls} /></div>
@@ -1442,12 +1511,16 @@ export function reusableEditorFingerprint(data: StudioNodeData): string {
       elementView: asset.metadata?.elementView,
       prompt: asset.metadata?.prompt,
       styleDescription: asset.metadata?.styleDescription,
+      referenceDescription: asset.metadata?.referenceDescription,
+      referenceDescriptionMode: asset.metadata?.referenceDescriptionMode,
       previewFocusX: asset.metadata?.previewFocusX,
       previewFocusY: asset.metadata?.previewFocusY,
     })),
     assetGenerationPrompt: localAssetGenerationPrompt(data),
     stylePrompt: data.stylePrompt || '',
     styleDescription: data.styleDescription || '',
+    referenceDescription: data.referenceDescription,
+    referenceDescriptionMode: data.referenceDescriptionMode,
     imageProvider: data.imageProvider,
     imageModelId: data.imageModelId,
     stylePromptModelId: data.stylePromptModelId,
@@ -1509,6 +1582,12 @@ interface NodeRuntime {
   completeElementSet: (id: string) => void
   saveCharacterAsset: (id: string, name: string) => void
   buildStylePrompt: (id: string) => void
+  revampAssetDescription?: (id: string) => void
+  assetDescriptionValue?: (id: string) => string
+  assetDescriptionHint?: (id: string) => string
+  mediaDescriptionConnected?: (id: string) => boolean
+  mediaReferenceType?: (id: string) => ReferenceMediaType | undefined
+  availableDescriptionTags?: (id: string) => string[]
   saveStylePreset: (id: string, name: string) => void
   saveSemanticAsset: (id: string, name: string) => void
   commitSemanticAssetResult: (id: string, selectedResultId: string) => void
@@ -1519,6 +1598,7 @@ interface NodeRuntime {
   nodeMediaLinkState: (id: string) => { assetId: string; mediaFamily: AssetMediaFamily; state: MediaOfflineVisualState; findingDots: number } | undefined
   semanticAssetAvailability?: (data: StudioNodeData) => SemanticAssetAvailability
   findOfflineAsset: (assetId: string) => void
+  renameGeneratedMedia?: (id: string, index: number, name: string, expectedPath: string) => Promise<void>
   openGeneratedMedia: (id: string, index: number) => void
   revealGeneratedMedia: (id: string, index: number) => void
   copyGeneratedMedia: (id: string, index: number) => void
@@ -1546,6 +1626,7 @@ interface NodeRuntime {
   availablePromptModels?: (provider: AssistantProvider) => ServiceModelAvailability['models']
   promptProviderAccount?: (provider: ServiceProvider) => ServiceAccountStatus | undefined
   availableModels: (provider: ServiceProvider) => ServiceModelAvailability['models']
+  refreshVoiceAvailability?: (provider: 'elevenlabs' | 'fal') => Promise<void>
   serviceAvailability?: (provider: ServiceProvider) => ServiceModelAvailability | undefined
   modelAvailabilityVerified: (provider: ServiceProvider) => boolean
   runAssistantNode: (id: string) => void
@@ -1667,12 +1748,12 @@ const kindMeta = {
   assistant: { icon: NODE_KIND_ICONS.assistant!, label: 'Assistant', subtitle: 'Prompt Enhancement', tone: 'violet' },
 } as const
 
-function mediaPreview(data: StudioNodeData) {
+function mediaPreview(data: StudioNodeData, audioProps?: Omit<AudioPlayerProps, 'src'>) {
   const activeResult = data.generatedResults?.[Math.min(Math.max(data.activeResultIndex || 0, 0), Math.max((data.generatedResults?.length || 1) - 1, 0))]
   const url = activeResult?.url || data.outputUrl || data.assetUrl
   if (!url) return null
   const outputType = activeResult?.type || data.outputType
-  if (outputType === 'audio') return <div className="node-audio-player nodrag"><AudioLines size={16} strokeWidth={1.2} /><span className="node-audio-waveform" aria-hidden="true">{Array.from({ length: 30 }, (_, index) => <i key={index} style={{ height: `${5 + (index * 7 % 15)}px` }} />)}</span><audio className="node-audio" src={url} controls preload="metadata" /></div>
+  if (outputType === 'audio') return <AudioPlayer src={url} {...audioProps} />
   if (outputType === 'video' || data.kind === 'video-generator') {
     return <video className="node-media" src={url} controls preload="metadata" playsInline draggable={false} onDragStart={(event) => event.preventDefault()} />
   }
@@ -1729,7 +1810,6 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   useEffect(() => setVideoPromptRovingMode(videoPrompt?.mode || 'manual'), [videoPrompt?.mode])
   const mediaLinkState = runtime?.nodeMediaLinkState(id)
   const intrinsicSemanticRatio = shouldUseIntrinsicAssetRatio(data.kind, data.kind === 'character' ? data.characterInputMode : data.kind === 'element' ? data.elementInputMode : undefined)
-  const [enhanceOpen, setEnhanceOpen] = useState(false)
   const assetSelector = useHorizontalAssetSelector<HTMLDivElement>()
   const [libraryQuery, setLibraryQuery] = useState('')
   const previousManualSeeded = useRef(Boolean(data.manualPromptSeeded))
@@ -1864,7 +1944,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
     } finally { setAssetBatchBusy(false) }
   }
   const saveAllBatchRows = async () => {
-    if (!assetBatchKind || assetBatchBusy || assetBatchRows.some((row) => !row.displayName.trim())) return
+    if (!assetBatchKind || assetBatchBusy || assetBatchRows.some((row) => !row.displayName.trim() || !row.referenceDescription?.trim())) return
     setAssetBatchBusy(true)
     try {
       for (const row of assetBatchRows) {
@@ -1884,11 +1964,22 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   }
   const activeGeneratedIndex = Math.min(Math.max(data.activeResultIndex || 0, 0), Math.max((data.generatedResults?.length || 1) - 1, 0))
   const activeGeneratedResult = data.generatedResults?.[activeGeneratedIndex]
+  const hasAudioPreview = (activeGeneratedResult?.type || data.outputType) === 'audio'
+  const previewMedia = () => mediaPreview(data, {
+    activeIndex: activeGeneratedIndex, total: data.generatedResults?.length || 1,
+    onPrevious: () => selectGeneratedResult(activeGeneratedIndex - 1),
+    onNext: () => selectGeneratedResult(activeGeneratedIndex + 1),
+    onReveal: activeGeneratedResult
+      ? undefined
+      : data.assetPath || data.outputPath ? () => { void window.prism.assets.revealPath((data.assetPath || data.outputPath)!) } : undefined,
+  })
   const generatedMediaOverlayFor = (index: number, onPrevious: () => void, onNext: () => void) => {
     const result = data.generatedResults?.[index]
     if (!result) return null
     const favorite = Boolean(runtime?.generatedMediaFavorite(id, index))
     return <GeneratedMediaOverlay
+      hideReveal={false}
+      hideNavigation={hasAudioPreview}
       activeIndex={index}
       total={data.generatedResults?.length || 0}
       favorite={favorite}
@@ -1929,7 +2020,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   }, [nodeAssetTag])
   const showsAssetTag = hasMaterializedAsset(data) || reusableEditorDirty
   const Icon = meta.icon
-  const enhanceCatalogs: AssistantCatalogs = data.kind === 'prompt'
+  const enhanceCatalogs: AssistantCatalogs = ['prompt', 'character', 'wardrobe', 'element', 'location', 'style-reference', 'upload'].includes(data.kind)
     ? Object.fromEntries(ASSISTANT_PROVIDER_GROUPS.map(({ id: provider }) => [provider, runtime?.availablePromptModels?.(provider) || runtime?.availableModels(provider) || []]))
     : {}
   const enhanceSelection = resolveAssistantSelection(data.assistantProvider, data.assistantModelId, enhanceCatalogs)
@@ -1939,13 +2030,13 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const enhanceModels = enhanceGroups.find((group) => group.provider === enhanceProvider)?.models || []
   const enhanceModel = enhanceSelection?.model || ''
   const enhanceModelLabel = enhanceModels.find((model) => model.id === enhanceModel)?.label || (enhanceModel ? modelDisplayName(enhanceModel) : 'Choose Model')
-  const enhanceAccount = data.kind === 'prompt' ? runtime?.promptProviderAccount?.(enhanceProvider) || runtime?.providerAccount(enhanceProvider) : undefined
+  const enhanceAccount = ['prompt', 'character', 'wardrobe', 'element', 'location', 'style-reference', 'upload'].includes(data.kind) ? runtime?.promptProviderAccount?.(enhanceProvider) || runtime?.providerAccount(enhanceProvider) : undefined
   const errorProvider: ServiceProvider = data.kind === 'prompt' ? enhanceProvider : generationServiceProvider(data)
-  const displayError = compactProviderError(data.error, errorProvider)
+  const displayError = compactProviderError(useNodeErrorNotice(data), errorProvider)
   const enhanceBlocked = Boolean(enhanceAccount && ['credit-required', 'temporarily-limited', 'unavailable'].includes(enhanceAccount.state))
   const running = data.runState === 'queued' || data.runState === 'running'
   const generationAction = generationActionState(data)
-  const rerun = generationAction === 'rerun'
+  const rerun = generationAction === 'rerun' && !data.draftCompletionPath
   const generationTimeLeft = useGenerationTimeLeft(data, running, id)
   const inputPorts = nodeInputPorts(data)
   // Audio nodes intentionally have no upstream text port, but own a local editor.
@@ -1974,10 +2065,10 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
     if (buttons[next].getAttribute('aria-disabled') !== 'true') runtime?.setVideoPromptMode(id, nextMode)
   }
   const isMediaTile = ['upload', 'output', 'gallery'].includes(data.kind) || isSemanticReference
-  const connectedTags = acceptsText ? runtime?.connectedReferenceTags(id) || [] : []
+  const connectedTags = acceptsText || ['prompt', 'assistant'].includes(data.kind) ? runtime?.connectedReferenceTags(id) || [] : []
   const connectedInputRules = runtime?.connectedInputRules(id) || []
-  const fidelityInputRules = connectedInputRules.filter((rule) => rule.toggleable && rule.edgeId)
-  const visibleInputRules = data.higgsfieldNative ? connectedInputRules : fidelityInputRules
+  const fidelityInputRules = ['image-generator', 'video-generator'].includes(data.kind) ? [] : connectedInputRules.filter((rule) => rule.toggleable && rule.edgeId)
+  const visibleInputRules = ['image-generator', 'video-generator'].includes(data.kind) ? [] : data.higgsfieldNative ? connectedInputRules : fidelityInputRules
   const connectedPromptTags = [...new Set([...connectedTags, ...connectedInputRules.flatMap((rule) => [rule.tag, ...(rule.aliases || [])])])]
   const availablePromptTags = runtime?.availablePromptTags(id) || connectedPromptTags
   const upscalerIsVideo = data.kind === 'upscaler' && data.upscalerModel === 'realesrgan-video'
@@ -2010,6 +2101,8 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       : []
   const nativeVideoFooterControls = nativeVideoFooterControlsWithOneSound(rawNativeVideoFooterControls)
   const nativeVideoFooterFieldKeys = new Set(nativeVideoFooterControls.map(control => control.fieldKey || control.key))
+  const falDraftResolution = Boolean(data.falNative && supportsFalSeedanceDraft(data.falNative.endpointId) && falVideoSchemaFields?.some(field => field.key === 'draft' && field.control === 'boolean'))
+  if (falDraftResolution) nativeVideoFooterFieldKeys.add('draft')
   if (nativeVideoFooterControls.some(control => control.key === 'sound' || control.key === 'generate_audio')) {
     nativeVideoFooterFieldKeys.add('sound')
     nativeVideoFooterFieldKeys.add('generate_audio')
@@ -2022,10 +2115,12 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const nativeVideoSchemaFields = data.falNative?.flow === 'video' ? falVideoSchemaFields
     : data.higgsfieldNative && higgsfieldNativeVideoView?.contract ? higgsfieldVideoSchemaFields : undefined
   const nativeVideoLocalQuantityAvailable = nativeVideoFooterState ? nativeVideoQuantityAvailable(nativeVideoSchemaFields) : false
-  const nativeVideoOutputFps = nativeVideoOutputFrameRate(nativeVideoFooterControls)
+  const nativeVideoEndpoint = nativeVideoFooterState === data.falNative ? data.falNative?.endpointId : data.higgsfieldNative?.endpointId
+  const nativeVideoOutputFps = nativeVideoOutputFrameRate(nativeVideoEndpoint || '', nativeVideoFooterFrameRate(nativeVideoFooterControls))
+  const nativeVideoCadenceIsNative = data.motionCadenceMode === 'native' || data.motionCadenceMode !== 'custom' && (nativeVideoOutputFps === undefined || (videoPrompt?.mode || data.promptMode || 'manual') === 'manual')
   const nativeVideoMotionOptions = nativeVideoFooterState ? nativeVideoMotionCadenceOptions(nativeVideoFooterState === data.falNative ? data.falNative!.endpointId : data.higgsfieldNative!.endpointId, nativeVideoOutputFps) : []
   const normalizedNativeMotionCadence = nativeVideoFooterState
-    ? normalizedNativeVideoMotionCadence(nativeVideoFooterState === data.falNative ? data.falNative!.endpointId : data.higgsfieldNative!.endpointId, nativeVideoOutputFps, data.motionCadence) ?? nativeVideoMotionOptions[0] ?? 24
+    ? normalizedNativeVideoMotionCadence(nativeVideoFooterState === data.falNative ? data.falNative!.endpointId : data.higgsfieldNative!.endpointId, nativeVideoOutputFps, data.motionCadence)
     : undefined
   const nativeVideoMotionCadence = typeof data.motionCadence === 'number' && Number.isFinite(data.motionCadence) ? data.motionCadence : normalizedNativeMotionCadence
   const nativeVideoPromptMode = videoPrompt?.mode || data.promptMode || 'manual'
@@ -2119,7 +2214,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const elementSheet = elementInputMode === 'single' ? elementReferences.find((asset) => asset.metadata?.elementView === ELEMENT_ANCHOR_VIEW) : undefined
   const elementMissingViews = data.kind === 'element' ? missingElementViews(elementReferences) : []
   const visibleProgress = data.kind === 'video-generator' && /Kling O3 References/.test(data.progress || '') ? undefined : data.progress
-  const suppressTerminal = isCanvasGenerator || data.kind === 'character' || data.kind === 'prompt' && !enhanceOpen
+  const suppressTerminal = isCanvasGenerator || data.kind === 'character'
   const notificationCategory = nodeNotificationCategory({ ...data, error: activeDisplayError, progress: visibleProgress, suppressTerminal })
   const visibleStatus = notificationCategory === 'error' ? activeDisplayError : notificationCategory === 'running' || notificationCategory === 'transient' ? visibleProgress : undefined
 
@@ -2285,12 +2380,22 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const semanticEditorActive = data.kind === 'style-reference' && styleCreateOpen
     || data.kind === 'character' && characterCreateOpen
     || ['element', 'location', 'wardrobe'].includes(data.kind) && semanticCreateOpen
+  const referenceDescription = runtime?.assetDescriptionValue?.(id) ?? assetReferenceDescription(data)
+  const descriptionPlaceholder = runtime?.assetDescriptionHint?.(id) ?? assetDescriptionPlaceholder(data.kind, nodeAssetTag)
+  const descriptionConnected = runtime?.mediaDescriptionConnected?.(id) ?? false
+  const descriptionRequired = showsAssetDescription(data, descriptionConnected)
+  const descriptionMissing = descriptionRequired && !referenceDescription.trim()
+  const assetPromptTags = [...new Set([nodeAssetTag, ...availablePromptTags])]
+  const descriptionTags = [...new Set([nodeAssetTag, ...(runtime?.availableDescriptionTags?.(id) || availablePromptTags)])]
+  const referenceMediaType = runtime?.mediaReferenceType?.(id)
+  const referenceModeControls = referenceMediaType && !(data.kind === 'voiceover' && referenceMediaType === 'audio') && <MediaReferenceModes type={referenceMediaType} value={effectiveMediaReferenceMode(data, referenceMediaType)} onChange={mode => { const patch = mediaReferenceModePatch(data, mode, referenceMediaType); if (patch) runtime?.updateNode(id, patch) }} />
+  const descriptionField = <AssetDescriptionField id={id} value={referenceDescription} placeholder={descriptionPlaceholder} connectedTags={descriptionTags} availableTags={descriptionTags} onChange={referenceDescription => runtime?.updateNode(id, { referenceDescription, referenceDescriptionMode: 'authored', error: undefined })} />
   const semanticAssetLabel = data.kind === 'style-reference' ? 'Style' : data.kind === 'character' ? 'Character' : data.kind === 'location' ? 'Location' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Element'
   const semanticModelControl = <GroupedMenuSelect catalog className="compact-engine image-engine" menuClassName="character-ai-provider-menu" ariaLabel={`${semanticAssetLabel} image model`} title="Image model" defaultLabel="GPT Image 2.5 Sunburst" fillTrack value={`${imageProvider}::${imageModelId}`} groups={referenceImageModelGroups} onChange={(nextValue) => { const [provider, ...modelParts] = nextValue.split('::'); runtime?.updateNode(id, { ...imageModelSelectionPatch(provider as StudioNodeData['imageProvider'], modelParts.join('::'), data.imageResolution), error: undefined }) }} />
   const selectedSemanticResultIsGenerated = semanticLifecycle?.references.find((reference) => reference.id === semanticLifecycle.selectedId)?.source === 'generated'
-  const semanticSaveDisabled = selectedSemanticResultIsGenerated
+  const semanticSaveDisabled = descriptionMissing || (selectedSemanticResultIsGenerated
     ? !semanticLifecycle?.canSave
-    : data.kind === 'character' ? !characterReady : data.kind === 'element' ? !elementReferences.some((asset) => asset.metadata?.elementView === ELEMENT_ANCHOR_VIEW) : data.kind === 'style-reference' ? data.runState !== 'complete' || !(data.stylePrompt || '').trim() || saveNameOpen && !saveName.trim() : !(data.referenceAssets || []).length
+    : data.kind === 'character' ? !characterReady : data.kind === 'element' ? !elementReferences.some((asset) => asset.metadata?.elementView === ELEMENT_ANCHOR_VIEW) : data.kind === 'style-reference' ? data.runState !== 'complete' || !(data.stylePrompt || '').trim() || saveNameOpen && !saveName.trim() : !(data.referenceAssets || []).length)
   const semanticSaveControl = <FooterSaveAction ariaLabel={`Save ${semanticAssetLabel}`} disabled={semanticSaveDisabled} onSave={selectedSemanticResultIsGenerated ? saveSelectedSemanticResult : data.kind === 'style-reference' ? saveNameOpen ? commitSaveName : () => { openSaveName(); return false } : saveReusableAssetDirectly} />
   const semanticRunControl = data.kind === 'character'
     ? <PlayTooltip tooltip={characterCompletionTooltip} persistent={running} disabled={!running && characterCompletionDisabled}><button className={`footer-run ${running ? 'is-running' : characterFrontFace ? 'is-rerun' : 'is-ready'} ${characterCompletionFailures.length ? 'is-access-blocked' : ''}`} aria-label={running ? 'Stop Character Generation' : characterInputMode === 'single' ? 'Generate Complete Character Sheet' : 'Complete Missing Character Views'} disabled={!running && characterCompletionDisabled} onClick={() => running ? runtime?.stopNode(id) : runtime?.completeCharacterSet(id)}>{running ? <StopIcon /> : characterFrontFace ? <RerunIcon /> : <Play size={13} fill="currentColor" />}</button></PlayTooltip>
@@ -2308,13 +2413,14 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           <img src={row.previewDataUrl} alt="" />
           <div className="asset-batch-name">{renamingBatchRowId === row.id || !row.displayName ? <input autoFocus value={row.displayName} placeholder="Rename asset" aria-label="Rename asset" onFocus={(event) => event.currentTarget.select()} onChange={(event) => setAssetBatchRows((current) => current.map((item) => item.id === row.id ? { ...item, displayName: event.target.value } : item))} onBlur={() => { if (row.displayName.trim()) setRenamingBatchRowId(null) }} onKeyDown={(event) => { if (event.key === 'Enter' && row.displayName.trim()) setRenamingBatchRowId(null) }} /> : <><strong title={row.displayName}>{row.displayName}</strong><button title="Rename Asset" aria-label="Rename Asset" onClick={() => setRenamingBatchRowId(row.id)}><PencilLine size={11} /></button></>}</div>
           <button className="asset-batch-delete" title="Remove Staged Asset" aria-label="Remove Staged Asset" onClick={() => setAssetBatchRows((current) => current.filter((item) => item.id !== row.id))}><Trash2 size={12} /></button>
-          <button className="asset-batch-save" title="Save Asset" aria-label="Save Asset" disabled={assetBatchBusy || !row.displayName.trim()} onClick={() => void saveBatchRow(row)}><Save size={13} /></button>
+          <button className="asset-batch-save" title="Save Asset" aria-label="Save Asset" disabled={assetBatchBusy || !row.displayName.trim() || !row.referenceDescription?.trim()} onClick={() => void saveBatchRow(row)}><Save size={13} /></button>
+          <AssetDescriptionField id={row.id} value={row.referenceDescription || ''} placeholder={assetDescriptionPlaceholder(assetBatchKind, fallbackAssetTag({ kind: assetBatchKind, title: row.displayName }, assetBatchKind))} connectedTags={availablePromptTags} availableTags={availablePromptTags} onChange={referenceDescription => setAssetBatchRows(current => current.map(item => item.id === row.id ? { ...item, referenceDescription } : item))} />
         </article>)}</div>
-        <div className="asset-batch-footer"><button disabled={assetBatchBusy || assetBatchRows.some((row) => !row.displayName.trim())} onClick={() => void saveAllBatchRows()}><Save size={13} />Save All Assets</button></div>
+        <div className="asset-batch-footer"><button disabled={assetBatchBusy || assetBatchRows.some((row) => !row.displayName.trim() || !row.referenceDescription?.trim())} onClick={() => void saveAllBatchRows()}><Save size={13} />Save All Assets</button></div>
       </>}
   </div> : null
 
-  const nativeModelSelect = data.falNative ? <GroupedMenuSelect catalog flatCatalog={data.falNative.flow === 'image' || data.falNative.flow === 'video'} catalogFlow={data.falNative.flow === 'video' ? 'video' : data.falNative.flow === 'image' ? 'image' : undefined} ariaLabel="Live model" defaultLabel={data.falNative.flow === 'image' ? 'GPT Image 2.5 Sunburst' : data.falNative.flow === 'video' ? 'Seedance 2.5…' : data.falNative.flow === 'voice' ? 'ElevenLabs Eleven v3' : 'Sound Effects v2'} fillTrack displayLabel={data.falNative.label} value={`fal-native::${data.falNative.endpointId}`} groups={data.falNative.flow === 'video' ? videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data) : liveFalModelGroups(data.falNative.flow, runtime?.serviceAvailability?.('fal'), data.falNative.flow === 'image' ? imageModelGroups : data.falNative.flow === 'voice' ? voiceModelMenuGroups(runtime?.availableModels('elevenlabs') || [], runtime?.serviceAvailability?.('fish'), data.fishModel) : [{ label: 'ElevenLabs · Direct', service: 'elevenlabs', options: [{ value: 'elevenlabs', label: 'Sound Effects v2', provider: 'elevenlabs' }] }], data.falNative)} onChange={(selection) => {
+  const nativeModelSelect = data.falNative ? <GroupedMenuSelect catalog flatCatalog catalogFlow={data.falNative.flow === 'video' ? 'video' : data.falNative.flow === 'image' ? 'image' : 'audio'} ariaLabel="Live model" defaultLabel={data.falNative.flow === 'image' ? 'GPT Image 2.5 Sunburst' : data.falNative.flow === 'video' ? 'Seedance 2.5…' : data.falNative.flow === 'voice' ? 'ElevenLabs Eleven v3' : 'Sound Effects v2'} fillTrack displayLabel={data.falNative.label} value={`fal-native::${data.falNative.endpointId}`} groups={data.falNative.flow === 'video' ? videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data) : liveFalModelGroups(data.falNative.flow, runtime?.serviceAvailability?.('fal'), data.falNative.flow === 'image' ? imageModelGroups : data.falNative.flow === 'voice' ? voiceModelMenuGroups(runtime?.availableModels('elevenlabs') || [], runtime?.serviceAvailability?.('fish'), data.fishModel) : [{ label: 'ElevenLabs · Direct', service: 'elevenlabs', options: [{ value: 'elevenlabs', label: 'Sound Effects v2', provider: 'elevenlabs' }] }], data.falNative)} onChange={(selection) => {
               if (selection.startsWith('higgsfield-native::')) { runtime?.selectHiggsfieldModel?.(id, selection.slice('higgsfield-native::'.length)); return }
               if (selection.startsWith('fal-native::')) { runtime?.selectFalModel?.(id, selection.slice(12)); return }
               const preserved = preserveFalNativeSelection(data)
@@ -2349,19 +2455,96 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
     intrinsicWidth: nativeVideoFooterFieldWidth(control), minimumWidth: control.key === 'duration' ? 38 : 44, priority: control.key === 'sound' || control.key === 'generate_audio' ? 45 : 55,
     preferredRow: control.key === 'aspect_ratio' || control.key === 'duration' ? 0 : 1, preferredZone: 'middle' as const,
     node: data.falNative?.flow === 'video'
-      ? <NativeVideoFooterField control={control} state={data.falNative} onChange={updateNativeVideoFooterState} running={running} />
+      ? <NativeVideoFooterField control={control} state={data.falNative} onChange={updateNativeVideoFooterState} running={running} draftNode={falDraftResolution ? data : undefined} onDraftPatch={patch => runtime?.updateNode(id, patch)} />
       : data.higgsfieldNative
         ? <NativeVideoFooterField control={control} state={data.higgsfieldNative} onChange={updateNativeVideoFooterState} running={running} />
         : null,
   }))
   const nativeVideoFooterControlsForGroup: FluidGroupControl<string>[] = nativeVideoFooterState && nativeVideoModelSelect ? [
     { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: 'Seedance 2.5…', fullLabel: nativeVideoModelLabel, compactLabel: nativeVideoModelLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, preferredRow: 0, preferredZone: 'start', fixedAnchor: 'first', node: nativeVideoModelSelect },
-    { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: `${nativeVideoMotionCadence} fps`, intrinsicWidth: 54, minimumWidth: 46, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect className="compact-fps" ariaLabel="Motion FPS" title={nativeVideoPromptMode === 'manual' ? 'Motion FPS changes the Locked prompt only. The User prompt is preserved; native output FPS remains model-controlled.' : 'Motion FPS controls how frequently movement visibly updates without changing encoded provider Native FPS or playback speed.'} disabled={nativeVideoPromptMode === 'manual'} displayLabel={`${nativeVideoMotionCadence} fps`} defaultLabel={`${nativeVideoMotionCadence} fps`} fillTrack value={String(nativeVideoMotionCadence)} options={[...nativeVideoMotionOptions.map(fps => ({ value: String(fps), label: `${fps} fps` })), ...(nativeVideoMotionCadence !== undefined && !nativeVideoMotionOptions.includes(nativeVideoMotionCadence) ? [{ value: String(nativeVideoMotionCadence), label: `${nativeVideoMotionCadence} fps · review`, disabled: true }] : [])]} onChange={value => runtime?.updateNode(id, { motionCadence: Number(value) })} /> },
+    { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: nativeFpsLabel(nativeVideoOutputFps), intrinsicWidth: 62, minimumWidth: 46, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect className="compact-fps" ariaLabel="Motion FPS" disabled={running} displayLabel={nativeVideoCadenceIsNative || nativeVideoMotionCadence === undefined ? nativeFpsLabel(nativeVideoOutputFps) : `${nativeVideoMotionCadence} fps${nativeVideoMotionOptions.includes(nativeVideoMotionCadence) ? '' : ' · review'}`} defaultLabel={nativeFpsLabel(nativeVideoOutputFps)} fillTrack value={nativeVideoCadenceIsNative || nativeVideoMotionCadence === undefined ? '@native' : String(nativeVideoMotionCadence)} options={[
+      { value: '@native', label: nativeFpsLabel(nativeVideoOutputFps) },
+      ...nativeVideoMotionOptions.map(fps => ({ value: String(fps), label: `${fps} fps` })),
+      ...(!nativeVideoCadenceIsNative && nativeVideoMotionCadence !== undefined && !nativeVideoMotionOptions.includes(nativeVideoMotionCadence) ? [{ value: String(nativeVideoMotionCadence), label: `${nativeVideoMotionCadence} fps · review`, disabled: true }] : []),
+    ]} onChange={value => runtime?.updateNode(id, value === '@native' ? { motionCadenceMode: 'native' } : { motionCadence: Number(value), motionCadenceMode: 'custom' })} /> },
     ...nativeVideoFooterFieldNodes,
     { id: 'quantity', kind: 'bounded-elastic', visible: nativeVideoLocalQuantityAvailable, available: nativeVideoLocalQuantityAvailable, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, preferredRow: 1, preferredZone: 'start', node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
     { id: 'settings', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 95, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button> },
-    { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
+    { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
   ] : []
+
+  const nativeVoiceState = data.kind === 'voiceover' ? data.falNative : undefined
+  const nativeVoiceContract = nativeVoiceState ? runtime?.falSchema?.(nativeVoiceState.endpointId).contract : undefined
+  const nativeVoiceField = nativeVoiceContract?.runtime?.fields.find(field => field.key === 'voice' || field.key === 'voice_id')
+  const allNativeVoices = runtime?.serviceAvailability?.('fal')
+  const nativeVoiceCatalog = useMemo(() => nativeVoiceField?.choices ? allNativeVoices && {...allNativeVoices,voices:allNativeVoices.voices?.filter(voice => nativeVoiceField.choices!.some(choice => typeof choice === 'string' && (nativeVoiceField.key === 'voice_id' ? choice === voice.id : choice.toLowerCase() === voice.label.toLowerCase())))} : allNativeVoices,[allNativeVoices,nativeVoiceField])
+  const nativeVoiceValue = nativeVoiceField && nativeVoiceState?.values[nativeVoiceField.key]
+  const nativeVoiceMatches = typeof nativeVoiceValue === 'string' ? nativeVoiceCatalog?.voices?.filter(voice => nativeVoiceField?.key === 'voice_id' ? voice.id === nativeVoiceValue : voice.label.toLocaleLowerCase() === nativeVoiceValue.toLocaleLowerCase()) || [] : []
+  const nativeVoiceInput = nativeVoiceState && nativeVoiceField ? /elevenlabs/i.test(nativeVoiceState.endpointId) ? <label><span>Voice</span><VoicePicker Selector={SimpleMenuSelect} provider="fal" availability={nativeVoiceCatalog} ariaLabel={nativeVoiceField.label || 'Voice'} value={typeof nativeVoiceValue === 'string' ? nativeVoiceValue : ''} valueType={nativeVoiceField.key === 'voice_id' ? 'id' : 'name'} onChange={voice => runtime?.updateNode(id,{falNative:{...nativeVoiceState,values:{...nativeVoiceState.values,[nativeVoiceField.key]:nativeVoiceField.key === 'voice_id' ? voice.id : voice.label}}})}/></label> : nativeFieldControls(nativeVoiceState, [nativeVoiceField], falNative => runtime?.updateNode(id, { falNative }))[0]?.node : undefined
+  const nativeVoiceModelAndFields = nativeVoiceState && <div className="native-model-field-section voice-footer-fields">
+    <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag">
+      <FluidControlGroup className="voice-primary-row" ariaLabel="Selected Live Model" recalculationKey={nativeVoiceState.endpointId} gap={7} allocation={{ minRows: 1, maxRows: 1 }} controls={[
+        { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <label><span>Model</span>{nativeModelSelect}</label> },
+      ]} />
+    </div>
+    <FalNativeFields state={nativeVoiceState} contract={nativeVoiceContract} placement="primary" onChange={falNative => runtime?.updateNode(id, { falNative })} footerFieldKeys={new Set(nativeVoiceField ? [nativeVoiceField.key] : [])} />
+  </div>
+
+  const genericQuantity = <>{!data.falNative && !['element', 'location', 'wardrobe'].includes(data.kind) && <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster">
+            <button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, -1) : runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={12} /></button>
+            <span>x{data.quantity || 1}</span>
+            <button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, 1) : runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={12} /></button>
+          </span></div>}</>
+
+  const voiceFooter = data.kind === 'voiceover'
+  const directVoiceCatalog = runtime?.serviceAvailability?.('elevenlabs')
+  const legacyVoiceCatalog = runtime?.serviceAvailability?.('fal')
+  const voiceFooterCatalog = data.voiceEngine === 'elevenlabs-direct' && !data.falNative ? directVoiceCatalog : legacyVoiceCatalog
+  const nonNativeVoiceFields = <>{data.kind === 'voiceover' && !data.falNative && data.voiceEngine === 'elevenlabs-direct' && <DirectElevenVoiceControls footer quantityControl={genericQuantity} data={data} availability={runtime?.serviceAvailability?.('elevenlabs')} fishAvailability={runtime?.serviceAvailability?.('fish')} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
+{data.kind === 'voiceover' && !data.falNative && data.voiceEngine !== 'elevenlabs-direct' && <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
+        <FluidControlGroup
+          className="voice-primary-row voice-primary-row-two"
+          ariaLabel="Voice Model And Voice Controls"
+          gap={7}
+          allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }}
+          recalculationKey={`${data.voiceEngine}:${data.fishModel || ''}:${data.fishReferenceId || ''}:${data.voice || ''}`}
+          controls={[
+            { id: 'model', kind: 'selector', defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} fishAvailability={runtime?.serviceAvailability?.('fish')} models={runtime?.availableModels('elevenlabs') || []} onChange={(patch) => runtime?.updateNode(id, patch)} /></label> },
+          ] as FluidGroupControl<'model' | 'voice'>[]}
+        />
+        {data.voiceEngine !== 'fish-audio' && <>
+          <FluidControlGroup
+            className="voice-primary-row voice-primary-row-three"
+            ariaLabel="Voice Language Output And Speed Controls"
+            gap={7}
+            allocation={{ minRows: 1, maxRows: 2 }}
+            recalculationKey={`${data.languageCode || 'eng'}:${data.audioOutputFormat || 'mp3_44100_128'}:${data.speed ?? 1}`}
+            controls={[
+              { id: 'language', kind: 'selector', intrinsicWidth: 92, node: <label className="voice-primary-language-field"><span>Language</span><SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" defaultLabel="English" fillTrack value={normalizedElevenV3LanguageCode(data.languageCode) || 'eng'} options={[...ELEVEN_V3_LANGUAGES]} onChange={(languageCode) => runtime?.updateNode(id, { languageCode })} /></label> },
+              { id: 'output', kind: 'selector', intrinsicWidth: 130, node: <label className="voice-primary-output-field"><span>Output</span><SimpleMenuSelect ariaLabel="Voice Output Format" defaultLabel={audioFormatLabel(ELEVEN_AUDIO_OUTPUT_FORMATS[0])} fillTrack value={data.audioOutputFormat || 'mp3_44100_128'} options={ELEVEN_AUDIO_OUTPUT_FORMATS.map((value) => ({ value, label: audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></label> },
+              { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label className="voice-primary-speed-field"><span>Speed</span><SimpleMenuSelect ariaLabel="ElevenLabs speech speed" defaultLabel="1×" fillTrack value={String(Number((Math.min(1.2, Math.max(0.7, data.speed ?? 1)) * 20).toFixed(0)) / 20)} options={ELEVEN_SPEED_OPTIONS} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
+            ]}
+          />
+          {!usesBuiltInElevenVoice && <label className="voice-primary-custom"><span>Custom Voice</span><input className="voice-primary-input" aria-label="Custom ElevenLabs voice name or ID" value={data.voice || ''} onChange={(event) => runtime?.updateNode(id, { voice: event.target.value, error: undefined })} placeholder="Voice name or ID (required)" /></label>}
+        </>}
+        {data.voiceEngine === 'fish-audio' && <FluidControlGroup
+          className="voice-primary-row voice-primary-output-row"
+          ariaLabel="Fish Audio Output Controls"
+          gap={7}
+          allocation={{ minRows: 1, maxRows: 3 }}
+          recalculationKey={`${data.fishFormat || 'mp3'}:${data.fishSampleRate || 44100}:${data.fishMp3Bitrate || 128}:${data.fishOpusBitrate ?? -1000}:${data.fishVolume ?? 0}:${data.speed ?? 1}`}
+          controls={[
+            { id: 'format', kind: 'selector', intrinsicWidth: 52, node: <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish Audio Format" defaultLabel="MP3" fillTrack value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label> },
+            { id: 'sample-rate', kind: 'selector', intrinsicWidth: 70, node: <label><span>Sample Rate</span><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" defaultLabel="44.1 kHz" fillTrack value={data.fishSampleRate === undefined ? '@default' : String(data.fishSampleRate)} options={fishSampleRateOptions(data.fishFormat, data.fishSampleRate)} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label> },
+            ...((data.fishFormat || 'mp3') === 'mp3' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" defaultLabel="128 kbps" fillTrack value={String(data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', data.fishMp3Bitrate ?? 128)} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label> }] : []),
+            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? -1000)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? -1000)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
+            { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label><span>Speed</span><SimpleMenuSelect ariaLabel="Fish Audio Speed" defaultLabel="1×" fillTrack value={String(data.speed ?? 1)} options={fishNumberOptions(Array.from({ length: 31 }, (_, i) => Number((0.5 + i / 20).toFixed(2))), data.speed ?? 1, '×', 0.5, 2)} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
+            { id: 'volume', kind: 'selector', intrinsicWidth: 52, node: <label><span>Volume</span><SimpleMenuSelect ariaLabel="Fish Audio Volume" defaultLabel="0 dB" fillTrack value={String(data.fishVolume ?? 0)} options={fishNumberOptions(Array.from({ length: 41 }, (_, i) => i - 20), data.fishVolume ?? 0, ' dB', -20, 20)} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label> },
+          ]}
+        />}
+      </div>}</>
+  const nonNativeVoiceSpeaker = voiceFooter && !data.falNative && !isElevenDialogue(data) ? <label><span>{data.voiceEngine === 'fish-audio' ? 'Voice ID' : 'Voice'}</span>{data.voiceEngine === 'fish-audio' ? <input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" value={data.fishReferenceId || ''} onChange={event => runtime?.updateNode(id,{fishReferenceId:event.target.value,error:undefined})} placeholder="Reference ID (required)"/> : <VoicePicker Selector={SimpleMenuSelect} provider={data.voiceEngine === 'elevenlabs-direct' ? 'elevenlabs' : 'fal'} availability={voiceFooterCatalog} value={data.voice || ''} valueType={data.voiceEngine === 'elevenlabs-direct' ? 'id' : 'name'} ariaLabel={data.voiceEngine === 'elevenlabs-direct' ? 'ElevenLabs voice ID' : 'ElevenLabs voice'} onRefresh={runtime?.refreshVoiceAvailability ? () => runtime.refreshVoiceAvailability!(data.voiceEngine === 'elevenlabs-direct' ? 'elevenlabs' : 'fal') : undefined} onChange={voice => runtime?.updateNode(id,{voice:data.voiceEngine === 'elevenlabs-direct' ? voice.id : voice.label,error:undefined})}/>}</label> : undefined
+  const nonNativeVoicePreview = voiceFooterCatalog?.voices?.find(voice => data.voiceEngine === 'elevenlabs-direct' ? voice.id === data.voice : voice.label.toLowerCase() === (data.voice || '').toLowerCase())
 
   return (
     <article className={`studio-node kind-${data.kind} tone-${meta.tone} ${selected ? 'is-selected' : ''} ${data.locked ? 'is-locked' : ''} ${running ? 'is-generating' : ''} ${isCanvasGenerator ? 'is-canvas-generator' : ''} ${isMediaTile ? 'is-media-tile' : ''}`} aria-busy={running || undefined}>
@@ -2374,10 +2557,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         <button data-tooltip="Delete [⌫]" aria-label="Delete Node" aria-keyshortcuts="Backspace Delete" onClick={() => runtime?.deleteNode(id)}><Trash2 size={13} /></button>
       </div>}
       {inputPorts.map((port) => <NodePort key={port.id} id={port.id} type="target" signal={port.signal} label={port.label} icon={port.icon} position={Position.Left} style={{ top: port.top }} onRoute={(event) => runtime?.openInputQuickConnect(id, port.id, event.clientX, event.clientY)} />)}
-      {renameNameOpen && <div className="asset-save-name-popover node-rename-name-popover nodrag">
-        <input autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="Asset name" value={renameName} onChange={(event) => setRenameName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') commitRenameName(); if (event.key === 'Escape') setRenameNameOpen(false) }} />
-        <button onClick={commitRenameName} disabled={!renameName.trim()}><Check size={11} />Rename</button>
-      </div>}
+      {renameNameOpen && <AssetRenamePopover value={renameName} onChange={setRenameName} onCommit={commitRenameName} onCancel={() => setRenameNameOpen(false)} />}
       {!data.headerHidden && showsAssetTag && (canRenameAsset
         ? <label className={`node-asset-tag nodrag ${reusableEditorDirty ? 'is-unsaved' : ''}`} title={reusableEditorDirty ? 'Unsaved changes' : 'Double-click to rename asset'} onDoubleClick={(event) => { event.stopPropagation(); if (!reusableEditorDirty) setAssetTagEditing(true) }}><span>@</span>{assetTagEditing && !reusableEditorDirty ? <input autoFocus aria-label={`Rename ${data.title}`} value={assetTagDraft} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setAssetTagDraft(event.target.value)} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()} onBlur={() => { commitAssetTagDraft(); setAssetTagEditing(false) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur() } if (event.key === 'Escape') { setAssetTagDraft(nodeAssetTag.slice(1)); setAssetTagEditing(false) } }} /> : <strong>{reusableEditorDirty ? 'Unsaved' : assetTagDraft}</strong>}</label>
         : <div className="node-asset-tag is-readonly nodrag" aria-label={`Preset Asset Tag ${nodeAssetTag}`}><span>@</span><strong>{nodeAssetTag.slice(1)}</strong></div>)}
@@ -2389,24 +2569,20 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         </div>
         {data.kind === 'character' && (characterCreateOpen ? <button className="header-readiness-pill is-action is-cancel" aria-label="Cancel Asset Creation" onClick={cancelReusableEditor}>Cancel</button> : <span className={`header-readiness-pill ${characterReady ? 'is-ready' : 'is-required'} ${reusableOffline ? 'is-offline' : ''}`}>{reusableOffline ? 'Offline' : characterReady ? 'Ready' : 'Face Required'}</span>)}
         {['element', 'location', 'wardrobe', 'style-reference'].includes(data.kind) && ((data.kind === 'style-reference' ? styleCreateOpen : semanticCreateOpen) ? <button className="header-readiness-pill is-action is-cancel" aria-label="Cancel Asset Creation" onClick={cancelReusableEditor}>Cancel</button> : <span className={`header-readiness-pill ${reusableReady ? 'is-ready' : 'is-required'} ${reusableOffline ? 'is-offline' : ''}`}>{reusableOffline ? 'Offline' : reusableReady ? 'Ready' : reusableRequiredLabel}</span>)}
-        {data.kind === 'prompt' && <button className={`prompt-enhance-switch nodrag ${enhanceOpen ? 'is-active' : ''}`} role="switch" aria-checked={enhanceOpen} title={enhanceOpen ? 'Turn Off Prompt Enhancement' : 'Turn On Prompt Enhancement'} onClick={() => { setEnhanceOpen((value) => !value); runtime?.updateNode(id, { error: undefined, progress: undefined }) }}><Sparkles className="prompt-enhance-switch-icon" size={12} /><span>Enhance</span><span className="prompt-enhance-track"><i /></span></button>}
+
       </header>}
 
       {data.kind === 'prompt' && (
         <div className="prompt-node-body nodrag">
           <TaggedPromptTextarea className="node-textarea" value={data.prompt || ''} connectedTags={connectedPromptTags} availableTags={availablePromptTags} placeholder="Describe a world, product, frame, or movement…" onValueChange={(prompt) => runtime?.updatePrompt(id, prompt)} />
-          {enhanceOpen && <div className="prompt-enhance-popover prompt-enhance-inline">
-            <div className="prompt-enhance-compact">
-              <div className="prompt-enhance-model-picker">
-                <GroupedMenuSelect catalog promptCatalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Enhance model" defaultLabel="GPT 6.1 Sol" value={`${enhanceProvider}::${enhanceModel || ''}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map((group) => ({ label: group.label, options: group.models.map((model) => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined, progress: undefined }) }} />
-              </div>
-              <button className="prompt-enhance-round" title="Connections" aria-label="Open Connections" onClick={() => runtime?.openConnections(enhanceProvider, enhanceModelLabel)}><Settings size={13} /></button>
-              <button className="prompt-enhance-apply" title="Apply Enhancement" aria-label="Apply Enhancement" disabled={enhanceBlocked || !enhanceModel || !(data.prompt || '').trim() || data.runState === 'running'} onClick={() => runtime?.runAssistantNode(id)}>{data.runState === 'running' ? <LoaderCircle size={11} className="spin" /> : 'Apply'}</button>
-            </div>
-            {displayError && <small className="prompt-enhance-hint">{displayError}</small>}
-          </div>}
+
         </div>
       )}
+
+      {data.kind === 'prompt' && <footer className="compact-generator-footer prompt-node-footer nodrag">
+        <GroupedMenuSelect catalog promptCatalog fillTrack ariaLabel="Prompt Revamp model" defaultLabel="Choose Model" value={`${enhanceProvider}::${enhanceModel}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map(group => ({ label: group.label, options: group.models.map(model => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={selection => { const [provider, ...model] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: model.join('::'), error: undefined, progress: undefined }) }} />
+        <PlayTooltip tooltip={running ? 'Revamping prompt' : 'Revamp Prompt'} disabled={running || enhanceBlocked || !enhanceModel || !(data.prompt || '').trim()}><button type="button" className="footer-run prompt-revamp-button" aria-label="Revamp Prompt" disabled={running || enhanceBlocked || !enhanceModel || !(data.prompt || '').trim()} onClick={() => runtime?.runAssistantNode(id)}>{running ? <LoaderCircle size={13} className="spin" /> : <WandSparkles size={13} />}</button></PlayTooltip>
+      </footer>}
 
       {data.kind === 'upload' && !data.assetUrl && (
         <button className="upload-drop media-tile-empty nodrag" onClick={() => runtime?.importAsset(id)}>
@@ -2456,7 +2632,6 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
             {semanticLifecycle?.status === 'SAVE_COMPLETE' && <div className="semantic-asset-save-status" aria-live="polite">Result saved.</div>}
             {!selectedSemanticGeneratedResult && <div className="reusable-large-preview-actions"><button title={(data.referenceAssets || []).some((asset) => asset.favorite) ? 'Remove From Favorites' : 'Add To Favorites'} onClick={() => runtime?.setReusableFavorite(id, !(data.referenceAssets || []).some((asset) => asset.favorite))}><Heart size={13} fill={(data.referenceAssets || []).some((asset) => asset.favorite) ? 'currentColor' : 'none'} /></button>{!selectedStylePreset && <button title="Export" disabled={!(data.referenceAssets || []).length && !(data.kind === 'style-reference' && (data.stylePrompt || data.prompt || '').trim())} onClick={() => runtime?.exportReusableAsset(id)}><Upload size={13} /></button>}{!selectedStylePreset ? <button title="Edit" aria-label="Edit" onClick={openReusableEditor}><PencilLine size={13} /></button> : null}{!selectedStylePreset && <button title="Delete" onClick={() => runtime?.deleteReusableAsset(id)}><Trash2 size={13} /></button>}</div>}
           </div>}
-          {!styleCreateOpen && !characterCreateOpen && !semanticCreateOpen && <button className={`style-create-toggle ${data.kind === 'character' ? 'character-create-toggle' : ''}`} onClick={openReusableCreator}><Plus size={12} />Create {data.kind === 'style-reference' ? 'Style' : data.kind === 'character' ? 'Character' : data.kind === 'location' ? 'Location' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Element'}</button>}
           {['element', 'location', 'wardrobe'].includes(data.kind) && semanticCreateOpen && <div className="style-create-panel-head"><span>Custom {data.kind === 'location' ? 'Location' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Element'}</span></div>}
           {data.kind === 'character' && characterCreateOpen && <div className="style-create-panel-head"><span>Custom Character</span></div>}
           {data.kind === 'character' && characterCreateOpen ? <>
@@ -2510,27 +2685,29 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           </button>{semanticGeneratedOverlay}</div> : null}
           {semanticLifecycle && <SemanticAssetSaveFeedback state={semanticLifecycle} dispatch={dispatchSemanticLifecycle} onConfirm={(committing) => { const selectedResultId = committing.pendingSave?.selectedResultId; if (selectedResultId) runtime?.commitSemanticAssetResult(id, selectedResultId) }} />}
           {data.kind === 'style-reference' && styleCreateOpen && <div className="style-node-details">
-            <input className="style-description-inline" required maxLength={140} aria-required="true" aria-label="Style short description" value={data.styleDescription || ''} placeholder="Short description (required)…" onChange={(event) => runtime?.updateNode(id, { styleDescription: event.target.value, styleSavedAt: undefined, runState: 'idle', progress: undefined, error: undefined })} />
-            <TaggedPromptTextarea className="style-prompt-inline" value={assetGenerationPrompt} connectedTags={[]} availableTags={[]} placeholder="Describe the visual style to create…" onValueChange={(assetGenerationPrompt) => runtime?.updateNode(id, { assetGenerationPrompt, prompt: undefined, stylePrompt: undefined, styleSavedAt: undefined, runState: 'idle', progress: undefined })} />
+            <input className="style-description-inline" required maxLength={140} aria-required="true" aria-label="Style short description" value={data.styleDescription || ''} placeholder="Short description (required)…" onChange={event => runtime?.updateNode(id, { styleDescription: event.target.value, styleSavedAt: undefined, runState: 'idle', progress: undefined, error: undefined })} />
           </div>}
-          {!assetBatchOpen && (data.kind === 'character' && characterCreateOpen || ['element', 'location', 'wardrobe'].includes(data.kind) && semanticCreateOpen) && <div className="style-node-details semantic-node-details"><TaggedPromptTextarea className="style-prompt-inline" value={assetGenerationPrompt} connectedTags={[]} availableTags={[]} placeholder={data.kind === 'character' ? 'Describe the character to create…' : data.kind === 'location' ? 'Describe the location to create…' : data.kind === 'wardrobe' ? 'Describe the wardrobe to create…' : 'Describe the element to create…'} onValueChange={(assetGenerationPrompt) => runtime?.updateNode(id, { assetGenerationPrompt, prompt: undefined })} /></div>}
+          {!assetBatchOpen && <AssetPromptFields id={id} data={data} editing={editorSessionMode === 'edit'} connectedToGenerator={descriptionConnected} showPrompt={semanticEditorActive} description={referenceDescription} descriptionPlaceholder={descriptionPlaceholder} descriptionTags={descriptionTags} connectedTags={assetPromptTags} availableTags={availablePromptTags} onDescriptionChange={referenceDescription => runtime?.updateNode(id, { referenceDescription, referenceDescriptionMode: 'authored', error: undefined })} onPromptChange={assetGenerationPrompt => runtime?.updateNode(id, { assetGenerationPrompt, prompt: undefined, ...(data.kind === 'style-reference' ? { stylePrompt: undefined, styleSavedAt: undefined } : {}) })} />}
+
+          {!styleCreateOpen && !characterCreateOpen && !semanticCreateOpen && <button className={`style-create-toggle ${data.kind === 'character' ? 'character-create-toggle' : ''}`} onClick={openReusableCreator}><Plus size={12} />Create {data.kind === 'style-reference' ? 'Style' : data.kind === 'character' ? 'Character' : data.kind === 'location' ? 'Location' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Element'}</button>}
+
         </div>
       )}
 
       {!isSemanticReference && !isCanvasGenerator && data.kind !== 'upscaler' && (mediaLinkState
         ? <div className="media-tile-preview"><MediaOfflineState mediaFamily={mediaLinkState.mediaFamily} state={mediaLinkState.state} findingDots={mediaLinkState.findingDots} onFind={() => runtime?.findOfflineAsset(mediaLinkState.assetId)} /></div>
         : activeGeneratedResult
-        ? <div className={`generated-media-stage nodrag ${isMediaTile ? 'media-tile-preview' : ''}`} {...generatedMediaInteraction}>{mediaPreview(data)}{generatedMediaOverlay}</div>
-        : isMediaTile && mediaPreview(data)
-          ? <div className="media-tile-preview">{mediaPreview(data)}</div>
-          : mediaPreview(data))}
+        ? <div className={`generated-media-stage nodrag ${isMediaTile ? 'media-tile-preview' : ''}`} {...generatedMediaInteraction}>{previewMedia()}{generatedMediaOverlay}</div>
+        : isMediaTile && previewMedia()
+          ? <div className="media-tile-preview">{previewMedia()}</div>
+          : previewMedia())}
 
       {isCanvasGenerator && <>
         {visibleInputRules.length > 0 && <div className="generator-connected-context nodrag">
           <div className="connected-input-rules" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>
         </div>}
         <div className="generator-stage nodrag" style={{ aspectRatio: stageRatio.replace(':', ' / ') }} {...generatedMediaInteraction}>
-          {mediaPreview(data)}
+          {previewMedia()}
           {generatedMediaOverlay}
           {!data.outputUrl && !data.outputPath && <div className="generator-input-slots nodrag" aria-label={`Available ${isImageGeneratorSurface ? 'Image' : 'Video'} Inputs`} data-input-count={inputPorts.length} data-stage-orientation={stageOrientation} style={{ '--generator-input-columns': stageOrientation === 'portrait' ? 1 : inputPorts.length >= 6 ? 3 : Math.min(2, Math.max(1, inputPorts.length)) } as CSSProperties}>
             {inputPorts.map((port) => <button key={port.id} type="button" disabled={port.maxConnections === 0} aria-label={`Add ${port.label}`} title={`Add ${port.label}`} onClick={(event) => runtime?.openInputQuickConnect(id, port.id, event.clientX, event.clientY)}><GeneratorInputIcon id={port.id} signal={port.signal} kind={data.kind} /><span>{generatorInputLabel(port.id, port.label)}</span></button>)}
@@ -2538,26 +2715,26 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         </div>
         <div className={`video-prompt-owner-shell ${videoPrompt ? `is-${videoPrompt.mode}` : ''}`}>
           <TaggedPromptTextarea
-            className="node-prompt generator-prompt nodrag"
+            className="node-prompt generator-prompt media-generator-prompt nodrag"
             value={videoPrompt?.activePrompt ?? data.prompt ?? ''}
             connectedTags={connectedPromptTags}
             availableTags={videoPrompt?.mode === 'auto' ? [] : availablePromptTags}
             readOnly={videoPrompt?.mode === 'auto'}
             aria-readonly={videoPrompt?.mode === 'auto'}
             aria-describedby={videoPrompt?.mode === 'auto' ? `video-prompt-owner-${id}` : undefined}
-            title={videoPrompt?.mode === 'auto' ? 'Compiled from connected Storyboard. Edit panels, timing, framing, camera, and transitions in Storyboard.' : undefined}
+            title={videoPrompt?.mode === 'auto' ? 'Compiled from connected inputs. Edit the source prompt, descriptions, and any Storyboard panels or timing.' : undefined}
             placeholder={isImageGeneratorSurface ? 'Describe the image you want to generate…' : 'Describe the video you want to generate…'}
             onValueChange={(prompt) => runtime?.updatePrompt(id, prompt)}
           />
-          {videoPrompt?.mode === 'auto' && <span id={`video-prompt-owner-${id}`} className="storyboard-visually-hidden">Compiled from connected Storyboard. Edit panels, timing, framing, camera, and transitions in Storyboard.</span>}
+          {videoPrompt?.mode === 'auto' && <span id={`video-prompt-owner-${id}`} className="storyboard-visually-hidden">Compiled from connected inputs. Edit the source prompt, descriptions, and any Storyboard panels or timing.</span>}
           {manualSeedDisclosure && <span className="storyboard-visually-hidden" role="status" aria-live="polite">Manual draft copied once from the current Auto prompt.</span>}
-          {data.kind === 'video-generator' && (!data.higgsfieldNative || !higgsfieldSourceOwnsTimeline(data.higgsfieldNative.endpointId)) && videoPrompt && <div className="storyboard-prompt-actions video-prompt-actions" role="radiogroup" aria-label="Video prompt mode" onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setVideoPromptRovingMode(videoPrompt?.mode || 'manual') }}>
+          {data.kind === 'video-generator' && (!data.higgsfieldNative || !higgsfieldSourceOwnsTimeline(data.higgsfieldNative.endpointId)) && videoPrompt && <div className="storyboard-control-reveal-zone"><div className="storyboard-prompt-actions video-prompt-actions" role="radiogroup" aria-label="Video prompt mode" onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setVideoPromptRovingMode(videoPrompt?.mode || 'manual') }}>
             <div className="storyboard-transition-choice">
-              <button type="button" role="radio" className={`storyboard-transition-option ${videoPrompt?.mode === 'auto' ? 'is-active' : ''}`} aria-checked={videoPrompt?.mode === 'auto'} aria-disabled={!videoPrompt?.connected} aria-label="Use Locked Storyboard Prompt" data-tooltip={videoPrompt?.connected ? 'Locked · Compiled from Storyboard' : 'Connect a Storyboard to use Locked'} tabIndex={videoPromptRovingTabIndex('auto', videoPromptRovingMode)} onKeyDown={handleVideoPromptModeKey} onClick={() => { if (videoPrompt?.connected) { setVideoPromptRovingMode('auto'); runtime?.setVideoPromptMode(id, 'auto') } }}>{videoPrompt?.mode === 'auto' ? 'Locked' : 'Lock'}</button>
+              <button type="button" role="radio" className={`storyboard-transition-option ${videoPrompt?.mode === 'auto' ? 'is-active' : ''}`} aria-checked={videoPrompt?.mode === 'auto'} aria-disabled={!videoPrompt?.connected} aria-label="Use Locked Connected Prompt" data-tooltip={videoPrompt?.connected ? 'Locked · Compiled from connected inputs' : 'Connect a prompt or reference to use Locked'} tabIndex={videoPromptRovingTabIndex('auto', videoPromptRovingMode)} onKeyDown={handleVideoPromptModeKey} onClick={() => { if (videoPrompt?.connected) { setVideoPromptRovingMode('auto'); runtime?.setVideoPromptMode(id, 'auto') } }}>{videoPrompt?.mode === 'auto' ? 'Locked' : 'Lock'}</button>
               <button type="button" role="radio" className={`storyboard-transition-option ${videoPrompt?.mode === 'manual' ? 'is-active' : ''}`} aria-checked={videoPrompt?.mode === 'manual'} aria-label="Use User Prompt" data-tooltip={manualSeedDisclosure ? 'User · Draft copied once from Locked' : data.manualPromptSeeded ? 'User · Edit your saved draft' : 'User · Start from the current Locked prompt'} tabIndex={videoPromptRovingTabIndex('manual', videoPromptRovingMode)} onKeyDown={handleVideoPromptModeKey} onClick={() => { setVideoPromptRovingMode('manual'); runtime?.setVideoPromptMode(id, 'manual') }}>User</button>
             </div>
-            <button type="button" className="storyboard-shot-action" aria-label="Reset Manual Prompt to Auto" disabled={videoPrompt?.mode !== 'manual' || videoPrompt.resetDisabled} data-tooltip={videoPrompt.resetDisabled ? videoPrompt.connected ? videoPrompt.autoPrompt ? 'User already matches latest Locked prompt' : 'Resolve the Storyboard prompt before resetting User' : 'Connect a Storyboard to reset User' : 'Reset User to latest Locked prompt'} onClick={() => runtime?.resetManualPrompt(id)}><RefreshCcw size={11} /></button>
-          </div>}
+            <button type="button" className="storyboard-shot-action" aria-label="Reset Manual Prompt to Auto" disabled={videoPrompt?.mode !== 'manual' || videoPrompt.resetDisabled} data-tooltip={videoPrompt.resetDisabled ? videoPrompt.connected ? videoPrompt.autoPrompt ? 'User already matches latest Locked prompt' : 'Resolve the connected prompt before resetting User' : 'Connect a prompt or reference to reset User' : 'Reset User to latest Locked prompt'} onClick={() => runtime?.resetManualPrompt(id)}><RefreshCcw size={11} /></button>
+          </div></div>}
         </div>
       </>}
 
@@ -2568,7 +2745,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         <>
           {visibleInputRules.length > 0 && <div className="inline-connected-input-rules nodrag" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>}
           <TaggedPromptTextarea
-            className="node-prompt nodrag"
+            className="node-prompt media-generator-prompt nodrag"
             value={data.prompt || ''}
             connectedTags={connectedPromptTags}
             availableTags={availablePromptTags}
@@ -2604,6 +2781,8 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         </figure>) : <div className="gallery-empty"><GalleryIcon size={22} /><strong>No Media Yet</strong><span>Connect generated or uploaded image, video, or audio</span></div>}
       </div>}
 
+      {!isSemanticReference && outputsMedia && <PlacedMediaDescription data={data} connectedToGenerator={descriptionConnected}>{referenceModeControls}{descriptionField}</PlacedMediaDescription>}
+
       {data.kind === 'output' && (
         <div className="output-continuation">
           <ArrowUpRight size={18} />
@@ -2635,12 +2814,16 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       </>}
 
       {data.falNative && <>
+        {data.kind !== 'voiceover' && <>
+        <div className="native-model-field-section">
         {!isCanvasGenerator && <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag">
           <FluidControlGroup className="voice-primary-row" ariaLabel="Selected Live Model" recalculationKey={data.falNative.endpointId} gap={7} allocation={{ minRows: 1, maxRows: 1 }} controls={[
             { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <label><span>Model</span>{nativeModelSelect}</label> },
           ]} />
         </div>}
         <FalNativeFields state={data.falNative} contract={runtime?.falSchema?.(data.falNative.endpointId).contract} placement="primary" onChange={(falNative) => runtime?.updateNode(id, { falNative })} footerFieldKeys={falNativeVideoContract ? nativeVideoFooterFieldKeys : undefined} />
+        </div>
+        </>}
         {isCanvasGenerator && nativeVideoFooterState && <div className="compact-generator-footer compact-video-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Video Footer Controls" recalculationKey={`${data.falNative.endpointId}:${data.falNative.fingerprint || ''}:${JSON.stringify(data.falNative.values)}:${JSON.stringify(data.falNative.drafts || {})}:${data.motionCadence}:${data.quantity || 1}:${nativeVideoPromptMode}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 2, maxRows: 3, firstId: 'model', terminalIds: ['settings', 'run'], preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'native-fps', 'resolution', 'sound', 'settings', 'run']] }} controls={nativeVideoFooterControlsForGroup} /></div>}
         {isCanvasGenerator && !nativeVideoFooterState && <div className="compact-generator-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Live Model Actions" recalculationKey={`${data.falNative.endpointId}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 1, maxRows: 1, firstId: 'model', terminalIds: ['settings', 'run'] }} controls={[
           { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: nativeModelSelect },
@@ -2671,7 +2854,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           quantity={<div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div>}
           slot={<SimpleMenuSelect ariaLabel="Image Aspect Ratio" title="Image Aspect Ratio" defaultLabel={normalizedImageRatio(data.aspectRatio)} fillTrack value={normalizedImageRatio(data.aspectRatio)} options={aspectRatioMenuOptions(usesNanoImageModel ? NANO_IMAGE_RATIOS : IMAGE_RATIOS)} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} />}
           settings={<button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button>}
-          run={<PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip>}
+          run={<PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip>}
         /> : <FluidControlGroup
           className="compact-video-footer-group"
           ariaLabel="Video Footer Controls"
@@ -2687,16 +2870,16 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
               const durationPatch = normalizedGeneratorDurationPatch({ videoEngine: engine, duration: data.duration, frameRate })
               runtime?.updateNode(id, { videoEngine: engine, aspectRatio: defaultVideoRatio(model) || data.aspectRatio, ...durationPatch, generateAudio: model.nativeAudio ? data.generateAudio : false, resolution: model.resolutions.length ? (model.resolutions.includes(data.resolution || '') ? data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined, frameRate, motionCadence: normalizedMotionCadence(model, frameRate, data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : data.inferenceSteps, guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : data.guidanceScale, acceleration: model.family === 'wan' ? 'regular' : data.acceleration })
             }} title={providerBlocked ? `${providerAccount?.message || 'This provider is unavailable.'} You can still inspect another model's controls.` : 'Video Model'} /> },
-            { id: 'motion', kind: 'selector', visible: true, available: effectiveMotionCadence !== undefined, defaultLabel: `${effectiveMotionCadence} fps`, intrinsicWidth: 54, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <GroupedMenuSelect className="compact-fps" ariaLabel="Motion FPS" title="Motion FPS controls how frequently movement visibly updates without changing encoded provider Native FPS or playback speed." displayLabel={`${effectiveMotionCadence} fps`} defaultLabel={`${effectiveMotionCadence} fps`} fillTrack value={String(effectiveMotionCadence)} groups={[
-              { label: 'Motion FPS', options: motionCadenceOptions(selectedVideoModel || resolveVideoModel(data.videoEngine), data.frameRate).map((fps) => ({ value: String(fps), label: `${fps} fps` })) },
-            ]} onChange={(value) => runtime?.updateNode(id, { motionCadence: Number(value) })} /> },
-            { id: 'ratio', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.ratios.length), defaultLabel: defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9', intrinsicWidth: 44, priority: 50, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Aspect Ratio" title="Video Aspect Ratio" defaultLabel={defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9'} fillTrack value={selectedVideoModel ? resolvedVideoRatio(selectedVideoModel, data.aspectRatio) : '16:9'} options={aspectRatioMenuOptions((selectedVideoModel?.ratios || []).filter((ratio) => ratio !== 'auto'))} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} /> },
+            { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: nativeFpsLabel(nativeVideoFps), intrinsicWidth: 62, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <GroupedMenuSelect className="compact-fps" ariaLabel="Motion FPS" disabled={running} displayLabel={data.motionCadenceMode === 'native' ? nativeFpsLabel(nativeVideoFps) : `${effectiveMotionCadence} fps`} defaultLabel={nativeFpsLabel(nativeVideoFps)} fillTrack value={data.motionCadenceMode === 'native' ? '@native' : String(effectiveMotionCadence)} groups={[
+              { label: 'Motion FPS', options: [{ value: '@native', label: nativeFpsLabel(nativeVideoFps) }, ...motionCadenceOptions(selectedVideoModel || resolveVideoModel(data.videoEngine), data.frameRate).map((fps) => ({ value: String(fps), label: `${fps} fps` }))] },
+            ]} onChange={(value) => runtime?.updateNode(id, value === '@native' ? { motionCadenceMode: 'native' } : { motionCadence: Number(value), motionCadenceMode: 'custom' })} /> },
+            { id: 'ratio', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.ratios.length), defaultLabel: defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9', intrinsicWidth: 44, priority: 50, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Aspect Ratio" disabled={running} title="Video Aspect Ratio" defaultLabel={defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9'} fillTrack value={selectedVideoModel ? resolvedVideoRatio(selectedVideoModel, data.aspectRatio) : '16:9'} options={aspectRatioMenuOptions((selectedVideoModel?.ratios || []).filter((ratio) => ratio !== 'auto'))} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} /> },
             { id: 'duration', kind: 'selector', visible: true, available: videoDurationOptions(data.videoEngine, data.frameRate).length > 1, defaultLabel: formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0])), intrinsicWidth: 42, priority: 60, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Duration" title="Video Duration" defaultLabel={formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0]))} fillTrack value={String(normalizedVideoDuration(data))} options={videoDurationMenuOptions(data)} onChange={(value) => runtime?.updateNode(id, { duration: Number(value), autoDuration: false })} /> },
             { id: 'quantity', kind: 'bounded-elastic', visible: true, available: true, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, preferredRow: 1, preferredZone: 'start', node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
-            { id: 'resolution', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.resolutions.length), defaultLabel: selectedVideoModel?.resolutions[0] || '720p', intrinsicWidth: 48, priority: 55, preferredRow: 1, preferredZone: 'middle', node: <SimpleMenuSelect className="compact-resolution" ariaLabel="Video Resolution" title="Video Resolution" defaultLabel={selectedVideoModel?.resolutions[0] || '720p'} fillTrack value={selectedVideoModel?.resolutions.includes(data.resolution || '') ? data.resolution || selectedVideoModel.resolutions[0] : selectedVideoModel?.resolutions[0] || ''} options={(selectedVideoModel?.resolutions || []).map((resolution) => ({ value: resolution, label: resolution }))} onChange={(value) => runtime?.updateNode(id, { resolution: value as StudioNodeData['resolution'] })} /> },
+            { id: 'resolution', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.resolutions.length), defaultLabel: selectedVideoModel?.resolutions[0] || '720p', intrinsicWidth: 48, priority: 55, preferredRow: 1, preferredZone: 'middle', node: videoDraftProvider(data) === 'byteplus' ? <VideoDraftResolutionSelect data={data} value={data.resolution || selectedVideoModel?.resolutions[0] || '720p'} displayLabel={data.resolution || selectedVideoModel?.resolutions[0] || '720p'} options={(selectedVideoModel?.resolutions || []).map(resolution => ({ value: resolution, label: resolution }))} disabled={running} onPatch={patch => runtime?.updateNode(id, patch)} regularPatch={value => ({ resolution: value as StudioNodeData['resolution'] })} /> : <SimpleMenuSelect className="compact-resolution" ariaLabel="Video Resolution" title="Video Resolution" defaultLabel={selectedVideoModel?.resolutions[0] || '720p'} fillTrack value={selectedVideoModel?.resolutions.includes(data.resolution || '') ? data.resolution || selectedVideoModel.resolutions[0] : selectedVideoModel?.resolutions[0] || ''} options={(selectedVideoModel?.resolutions || []).map((resolution) => ({ value: resolution, label: resolution }))} onChange={(value) => runtime?.updateNode(id, { resolution: value as StudioNodeData['resolution'] })} /> },
             { id: 'sound', kind: 'intrinsic', visible: true, available: Boolean(selectedVideoModel?.nativeAudio), defaultLabel: 'Sound', intrinsicWidth: 28, priority: 45, preferredRow: 1, preferredZone: 'middle', node: <button type="button" className={`compact-settings compact-options compact-sound ${data.generateAudio ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={Boolean(data.generateAudio)} disabled={running} onClick={() => runtime?.updateNode(id, { generateAudio: !data.generateAudio })}><Volume2 size={14} /></button> },
             { id: 'settings', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 95, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button> },
-            { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
+            { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
           ]) as FluidGroupControl<VideoFooterControlId>[]}
         />}
 
@@ -2704,6 +2887,10 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
 
       {semanticEditorActive && <div className="reusable-asset-footer-wrap nodrag">
         {saveNameOpen && <div className="asset-save-name-popover"><input ref={saveNameInputRef} autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label={`${semanticAssetLabel} name`} value={saveName} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setSaveName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') commitSaveName(); if (event.key === 'Escape') setSaveNameOpen(false) }} /></div>}
+        <div className="asset-prompt-revamp-footer prompt-enhance-compact">
+          <GroupedMenuSelect catalog promptCatalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Prompt Revamp model" defaultLabel="Choose Model" fillTrack value={`${enhanceProvider}::${enhanceModel}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map(group => ({ label: group.label, options: group.models.map(model => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={selection => { const [provider, ...model] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: model.join('::'), error: undefined }) }} />
+          <button type="button" className="storyboard-shot-action" aria-label="Revamp Prompt" disabled={running || enhanceBlocked || !enhanceModel || !assetGenerationPrompt.trim()} onClick={() => runtime?.runAssistantNode(id)}><Sparkles size={11} /></button>
+        </div>
         <div className="compact-generator-footer">
           <ImageGenerationControlGroup
             semantic
@@ -2725,60 +2912,19 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         <label className={upscalerIsVideo ? 'is-disabled' : ''}><span>Resemblance · {(data.resemblance ?? 0.6).toFixed(2)}</span><input disabled={upscalerIsVideo} type="range" min="0" max="1" step="0.05" value={data.resemblance ?? 0.6} onChange={(event) => runtime?.updateNode(id, { resemblance: Number(event.target.value) })} /></label>
       </div>}
 
-      {data.kind === 'voiceover' && !data.falNative && data.voiceEngine === 'elevenlabs-direct' && <DirectElevenVoiceControls data={data} availability={runtime?.serviceAvailability?.('elevenlabs')} fishAvailability={runtime?.serviceAvailability?.('fish')} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
-      {data.kind === 'voiceover' && !data.falNative && data.voiceEngine !== 'elevenlabs-direct' && <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
-        <FluidControlGroup
-          className="voice-primary-row voice-primary-row-two"
-          ariaLabel="Voice Model And Voice Controls"
-          gap={7}
-          allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }}
-          recalculationKey={`${data.voiceEngine}:${data.fishModel || ''}:${data.fishReferenceId || ''}:${data.voice || ''}`}
-          controls={[
-            { id: 'model', kind: 'selector', defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} fishAvailability={runtime?.serviceAvailability?.('fish')} models={runtime?.availableModels('elevenlabs') || []} onChange={(patch) => runtime?.updateNode(id, patch)} /></label> },
-            data.voiceEngine === 'fish-audio'
-              ? { id: 'voice', kind: 'editable-field', intrinsicWidth: 132, node: <label className="voice-primary-voice-field"><span>Voice ID</span><input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" style={{width:'100%'}} value={data.fishReferenceId || ''} onChange={(event) => runtime?.updateNode(id, { fishReferenceId: event.target.value, error: undefined })} placeholder="Reference ID (required)" /></label> }
-              : { id: 'voice', kind: 'selector', intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><SimpleMenuSelect className="voice-primary-voice" ariaLabel="ElevenLabs voice" defaultLabel="Adam" fillTrack value={usesBuiltInElevenVoice ? elevenVoiceValue : '__custom'} options={[...ELEVEN_V3_BUILT_IN_VOICES.map((voice) => ({ value: voice, label: voice })), { value: '__custom', label: 'Custom voice name / ID' }]} onChange={(voice) => runtime?.updateNode(id, { voice: voice === '__custom' ? '' : voice, error: undefined })} /></label> },
-          ] as FluidGroupControl<'model' | 'voice'>[]}
-        />
-        {data.voiceEngine !== 'fish-audio' && <>
-          <FluidControlGroup
-            className="voice-primary-row voice-primary-row-three"
-            ariaLabel="Voice Language Output And Speed Controls"
-            gap={7}
-            allocation={{ minRows: 1, maxRows: 2 }}
-            recalculationKey={`${data.languageCode || 'eng'}:${data.audioOutputFormat || 'mp3_44100_128'}:${data.speed ?? 1}`}
-            controls={[
-              { id: 'language', kind: 'selector', intrinsicWidth: 92, node: <label className="voice-primary-language-field"><span>Language</span><SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" defaultLabel="English" fillTrack value={normalizedElevenV3LanguageCode(data.languageCode) || 'eng'} options={[...ELEVEN_V3_LANGUAGES]} onChange={(languageCode) => runtime?.updateNode(id, { languageCode })} /></label> },
-              { id: 'output', kind: 'selector', intrinsicWidth: 130, node: <label className="voice-primary-output-field"><span>Output</span><SimpleMenuSelect ariaLabel="Voice Output Format" defaultLabel={audioFormatLabel(ELEVEN_AUDIO_OUTPUT_FORMATS[0])} fillTrack value={data.audioOutputFormat || 'mp3_44100_128'} options={ELEVEN_AUDIO_OUTPUT_FORMATS.map((value) => ({ value, label: audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></label> },
-              { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label className="voice-primary-speed-field"><span>Speed</span><SimpleMenuSelect ariaLabel="ElevenLabs speech speed" defaultLabel="1×" fillTrack value={String(Number((Math.min(1.2, Math.max(0.7, data.speed ?? 1)) * 20).toFixed(0)) / 20)} options={ELEVEN_SPEED_OPTIONS} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
-            ]}
-          />
-          {!usesBuiltInElevenVoice && <label className="voice-primary-custom"><span>Custom Voice</span><input className="voice-primary-input" aria-label="Custom ElevenLabs voice name or ID" value={data.voice || ''} onChange={(event) => runtime?.updateNode(id, { voice: event.target.value, error: undefined })} placeholder="Voice name or ID (required)" /></label>}
-        </>}
-        {data.voiceEngine === 'fish-audio' && <FluidControlGroup
-          className="voice-primary-row voice-primary-output-row"
-          ariaLabel="Fish Audio Output Controls"
-          gap={7}
-          allocation={{ minRows: 1, maxRows: 3 }}
-          recalculationKey={`${data.fishFormat || 'mp3'}:${data.fishSampleRate || 44100}:${data.fishMp3Bitrate || 128}:${data.fishOpusBitrate ?? -1000}:${data.fishVolume ?? 0}:${data.speed ?? 1}`}
-          controls={[
-            { id: 'format', kind: 'selector', intrinsicWidth: 52, node: <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish Audio Format" defaultLabel="MP3" fillTrack value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label> },
-            { id: 'sample-rate', kind: 'selector', intrinsicWidth: 70, node: <label><span>Sample Rate</span><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" defaultLabel="44.1 kHz" fillTrack value={data.fishSampleRate === undefined ? '@default' : String(data.fishSampleRate)} options={fishSampleRateOptions(data.fishFormat, data.fishSampleRate)} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label> },
-            ...((data.fishFormat || 'mp3') === 'mp3' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" defaultLabel="128 kbps" fillTrack value={String(data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', data.fishMp3Bitrate ?? 128)} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label> }] : []),
-            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? -1000)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? -1000)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
-            { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label><span>Speed</span><SimpleMenuSelect ariaLabel="Fish Audio Speed" defaultLabel="1×" fillTrack value={String(data.speed ?? 1)} options={fishNumberOptions(Array.from({ length: 31 }, (_, i) => Number((0.5 + i / 20).toFixed(2))), data.speed ?? 1, '×', 0.5, 2)} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
-            { id: 'volume', kind: 'selector', intrinsicWidth: 52, node: <label><span>Volume</span><SimpleMenuSelect ariaLabel="Fish Audio Volume" defaultLabel="0 dB" fillTrack value={String(data.fishVolume ?? 0)} options={fishNumberOptions(Array.from({ length: 41 }, (_, i) => i - 20), data.fishVolume ?? 0, ' dB', -20, 20)} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label> },
-          ]}
-        />}
-      </div>}
+
 
       {runnable && !isCanvasGenerator && !['element', 'location', 'wardrobe'].includes(data.kind) && (
-        <div className="compact-generator-footer compact-generic-footer nodrag">
-          {!data.falNative && !['element', 'location', 'wardrobe'].includes(data.kind) && <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster">
-            <button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, -1) : runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={12} /></button>
-            <span>x{data.quantity || 1}</span>
-            <button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, 1) : runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={12} /></button>
-          </span></div>}
+        <div className={`compact-generator-footer compact-generic-footer nodrag${voiceFooter ? ' has-voice-footer' : ''}${nativeVoiceState ? ' has-native-voice' : ''}`}>
+          {nativeVoiceModelAndFields}
+          {voiceFooter && !nativeVoiceState && <div className="voice-footer-fields">{nonNativeVoiceFields}{data.voiceEngine === 'elevenlabs-direct' && !isElevenDialogue(data) && !directVoiceCatalog?.voices?.some(voice => voice.id === data.voice) && <div className="voice-primary-controls"><label><span>Voice ID</span><input className="voice-primary-input" aria-label="ElevenLabs voice ID entry" value={data.voice || ''} placeholder="Voice ID (required)" onChange={event => runtime?.updateNode(id,{voice:event.target.value,error:undefined})}/></label></div>}{data.voiceEngine !== 'elevenlabs-direct' && genericQuantity}</div>}
+          {nonNativeVoiceSpeaker && <div className="voice-footer-speaker voice-primary-controls">{nonNativeVoiceSpeaker}</div>}
+          {nonNativeVoiceSpeaker && <div className="voice-footer-sample"><ElevenVoiceSampleButton voice={data.voiceEngine === 'fish-audio' ? undefined : nonNativeVoicePreview} availability={voiceFooterCatalog}/></div>}
+
+          {nativeVoiceInput && <div className="voice-footer-speaker voice-primary-controls">{nativeVoiceInput}</div>}
+          {nativeVoiceInput && <div className="voice-footer-sample"><ElevenVoiceSampleButton voice={nativeVoiceMatches.length === 1 ? nativeVoiceMatches[0] : undefined} availability={nativeVoiceCatalog} /></div>}
+          {!voiceFooter && genericQuantity}
+
           {data.kind === 'upscaler' && <SimpleMenuSelect className="upscaler-scale-select" ariaLabel="Upscale Amount" title="Upscale Amount" value={String(data.scale || 2)} options={[2, 3, 4].map((value) => ({ value: String(value), label: `${value}×` }))} onChange={(value) => runtime?.updateNode(id, { scale: Number(value) })} />}
           {data.kind === 'sound-effects' && !data.falNative && <SoundModelSelect className="compact-engine voice-engine" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
           {data.kind === 'sound-effects' && !data.falNative && <><SimpleMenuSelect ariaLabel="Sound Effect Duration" title="Sound Effect Duration" value={String(data.duration || 5)} options={(data.audioProvider === 'elevenlabs' ? [0.5,1,2,3,5,8,10,15,22,30] : [0.5,1,2,3,5,8,10,15,22]).map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /><label className="compact-toggle compact-loop" title="Loop Sound Effect"><span>Loop</span><input aria-label="Loop Sound Effect" type="checkbox" checked={Boolean(data.loop)} onChange={(event) => runtime?.updateNode(id, { loop: event.target.checked })} /><i /></label><SimpleMenuSelect className="sound-output-format" ariaLabel="Sound Effect Output Format" title="Sound Effect Output Format" value={data.audioOutputFormat || 'mp3_44100_128'} options={(data.audioProvider === 'elevenlabs' ? ELEVEN_DIRECT_OUTPUT_FORMATS : ELEVEN_AUDIO_OUTPUT_FORMATS).map((value) => ({ value, label: data.audioProvider === 'elevenlabs' ? directAudioFormatLabel(value) : audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></>}
@@ -2800,13 +2946,13 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
             runtime?.updateNode(id, { imageProvider: provider as StudioNodeData['imageProvider'], imageModelId: modelParts.join('::') })
           }} />}
           <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button>
-          <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={13} fill="currentColor" />}</button></PlayTooltip>
+          <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={13} fill="currentColor" />}</button></PlayTooltip>
         </div>
       )}
 
       {outputsText && <NodePort id="text-out" type="source" signal="text" label="Text Output" position={Position.Right} onRoute={(event) => runtime?.openQuickConnect(id, event.clientX, event.clientY, 'text-out')} />}
       {outputsMedia && <NodePort id="media-out" type="source" signal={outputSignalFor(data, 'media-out')} label="Output" position={Position.Right} available={!reusableOffline} onRoute={(event) => runtime?.openQuickConnect(id, event.clientX, event.clientY, 'media-out')} />}
-      {data.outputUrl && !isCanvasGenerator && !isSemanticReference && <a className="node-open nodrag" href={data.outputUrl} title="Open Media" aria-label="Open Media"><ArrowUpRight size={13} /></a>}
+      {data.outputUrl && !hasAudioPreview && !isCanvasGenerator && !isSemanticReference && <a className="node-open nodrag" href={data.outputUrl} title="Open Media" aria-label="Open Media"><ArrowUpRight size={13} /></a>}
       {pendingAssetBatch && assetBatchKind && createPortal(<div className="modal-backdrop asset-batch-confirm-backdrop" onMouseDown={() => setPendingAssetBatch(null)}><section className="delete-confirm-modal asset-batch-confirm" role="dialog" aria-modal="true" aria-labelledby={`asset-batch-confirm-${id}`} onMouseDown={(event) => event.stopPropagation()}><header><span><Layers3 size={18} /></span><div><strong id={`asset-batch-confirm-${id}`}>Insert {pendingAssetBatch.length} assets into {assetBatchKind[0].toUpperCase() + assetBatchKind.slice(1)} Batch?</strong><small>Files stay staged until you save them.</small></div></header><footer><button onClick={() => setPendingAssetBatch(null)}>Cancel</button><button className="is-primary" onClick={() => { setAssetBatchRows(pendingAssetBatch); setPendingAssetBatch(null); const unnamed = pendingAssetBatch.find((row) => !row.displayName); setRenamingBatchRowId(unnamed?.id || null) }}>Insert Assets</button></footer></section></div>, document.body)}
     </article>
   )

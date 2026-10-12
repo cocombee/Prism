@@ -1,3 +1,4 @@
+import { projectFolderPath, type ProjectFolder } from './projectFolders'
 import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -30,13 +31,13 @@ function replaceNodeEverywhere<T>(value: T, nodeId: string, data: StudioNodeData
   return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, replaceNodeEverywhere(item, nodeId, data)])) as T
 }
 function safeName(value: string) { return value.replace(/^@+/, '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'asset' }
-function categoryFolder(kind: string) {
-  return kind === 'character' ? '01. Characters' : kind === 'element' ? '02. Elements' : kind === 'location' ? '03. Locations' : kind === 'style-reference' ? '04. Styles' : '04. Wardrobes'
+function categoryFolder(kind: string): ProjectFolder {
+  return kind === 'character' ? 'Characters' : kind === 'element' ? 'Elements' : kind === 'location' ? 'Locations' : kind === 'style-reference' ? 'Styles' : 'Wardrobes'
 }
 function localUrl(path: string) { return `prism-asset://local/${encodeURIComponent(resolve(path))}` }
 async function exists(path: string) { try { await stat(path); return true } catch { return false } }
 async function createCanonicalPath(rootPath: string, kind: string, logicalName: string, extension: string) {
-  const categoryRoot = join(rootPath, categoryFolder(kind))
+  const categoryRoot = projectFolderPath(rootPath, categoryFolder(kind))
   for (let suffix = 1; suffix < 10_000; suffix += 1) {
     const folderName = suffix === 1 ? logicalName : `${logicalName}-${suffix}`
     const candidate = join(categoryRoot, folderName, `${logicalName}${extension}`)

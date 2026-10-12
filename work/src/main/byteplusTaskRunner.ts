@@ -22,7 +22,7 @@ export interface RunBytePlusTaskOptions {
 }
 
 export interface RunBytePlusTaskAndDownloadOptions extends RunBytePlusTaskOptions {
-  download: (url: string) => Promise<string>
+  download: (url: string, result: BytePlusTaskResult) => Promise<string>
 }
 
 function abortError(): DOMException { return new DOMException('This operation was aborted', 'AbortError') }
@@ -103,6 +103,6 @@ export async function runBytePlusTask(options: RunBytePlusTaskOptions): Promise<
 
 export async function runBytePlusTaskAndDownload(options: RunBytePlusTaskAndDownloadOptions): Promise<BytePlusTaskResult & { outputUrl: string; outputPath: string }> {
   const result = await runBytePlusTask(options)
-  const outputPath = await options.download(result.outputUrl)
+  const outputPath = await options.download(result.outputUrl, result)
   return { ...result, outputPath }
 }

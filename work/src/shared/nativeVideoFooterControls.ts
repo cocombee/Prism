@@ -1,4 +1,5 @@
-import { findVideoModel, MOTION_CADENCES, motionCadenceOptions, normalizedMotionCadence } from './videoModels'
+import { verifiedNativeVideoFrameRate } from './videoCadenceSelection'
+import { MOTION_CADENCES } from './videoModels'
 import { describeFalRuntimeInputs, type FalRuntimeField } from './falRuntimeInputs'
 import { validateFalSchema, type FalJson, type FalSchemaContract, type FalSchemaNode } from './falSchemaBinding'
 import type { FalNativeNodeState } from './falNodeBinding'
@@ -156,9 +157,11 @@ function optionsFor(
   hasValue: boolean,
   value: FalJson | undefined,
   numericValues: number[] | undefined,
+  sourceOwnedAspectRatio: boolean,
 ): { options: FalNativeVideoFooterOption[]; selectedToken: string } {
   const options: FalNativeVideoFooterOption[] = []
-  if (!field.required) {
+  const explicitRatioOnly = key === 'aspect_ratio' && !sourceOwnedAspectRatio && field.choices?.some(value => typeof value === 'string' && /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(value))
+  if (!field.required && !explicitRatioOnly) {
     options.push({
       token: '@default', kind: 'default',
       label: hasDefault && defaultValue !== undefined ? `Default (${displayValue(key, defaultValue)})` : 'Default',
@@ -167,10 +170,11 @@ function optionsFor(
   const values = field.control === 'choice' ? field.choices || []
     : field.control === 'boolean' ? [false, true]
       : numericValues || []
-  if (nullable && !values.some(optionValue => optionValue === null)) {
+  if (!explicitRatioOnly && nullable && !values.some(optionValue => optionValue === null)) {
     options.push({ token: tokenForValue(null), kind: 'value', value: null, label: key === 'duration' ? 'Auto' : 'None' })
   }
   for (const optionValue of values) {
+    if (explicitRatioOnly && (optionValue === null || typeof optionValue === 'string' && optionValue.toLowerCase() === 'auto')) continue
     const label = control === 'boolean' && key === 'generate_audio'
       ? (optionValue ? 'On' : 'Off')
       : displayValue(key, optionValue)
@@ -208,13 +212,15 @@ export function projectNativeVideoFooterFields(
   runtimeFields: readonly FalRuntimeField[],
   state: FalNativeVideoFooterState | Pick<FalNativeNodeState, 'values' | 'drafts'>,
   bindings: Partial<Record<FalNativeVideoFooterField,string>> = {},
+  sourceOwnedAspectRatio = runtimeFields.some(field => field.media?.role === 'source-video'),
 ): FalNativeVideoFooterControl[] {
   if (!state || !state.values || typeof state.values !== 'object') return []
   const fields = new Map(runtimeFields.map(field => [field.key, field]))
   const controls: FalNativeVideoFooterControl[] = []
 
   for (const key of FAL_NATIVE_VIDEO_FOOTER_FIELD_ORDER) {
-    const fieldKey=bindings[key] || key
+    const audioAlias = key === 'generate_audio' && !fields.has(key) ? ['audio', 'sound'].find(candidate => fields.get(candidate)?.control === 'boolean') : undefined
+    const fieldKey=bindings[key] || audioAlias || key
     const field = fields.get(fieldKey)
     if (!field) continue
     const schemaControl = supportedControl(field)
@@ -235,7 +241,7 @@ export function projectNativeVideoFooterFields(
     const hasDraft = Boolean(state.drafts && own(state.drafts, fieldKey))
     const draft = hasDraft ? state.drafts?.[fieldKey] : undefined
     const { hasDefault, value: defaultValue } = uniqueDefault(field.schema)
-    const { options, selectedToken } = optionsFor(key, field, control, field.nullable, hasDefault, defaultValue, hasValue, value, numericValues)
+    const { options, selectedToken } = optionsFor(key, field, control, field.nullable, hasDefault, defaultValue, hasValue, value, numericValues, sourceOwnedAspectRatio)
     const label = key === 'aspect_ratio' ? 'Aspect Ratio'
       : key === 'duration' ? 'Duration'
         : key === 'resolution' ? 'Resolution'
@@ -254,15 +260,23 @@ export function projectNativeVideoFooterFields(
 
 /** Motion cadence is prompt intent; this never declares a provider output FPS field. */
 export function nativeVideoMotionCadenceOptions(endpointId: string, fps?: number): number[] {
-  const model = findVideoModel(endpointId)
-  if (model) return motionCadenceOptions(model, fps)
-  return fps && Number.isFinite(fps) ? MOTION_CADENCES.filter(value => value < fps) : [...MOTION_CADENCES]
+  const ceiling = fps ?? verifiedNativeVideoFrameRate(endpointId)
+  if (ceiling && Number.isFinite(ceiling)) return MOTION_CADENCES.filter(value => value <= ceiling)
+  return []
 }
 
 export function normalizedNativeVideoMotionCadence(endpointId: string, fps?: number, cadence?: number): number | undefined {
-  const model = findVideoModel(endpointId)
-  if (model) return normalizedMotionCadence(model, fps, cadence)
   const options = nativeVideoMotionCadenceOptions(endpointId, fps)
   if (cadence && options.includes(cadence)) return cadence
   return options.includes(24) ? 24 : [...options].reverse().find(value => value < 24) ?? options[0]
+}
+
+/** Preserve the actual schema field and value type, including provider audio aliases. */
+export function nativeVideoSoundChoice(control: FalNativeVideoFooterControl, state: FalNativeVideoFooterState): {active: boolean; next?: FalNativeVideoFooterOption} {
+  const key=control.fieldKey || control.key
+  const value=own(state.values,key)?state.values[key]:control.hasDefault?control.defaultValue:undefined
+  const boolean=control.control==='boolean'
+  const active=boolean?value===true:typeof value==='string'&&value.toLowerCase()==='on'
+  const next=control.options.find(option=>option.kind==='value'&&(boolean?option.value===!active:typeof option.value==='string'&&option.value.toLowerCase()===(active?'off':'on')))
+  return {active,next}
 }

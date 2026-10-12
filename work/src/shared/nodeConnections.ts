@@ -151,6 +151,7 @@ export function connectionCompatibilityError(
   const handle = targetHandle || ''
   const native = target.falNative?.media.find(binding => binding.portId === handle)
   const higgsfieldMedia = target.higgsfieldNative?.media?.find(binding => binding.portId === handle)
+  if (sourceSignal === 'audio' && ['image-generator', 'image-editor'].includes(target.kind)) return 'Audio cannot connect to an Image Generator. Use a compatible Video Generator Audio Reference input.'
   if (target.falNative?.retiredPorts?.some(port => port.id === handle) && !native && nodeInputPorts(target).find(port => port.id === handle)?.maxConnections === 0) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'
   if (target.higgsfieldNative?.retiredPorts?.some(port => port.id === handle) && nodeInputPorts(target).find(port => port.id === handle)?.maxConnections === 0) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'
   if (native?.retired) return 'This model no longer declares that input. Disconnect or rebind its preserved connection.'

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 const tagged = readFileSync(new URL('./TaggedPromptTextarea.tsx', import.meta.url), 'utf8')
 const app = readFileSync(new URL('./AppNext.tsx', import.meta.url), 'utf8')
 const nodeCard = readFileSync(new URL('./NodeCardNext.tsx', import.meta.url), 'utf8')
+const assetFields = readFileSync(new URL('./AssetPromptFields.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('./styles-next.css', import.meta.url), 'utf8')
 
 describe('active Storyboard editor and Canvas history wiring', () => {
@@ -19,8 +20,9 @@ describe('active Storyboard editor and Canvas history wiring', () => {
 
   it('routes Storyboard, generic, Style, and Video User prompt fields through shared controlled history', () => {
     expect(nodeCard).toContain('<TaggedPromptTextarea className="node-textarea"')
-    expect(nodeCard).toContain('<TaggedPromptTextarea className="style-prompt-inline"')
-    expect(nodeCard).toContain('className="node-prompt generator-prompt nodrag"')
+    expect(nodeCard).toContain('<AssetPromptFields')
+    expect(assetFields).toContain('<TaggedPromptTextarea id={`asset-description-${id}`} className="style-prompt-inline')
+    expect(nodeCard).toContain('className="node-prompt generator-prompt media-generator-prompt nodrag"')
     expect(tagged).toContain('createControlledTextHistory')
     expect(tagged).toContain("historyAction === 'undo' ? undoControlledText")
     expect(tagged).toContain('pendingScroll.current')

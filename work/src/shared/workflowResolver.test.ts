@@ -1,3 +1,4 @@
+import { referenceIntroductionLine } from './assetReferenceDescriptions'
 import { describe, expect, it } from 'vitest'
 import type { Edge } from '@xyflow/react'
 import type { ImportedAsset, NodeKind, StudioNode, StudioNodeData } from './types'
@@ -6,13 +7,14 @@ import { klingStoryboardPrompts, providerPromptPreview, resolvedPromptWithRefere
 import { STYLE_PRESETS } from './stylePresets'
 import { incompleteSemanticReason } from './semanticReadiness'
 import { generationRequirementFailures } from './generationReadiness'
+import { buildStoryboardConnectedContextManifest } from './storyboardRewrite'
 
 function node(id: string, kind: NodeKind, data: Partial<StudioNodeData> = {}): StudioNode {
   return { id, type: kind === 'storyboard' ? 'storyboard' : 'studio', position: { x: 0, y: 0 }, data: { kind, title: data.title || kind, ...data } }
 }
 
 function asset(id: string, view?: NonNullable<ImportedAsset['metadata']>['characterView'], mimeType = 'image/png'): ImportedAsset {
-  return { id, name: `${id}.png`, path: `/project/${id}.png`, url: `https://assets.invalid/${id}.png`, mimeType, createdAt: '2026-08-01T00:00:00.000Z', metadata: view ? { characterView: view } : undefined }
+  return { id, name: `${id}.png`, path: `/project/${id}.png`, url: `https://assets.invalid/${id}.png`, mimeType, createdAt: '2026-08-01T00:00:00.000Z', metadata: { referenceDescription: 'Completed fixture reference: preserve the supplied asset in its connected role.', ...(view ? { characterView: view } : {}) } }
 }
 
 function edge(source: string, target: string, targetHandle = 'reference', inputFidelity?: 'guide' | 'auto' | 'lock'): Edge {
@@ -20,6 +22,35 @@ function edge(source: string, target: string, targetHandle = 'reference', inputF
 }
 
 describe('combined graph prompt X-ray', () => {
+  it.each([
+    ['wardrobe', 'wardrobe-in', 'direct'], ['wardrobe', 'wardrobe-in', 'storyboard'],
+    ['element', 'element-in', 'direct'], ['element', 'element-in', 'storyboard'],
+  ] as const)('binds %s to its actual Character after reconnecting through %s %s, overriding a cached old owner', (kind, handle, route) => {
+    const previous = node('previous', 'character', { referenceTag: '@previous', characterInputMode: 'single', referenceAssets: [asset('previous')] })
+    const current = node('current', 'character', { referenceTag: '@current', characterInputMode: 'single', characterAuthorityMode: 'identity-body-with-layers', referenceAssets: [asset('current')] })
+    const layer = node('layer', kind, { referenceTag: '@layer', referenceAssets: [asset('layer')], appearanceOwnerCharacterTag: '@previous', appearanceScope: kind === 'wardrobe' ? 'wardrobe' : 'connected-element', appearanceSelection: 'explicit-replacement' })
+    const board = node('board', 'storyboard', { storyboardPanels: [{ id: 'shot', prompt: '@current stands still.', duration: 4 }] })
+    const video = node('video', 'video-generator', { videoEngine: 'byteplus/seedance-2.5/reference-to-video', duration: 4, prompt: '@current stands still.' })
+    const nodes = [previous, current, layer, board, video]
+    const links = [edge(layer.id, current.id, handle), edge(current.id, route === 'storyboard' ? board.id : video.id, 'character-in'), ...(route === 'storyboard' ? [edge(board.id, video.id, 'storyboard-in')] : [])]
+    const snapshot = JSON.stringify(nodes)
+    const request = buildGenerationRequest(video, nodes, links)
+    expect(request.references!.find(reference => reference.tag === '@layer')!.boundCharacterTag).toBe('@current')
+    if (route === 'storyboard') {
+      const manifest = buildStoryboardConnectedContextManifest(board.id, nodes, links, '@current stands still.', { id: 'shot' })
+      expect(manifest.entries.find(entry => entry.tag === '@layer')!.appearanceOwnerCharacterTag).toBe('@current')
+    }
+    expect(JSON.stringify(nodes)).toBe(snapshot)
+  })
+
+  it('retains explicit saved ownership for a direct appearance input without a Character edge', () => {
+    const layer = node('layer', 'element', { referenceTag: '@layer', referenceAssets: [asset('layer')], appearanceOwnerCharacterTag: '@declared', appearanceScope: 'helmet-headwear' })
+    const declared = node('declared', 'character', { referenceTag: '@declared', characterInputMode: 'single', referenceAssets: [asset('declared')] })
+    const video = node('video', 'video-generator', { videoEngine: 'byteplus/seedance-2.5/reference-to-video', duration: 4, prompt: 'Preserve the declared clothing assignment.' })
+    const request = buildGenerationRequest(video, [layer, declared, video], [edge(layer.id, video.id, 'element-in'), edge(declared.id, video.id, 'character-in')])
+    expect(request.references!.find(reference => reference.tag === '@layer')!.boundCharacterTag).toBe('@declared')
+  })
+
   it('rejects unsupported saved video selections instead of compiling a default model request', () => {
     const unsupported = node('unknown-video', 'video-generator', { prompt: 'Follow this motion.', videoEngine: 'not-a-supported-provider/video' })
     expect(() => buildGenerationRequest(unsupported, [unsupported], [])).toThrow(/supported video model/i)
@@ -74,8 +105,9 @@ describe('combined graph prompt X-ray', () => {
     })
     const target = node('consumer', 'video-generator', { prompt: 'Animate @second-portrait.', videoEngine: 'fal-ai/kling-video/v3/standard/image-to-video' })
     const resolved = resolveWorkflowInput(target.id, [source, target], [edge(source.id, target.id, 'image-in')])
-    expect(resolved.references).toHaveLength(1)
-    expect(resolved.references[0]).toMatchObject({ path: '/project/second.jpg', url: 'file:///second.jpg', name: 'Second Portrait', tag: '@second-portrait' })
+    expect(resolved).toMatchObject({ inputPath: '/project/second.jpg', inputUrl: 'file:///second.jpg', inputName: 'Second Portrait', inputTag: '@second-portrait', inputRole: 'start-frame' })
+    const request = buildGenerationRequest(target, [source, target], [edge(source.id, target.id, 'image-in')])
+    expect(request).toMatchObject({ inputPath: '/project/second.jpg', inputTag: '@second-portrait', inputRole: 'start-frame' })
     expect(JSON.stringify(resolved)).not.toContain('stale.jpg')
     expect(JSON.stringify(resolved)).not.toContain('first.jpg')
   })
@@ -254,6 +286,11 @@ describe('combined graph prompt X-ray', () => {
     expect(request.motionCadence).toBe(16)
     expect(request.prompt?.match(/MOTION CADENCE:/g)).toHaveLength(1)
     expect(request.prompt?.match(/16 fps animation cadence/g)).toHaveLength(1)
+    expect(request.prompt).toContain('uniform 1/16-second intervals')
+    const compiled = providerPromptPreview(request)
+    expect(compiled.match(/uniform 1\/16-second intervals/g)).toHaveLength(1)
+    expect(compiled).not.toContain('natural directional exposure blur')
+    expect(compiled).not.toContain('stop-motion cadence')
     expect(request.prompt).toContain('Preserve the provider-native encoded output frame rate and playback duration')
     expect(request.prompt?.match(/Handcrafted paper-cutout movement with restrained gestures\./g)).toHaveLength(1)
 
@@ -291,7 +328,7 @@ describe('combined graph prompt X-ray', () => {
     expect(request.prompt).toContain('grouped into 4 shots by authored Cut/Continue boundaries')
     expect(request.prompt).not.toContain('Sequence Type')
     expect(request.connectionRules).toEqual(expect.arrayContaining([
-      expect.objectContaining({ tag: '@repair-sequence', label: 'Storyboard', mode: 'auto', rule: expect.stringContaining('automatically improving') }),
+      expect.objectContaining({ tag: '@repair-sequence', label: 'Storyboard', rule: expect.stringContaining('authored action intervals') }),
       expect.objectContaining({ tag: '@prompt', label: 'Prompt' }),
       expect.objectContaining({ tag: '@idris', label: expect.stringContaining('Character') }),
       expect.objectContaining({ tag: '@cliff-workshop', label: 'Location' }),
@@ -549,8 +586,10 @@ describe('combined graph prompt X-ray', () => {
     const preview = providerPromptPreview(request)
     expect(preview).toContain('REFERENCE AUTHORITY')
     expect(preview).toContain('Use @idris as Idris.')
-    expect(preview).toContain('Use @cliff-workshop for the location')
-    expect(preview).toContain('Use @brass-compass for the element')
+    expect(request.references!.find(reference => reference.tag === '@cliff-workshop')!.referenceDescription).toBeTruthy()
+    expect(preview).toContain(request.references!.find(reference => reference.tag === '@cliff-workshop')!.referenceDescription!)
+    expect(request.references!.find(reference => reference.tag === '@brass-compass')!.referenceDescription).toBeTruthy()
+    expect(preview).toContain(request.references!.find(reference => reference.tag === '@brass-compass')!.referenceDescription!)
     expect(preview).not.toMatch(/@Image\d+/)
     expect(preview).toContain("exceed Seedance 2's 9-image / 12-total limit. Generation is blocked")
   })
@@ -718,7 +757,7 @@ describe('combined graph prompt X-ray', () => {
       inputRole: 'start-frame',
     })
     expect(request.connectionRules).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'Starting Frame', mode: 'auto' }),
+      expect.objectContaining({ label: 'Starting Frame', rule: expect.stringContaining('opening visual state') }),
     ]))
   })
 
@@ -755,7 +794,7 @@ describe('combined graph prompt X-ray', () => {
     ])
     expect(extendRequest).toMatchObject({ inputPath: '/project/take.mp4', inputUrl: 'https://assets.invalid/take.mp4', inputRole: 'source-video' })
     expect(extendRequest.connectionRules).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'Video To Extend', mode: 'auto' }),
+      expect.objectContaining({ label: 'Video To Extend', rule: expect.stringContaining('final state') }),
     ]))
 
     const upscaleRequest = resolveWorkflowInput(upscaler.id, routedNodes, [
@@ -807,7 +846,11 @@ describe('combined graph prompt X-ray', () => {
     const video = node('cadence-kling', 'video-generator', { prompt: 'Visible handmade paper motion.', videoEngine: 'fal-ai/kling-video/v3/standard/text-to-video', duration: 6, motionCadence: 16 })
     const request = buildGenerationRequest(video, [storyboard, video], [edge('cadence-storyboard', 'cadence-kling', 'storyboard-in')])
     expect(request.multiPrompt).toHaveLength(2)
-    for (const shot of request.multiPrompt || []) expect(shot.prompt.match(/MOTION CADENCE:/g)).toHaveLength(1)
+    for (const shot of request.multiPrompt || []) {
+      expect(shot.prompt.match(/MOTION CADENCE:/g)).toHaveLength(1)
+      expect(shot.prompt.match(/uniform 1\/16-second intervals/g)).toHaveLength(1)
+      expect(shot.prompt).not.toContain('natural directional exposure blur')
+    }
   })
 
   it('preserves start, end, and independent references by selecting a compatible provider route', () => {
@@ -891,7 +934,7 @@ describe('combined graph prompt X-ray', () => {
     ]))
     expect(preview).toContain('KLING REFERENCE MAP:')
     expect(preview).toContain('Controls shot order, editorial map, composition and continuity only')
-    expect(preview).toContain('Camera geometry, path and speed curve only')
+    expect(preview).toContain('Apply only that authored assignment; other references retain their own assigned domains.')
     expect(preview).toContain('FIRST FRAME')
     expect(preview).toContain('@closing-frame matches the reference in every appearance.')
     expect(preview).toContain('POSITIVE LOCKS')
@@ -902,7 +945,7 @@ describe('combined graph prompt X-ray', () => {
   it('assigns role-specific hard rules to prompt, source image, extend video, and audio reference inputs exactly once', () => {
     const prompt = node('connected-prompt', 'prompt', { title: 'Action Brief', prompt: 'Keep the action restrained and physically plausible.' })
     const image = node('connected-image', 'upload', { title: 'Portrait Base', assetPath: '/project/base.png', outputType: 'image' })
-    const videoSource = node('connected-video', 'output', { title: 'Previous Take', outputPath: '/project/take.mp4', outputType: 'video' })
+    const videoSource = node('connected-video', 'output', { referenceDescription: 'Source clip for continuation: preserve its ending state and existing temporal continuity.', title: 'Previous Take', outputPath: '/project/take.mp4', outputType: 'video' })
     const audioSource = node('connected-audio', 'output', { title: 'Dialogue Timing', outputPath: '/project/dialogue.wav', outputType: 'audio' })
     const editor = node('connected-editor', 'image-editor', { prompt: 'Change only the jacket color.' })
     const extender = node('connected-extender', 'video-generator', { prompt: 'Continue the walk into the doorway.', videoEngine: 'fal-ai/veo3.1/extend-video' })
@@ -922,29 +965,34 @@ describe('combined graph prompt X-ray', () => {
     expect(audioRequest.connectionRules).toEqual([expect.objectContaining({ tag: '@dialogue-timing', label: 'Audio Reference', rule: expect.stringContaining('never reinterpret it as visual content') })])
   })
 
-  it('routes Guide as a repairable reference and Lock as the provider frame anchor', () => {
+  it('preserves an explicit frame role regardless of retired Guide/Auto/Lock edge values', () => {
     const frame = node('fidelity-frame', 'upload', { title: 'Pixelated Opening', assetPath: '/project/pixelated.png', outputType: 'image' })
     const video = node('fidelity-video', 'video-generator', { prompt: 'A cyclist rides away from the camera.', videoEngine: 'fal-ai/kling-video/o3/standard/reference-to-video' })
-    const guide = buildGenerationRequest(video, [frame, video], [edge('fidelity-frame', 'fidelity-video', 'image-in', 'guide')])
-    expect(guide.inputPath).toBeUndefined()
-    expect(guide.references).toEqual([expect.objectContaining({ path: '/project/pixelated.png', slot: 'reference' })])
-    expect(guide.connectionRules).toEqual([expect.objectContaining({ mode: 'guide', rule: expect.stringContaining('loose opening-state guidance') })])
-    const automatic = buildGenerationRequest(video, [frame, video], [edge('fidelity-frame', 'fidelity-video', 'image-in', 'auto')])
-    expect(automatic.inputPath).toBeUndefined()
-    expect(automatic.references).toEqual([expect.objectContaining({ path: '/project/pixelated.png', slot: 'start' })])
-    expect(automatic.connectionRules).toEqual([expect.objectContaining({ tag: '@pixelated-opening', mode: 'auto', rule: expect.stringContaining('automatically repairing pixelation') })])
-    const lock = buildGenerationRequest(video, [frame, video], [edge('fidelity-frame', 'fidelity-video', 'image-in', 'lock')])
-    expect(lock.inputPath).toBe('/project/pixelated.png')
-    expect(lock.inputRole).toBe('start-frame')
-    expect(lock.connectionRules).toEqual([expect.objectContaining({ mode: 'lock', rule: expect.stringContaining('pixel-for-pixel') })])
+    const bodies: string[] = []
+    for (const inputFidelity of ['guide', 'auto', 'lock'] as const) {
+      const link = edge(frame.id, video.id, 'image-in', inputFidelity)
+      const request = buildGenerationRequest(video, [frame, video], [link])
+      expect(request).toMatchObject({ inputPath: '/project/pixelated.png', inputRole: 'start-frame' })
+      expect(request.connectionRules![0]).toMatchObject({ label: 'Starting Frame' })
+      expect(request.connectionRules![0]).not.toHaveProperty('mode')
+      expect(request.connectionRules![0]).not.toHaveProperty('toggleable')
+      expect(link.data).toEqual({ inputFidelity })
+      bodies.push(providerPromptPreview(request))
+    }
+    expect(new Set(bodies).size).toBe(1)
   })
 
-  it('promotes prompt-sensitive Auto artwork to deterministic lock metadata', () => {
-    const artwork = node('exact-artwork', 'upload', { title: 'Analisa', referenceTag: '@analisa', assetPath: '/project/analisa.png', outputType: 'image' })
+  it('does not promote an Image Generator media reference into the retired Auto artwork lock', () => {
+    const artwork = node('exact-artwork', 'upload', { title: 'Analisa', referenceTag: '@analisa', assetPath: '/project/analisa.png', outputType: 'image', referenceDescription: '@analisa supplies the original artwork layout.' })
     const image = node('exact-image', 'image-generator', { prompt: 'Place @analisa on the lowest placard exactly unmodified with its original letterforms and layout intact.' })
-    const request = buildGenerationRequest(image, [artwork, image], [edge('exact-artwork', 'exact-image', 'reference-in', 'auto')])
-    expect(request.connectionRules).toEqual([expect.objectContaining({ mode: 'auto', rule: expect.stringContaining('AUTO → PRESERVE RULE') })])
-    expect(request.references).toEqual([expect.objectContaining({ tag: '@analisa', fidelity: 'lock' })])
+    const request = buildGenerationRequest(image, [artwork, image], [edge(artwork.id, image.id, 'reference-in', 'lock')])
+    expect(request.connectionRules![0]).toMatchObject({ label: 'Media Reference' })
+    expect(request.connectionRules![0]).not.toHaveProperty('mode')
+    expect(request.references).toEqual([expect.objectContaining({ tag: '@analisa', mediaReferenceMode: 'reference', fidelity: undefined })])
+    const body = resolvedPromptWithReferences(request)
+    expect(body).toContain(image.data.prompt)
+    expect(body).toContain(artwork.data.referenceDescription)
+    expect(body).not.toMatch(/AUTO → PRESERVE|Reserved Blank Carrier/)
   })
 
   it('resolves Prompt, Router, media List, unified Storyboard, Style, and Video together', () => {
@@ -988,7 +1036,7 @@ describe('combined graph prompt X-ray', () => {
     const audio = node('bad-audio', 'output', { outputPath: '/project/dialogue.wav', outputType: 'audio' })
     const imageEditor = node('bad-image-editor', 'image-editor', { outputType: 'image' })
     const video = node('bad-video', 'video-generator', { prompt: 'Test.', videoEngine: 'bytedance/seedance-2.0/reference-to-video' })
-    expect(() => buildGenerationRequest(video, [audio, imageEditor, video], [edge('bad-audio', 'bad-image-editor', 'image-in'), edge('bad-image-editor', 'bad-video', 'reference-in')])).toThrow('Audio can connect only')
+    expect(() => buildGenerationRequest(video, [audio, imageEditor, video], [edge('bad-audio', 'bad-image-editor', 'image-in'), edge('bad-image-editor', 'bad-video', 'reference-in')])).toThrow('Audio cannot connect to an Image Generator')
   })
 
   it('X-rays provider-native Kling shots with global Style and reference authority exactly once', () => {
@@ -999,8 +1047,10 @@ describe('combined graph prompt X-ray', () => {
       expect(shot.prompt).toContain('LOOK-ONLY KODAK AUTHORITY')
       expect(shot.prompt.match(/LOOK-ONLY KODAK AUTHORITY/g)).toHaveLength(1)
       expect(shot.prompt).toContain('Use @idris as Idris.')
-      expect(shot.prompt).toContain('Use @cliff-workshop for the location')
-      expect(shot.prompt).toContain('Use @brass-compass for the element')
+      expect(request.references?.find(reference => reference.tag === '@cliff-workshop')?.referenceDescription).toBeTruthy()
+      expect(shot.prompt).toContain(request.references!.find(reference => reference.tag === '@cliff-workshop')!.referenceDescription!)
+      expect(request.references?.find(reference => reference.tag === '@brass-compass')?.referenceDescription).toBeTruthy()
+      expect(shot.prompt).toContain(request.references!.find(reference => reference.tag === '@brass-compass')!.referenceDescription!)
       expect(shot.prompt.match(/ACTIVE REFERENCES/g)).toHaveLength(1)
       expect(shot.prompt.match(/KLING REFERENCE MAP:/g)).toHaveLength(1)
     }
@@ -1018,9 +1068,9 @@ STATE LEDGER: The compass begins open with its loose gear on the bench; after Id
 FINAL ACCEPTANCE: Idris, compass geometry, travel direction, repair outcome, and final doorway composition all remain continuous.
 HARD AVOID: no identity drift, impossible hand geometry, state reset, text, logo, subtitle, or watermark.` })
     const routers = Array.from({ length: 15 }, (_, index) => node(`max-router-${index + 1}`, 'router', { title: `Max Router ${index + 1}`, routeSignal: 'text' }))
-    const visual = node('max-visual', 'upload', { title: 'Opening Guide', assetPath: '/project/opening.png', outputType: 'image' })
-    const generatedImage = node('max-generated-image', 'image-generator', { title: 'Generated Prop Guide', generatedResults: [{ path: '/project/generated-prop.png', url: 'file:///project/generated-prop.png', type: 'image', modelId: 'fal-ai/flux/schnell' }], outputType: 'image' })
-    const upscaledImage = node('max-upscaled-image', 'upscaler', { title: 'Upscaled Surface Guide', generatedResults: [{ path: '/project/upscaled-surface.png', url: 'file:///project/upscaled-surface.png', type: 'image', modelId: 'fal-ai/esrgan' }], outputType: 'image' })
+    const visual = node('max-visual', 'upload', { referenceDescription: 'Opening image reference for the authored composition.', title: 'Opening Guide', assetPath: '/project/opening.png', outputType: 'image' })
+    const generatedImage = node('max-generated-image', 'image-generator', { referenceDescription: 'Supplied prop-design image reference.', title: 'Generated Prop Guide', generatedResults: [{ path: '/project/generated-prop.png', url: 'file:///project/generated-prop.png', type: 'image', modelId: 'fal-ai/flux/schnell' }], outputType: 'image' })
+    const upscaledImage = node('max-upscaled-image', 'upscaler', { referenceDescription: 'Supplied surface-detail reference.', title: 'Upscaled Surface Guide', generatedResults: [{ path: '/project/upscaled-surface.png', url: 'file:///project/upscaled-surface.png', type: 'image', modelId: 'fal-ai/esrgan' }], outputType: 'image' })
     const motion = node('max-motion', 'output', { title: 'Motion Guide', outputPath: '/project/motion.mp4', outputType: 'video' })
     const generatedMotion = node('max-generated-motion', 'video-generator', { title: 'Generated Camera Guide', generatedResults: [{ path: '/project/generated-camera.mp4', url: 'file:///project/generated-camera.mp4', type: 'video', modelId: 'fal-ai/kling-video' }], outputType: 'video' })
     const dialogue = node('max-dialogue', 'voiceover', { title: 'Dialogue Guide', generatedResults: [{ path: '/project/dialogue.wav', url: 'file:///project/dialogue.wav', type: 'audio', modelId: 'elevenlabs/tts' }], outputType: 'audio' })
@@ -1033,7 +1083,7 @@ HARD AVOID: no identity drift, impossible hand geometry, state reset, text, logo
     const location = node('max-location', 'location', { title: 'Workshop', referenceTag: '@workshop', referenceAssets: [asset('max-workshop')] })
     const element = node('max-element', 'element', { title: 'Compass', referenceTag: '@compass', referenceAssets: [asset('max-compass')] })
     const style = node('max-style', 'style-reference', { title: 'Grounded Film', referenceTag: '@grounded-film', stylePrompt: 'Grounded practical lighting, restrained color, natural texture.', referenceAssets: [asset('max-style-guide')] })
-    const storyboard = node('max-storyboard', 'storyboard', { title: 'Repair Story', storyboardDuration: 8, outputPath: '/project/repair-storyboard.png', outputUrl: 'file:///project/repair-storyboard.png', outputType: 'image', referenceTag: '@repair-storyboard', storyboardPanels: [
+    const storyboard = node('max-storyboard', 'storyboard', { referenceDescription: 'Supplied editorial shot map; preserve shot order and continuity, never render its sheet layout.', title: 'Repair Story', storyboardDuration: 8, outputPath: '/project/repair-storyboard.png', outputUrl: 'file:///project/repair-storyboard.png', outputType: 'image', referenceTag: '@repair-storyboard', storyboardPanels: [
       { id: 'max-one', prompt: 'Idris studies the compass at the bench.', duration: 4, shotSize: 'medium', camera: 'dolly-in', audioCue: 'quiet dialogue begins' },
       { id: 'max-two', prompt: 'The compass needle aligns with the doorway.', duration: 4, shotSize: 'detail', camera: 'rack-focus-far', audioCue: 'metal click' },
     ] })
@@ -1090,20 +1140,22 @@ HARD AVOID: no identity drift, impossible hand geometry, state reset, text, logo
     expect(preview).toContain('REFERENCE AUTHORITY')
     expect(preview).toContain('@repair-storyboard — storyboard.')
     expect(preview).toContain('Use @idris as Idris.')
-    expect(preview).toContain('Use @workshop for the location')
-    expect(preview).toContain('Use @compass for the element')
+    expect(request.references!.find(reference => reference.tag === '@workshop')!.referenceDescription).toBeTruthy()
+    expect(preview).toContain(request.references!.find(reference => reference.tag === '@workshop')!.referenceDescription!)
+    expect(request.references!.find(reference => reference.tag === '@compass')!.referenceDescription).toBeTruthy()
+    expect(preview).toContain(request.references!.find(reference => reference.tag === '@compass')!.referenceDescription!)
     expect(preview.match(/Use @idris as Idris\./g)).toHaveLength(1)
-    expect(preview.match(/Use @workshop for the location\./g)).toHaveLength(1)
-    expect(preview.match(/Use @compass for the element\./g)).toHaveLength(1)
+    expect(preview.split(referenceIntroductionLine(request.references!.find(reference => reference.tag === '@workshop')!)!)).toHaveLength(2)
+    expect(preview.split(referenceIntroductionLine(request.references!.find(reference => reference.tag === '@compass')!)!)).toHaveLength(2)
     expect(preview).not.toMatch(/@Image\d+/)
     expect(preview.match(/Grounded practical lighting, restrained color, natural texture\./g)).toHaveLength(1)
-    expect(preview).toContain('motion reference')
+    expect(preview).toContain('supplied video reference')
     expect(preview).toContain('audio reference')
     expect(preview).toContain('@repair-storyboard — storyboard.')
     expect(preview).toContain('Controls shot order, editorial map, composition and continuity only; sheet layout not rendered.')
     expect(preview).toContain('FINAL-FRAME AND OUTPUT HARD GATE')
-    expect(preview).toContain('Hard cuts occur only at Storyboard boundaries selected Cut.')
-    expect(preview).toContain('Continue boundaries remain one uninterrupted take')
+    expect(preview).toContain('Hard cuts occur only where explicitly marked at the authored timecodes.')
+    expect(preview).toContain('All other timed action intervals continue within the same uninterrupted take')
     expect(preview).toContain('STATE LEDGER: The compass begins open')
     expect(preview.match(/STATE LEDGER: The compass begins open/g)).toHaveLength(1)
     expect(preview).toContain('Authored camera and lens: A physical dolly on a 40mm spherical lens')

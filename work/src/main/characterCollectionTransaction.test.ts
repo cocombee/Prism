@@ -25,7 +25,7 @@ describe('Character collection transaction boundary', () => {
   it('stages collection files and commits the pruned workflow before one physical trash operation', () => {
     const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
     const handler = source.slice(source.indexOf("ipcMain.handle('assets:delete-collection'"), source.indexOf("ipcMain.handle('assets:delete'"))
-    expect(handler).toContain("projectPath('05. Canvas', '.prism-delete-staging', randomUUID())")
+    expect(handler).toContain("projectFolder('Canvas', '.prism-delete-staging', randomUUID())")
     expect(handler).toContain('await atomicJson(workflowPath(), nextWorkflow)')
     expect(handler).toContain('await shell.trashItem(stagingRoot)')
     expect(handler).toContain('await atomicJson(assetsIndexPath(), originalAssets).catch')

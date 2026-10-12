@@ -361,6 +361,37 @@ describe('Higgsfield primary text and reference model integration (mock-only)', 
     expect(api).not.toHaveBeenCalled()
   })
 
+  it('routes Grok scalar speech and frames from graph through durable protected submission', async () => {
+    const run = await runThroughProtectedApi('xai/grok-imagine-video/v1.5/reference-to-video', [
+      { id: 'additional-image', field: 'image_urls', type: 'image', url: 'https://cdn.prism.example/additional.png' },
+      { id: 'speech', field: 'audio_url', type: 'audio', url: 'https://cdn.prism.example/speech.wav' },
+      { id: 'first-frame', field: 'image_url', type: 'image', url: 'https://cdn.prism.example/first.png' },
+    ])
+    const wire = JSON.parse(openHiggsfieldSubmission(run.completed, decrypt)!.body)
+    expect(wire.prompt).toBe(PROMPT)
+    expect(wire.audio_url).toBe('https://cdn.prism.example/speech.wav')
+    expect(wire.image_url).toBe('https://cdn.prism.example/first.png')
+    expect(wire.image_urls).toEqual(['https://cdn.prism.example/additional.png'])
+    expect(wire).not.toHaveProperty('audio_urls')
+    const ports = nodeInputPorts({ kind: 'video-generator', higgsfieldNative: run.end.data.higgsfieldNative })
+    expect(ports.find(port => port.id === higgsfieldFieldPortId('audio_url'))).toMatchObject({signal:'audio',maxConnections:1})
+    expect(run.contract.media.find(field => field.key === 'image_urls')?.maximum).toBe(7)
+  })
+
+  it.each(['kling-video/o3/first-last-frame','kling-video/omni/first-last-frame'])('preserves the graph first/last aliases through durable submission on %s', async endpointId => {
+    const run = await runThroughProtectedApi(endpointId, [
+      { id: 'start-frame', field: 'first_frame_url', type: 'image', url: 'https://cdn.prism.example/first.png' },
+      { id: 'end-frame', field: 'last_frame_url', type: 'image', url: 'https://cdn.prism.example/last.png' },
+    ])
+    const wire = JSON.parse(openHiggsfieldSubmission(run.completed, decrypt)!.body)
+    expect(wire.prompt).toBe(PROMPT)
+    expect(wire.first_frame_url).toBe('https://cdn.prism.example/first.png')
+    expect(wire.last_frame_url).toBe('https://cdn.prism.example/last.png')
+    expect(wire).not.toHaveProperty('image_url')
+    const snapshot = openHiggsfieldJobSnapshot(run.completed, decrypt)
+    expect(snapshot.endpointId).toBe(endpointId)
+  })
+
   it('composes MiniMax H3 ordered image, video and audio arrays using typed graph media', async () => {
     const endpointId = 'minimax/h3/reference-to-video'
     const specs: SourceSpec[] = [

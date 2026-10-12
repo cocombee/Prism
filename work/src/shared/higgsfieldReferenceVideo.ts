@@ -1,3 +1,4 @@
+import routes from './fixtures/higgsfieldReferenceVideoRoutes.json'
 import schemas from './fixtures/higgsfieldReferenceVideoSchemas.json'
 import { validateFalSchema, type FalJson, type FalSchemaNode } from './falSchemaBinding'
 import { assertHiggsfieldPublicUrl } from './higgsfieldPublicUrl'
@@ -18,6 +19,9 @@ export interface HiggsfieldReferenceVideoMediaBinding {
 }
 
 export const HIGGSFIELD_REFERENCE_VIDEO_MEDIA: Readonly<Record<string, HiggsfieldReferenceVideoMediaBinding>> = Object.freeze({
+  audio_url: Object.freeze({ type: 'audio', array: false, role: 'reference-audio', label: 'Audio reference' }),
+  first_frame_url: Object.freeze({ type: 'image', array: false, role: 'start-frame', label: 'Start frame' }),
+  last_frame_url: Object.freeze({ type: 'image', array: false, role: 'end-frame', label: 'End frame' }),
   image_url: Object.freeze({ type: 'image', array: false, role: 'start-frame', label: 'Start frame' }),
   end_image_url: Object.freeze({ type: 'image', array: false, role: 'end-frame', label: 'End frame' }),
   last_image_url: Object.freeze({ type: 'image', array: false, role: 'end-frame', label: 'End frame' }),
@@ -26,39 +30,15 @@ export const HIGGSFIELD_REFERENCE_VIDEO_MEDIA: Readonly<Record<string, Higgsfiel
   audio_urls: Object.freeze({ type: 'audio', array: true, role: 'reference-audio', label: 'Audio references' }),
 })
 
-const routeMedia = {
-  'kling-video/v3.0/std/image-to-video': ['image_url', 'last_image_url'],
-  'kling-video/v2.6/pro/image-to-video': ['image_url'],
-  'minimax/h3/reference-to-video': ['image_urls', 'video_urls', 'audio_urls'],
-  'minimax/hailuo-2.3/standard/image-to-video': ['image_url'],
-  'lightricks/ltx-2.5/image-to-video/pro': ['image_url', 'end_image_url'],
-  'pixverse/v6/image-to-video': ['image_url', 'end_image_url'],
-  'wan/v2.7/reference-to-video': ['image_urls', 'video_urls'],
-  'alibaba/wan-3.0/image-to-video': ['image_url', 'end_image_url'],
-} as const satisfies Record<string, readonly string[]>
-
-type HiggsfieldReferenceVideoEndpoint = keyof typeof routeMedia
-const omittedStructuredControls: Readonly<Record<HiggsfieldReferenceVideoEndpoint, readonly string[]>> = Object.freeze({
-  'kling-video/v3.0/std/image-to-video': Object.freeze(['elements', 'multi_prompt']),
-  'kling-video/v2.6/pro/image-to-video': Object.freeze([]),
-  'minimax/h3/reference-to-video': Object.freeze([]),
-  'minimax/hailuo-2.3/standard/image-to-video': Object.freeze([]),
-  'lightricks/ltx-2.5/image-to-video/pro': Object.freeze([]),
-  'pixverse/v6/image-to-video': Object.freeze([]),
-  'wan/v2.7/reference-to-video': Object.freeze([]),
-  'alibaba/wan-3.0/image-to-video': Object.freeze([]),
-})
-
-const registry: Readonly<Record<string, { kind: 'reference-video'; id: HiggsfieldReferenceVideoEndpoint; label: string; company: string; release: string }>> = Object.freeze({
-  'kling-video/v3.0/std/image-to-video': Object.freeze({ kind: 'reference-video', id: 'kling-video/v3.0/std/image-to-video', label: 'Kling 3.0 Standard · Reference to Video', company: 'Kling', release: 'Kling 3.0' }),
-  'kling-video/v2.6/pro/image-to-video': Object.freeze({ kind: 'reference-video', id: 'kling-video/v2.6/pro/image-to-video', label: 'Kling 2.6 Pro · Reference to Video', company: 'Kling', release: 'Kling 2.6' }),
-  'minimax/h3/reference-to-video': Object.freeze({ kind: 'reference-video', id: 'minimax/h3/reference-to-video', label: 'MiniMax H3 · Reference to Video', company: 'MiniMax', release: 'MiniMax H3' }),
-  'minimax/hailuo-2.3/standard/image-to-video': Object.freeze({ kind: 'reference-video', id: 'minimax/hailuo-2.3/standard/image-to-video', label: 'Hailuo 2.3 Standard · Reference to Video', company: 'MiniMax', release: 'Hailuo 2.3' }),
-  'lightricks/ltx-2.5/image-to-video/pro': Object.freeze({ kind: 'reference-video', id: 'lightricks/ltx-2.5/image-to-video/pro', label: 'LTX 2.5 Pro · Reference to Video', company: 'Lightricks', release: 'LTX 2.5' }),
-  'pixverse/v6/image-to-video': Object.freeze({ kind: 'reference-video', id: 'pixverse/v6/image-to-video', label: 'PixVerse V6 · Reference to Video', company: 'PixVerse', release: 'PixVerse V6' }),
-  'wan/v2.7/reference-to-video': Object.freeze({ kind: 'reference-video', id: 'wan/v2.7/reference-to-video', label: 'Wan 2.7 · Reference to Video', company: 'Alibaba', release: 'Wan 2.7' }),
-  'alibaba/wan-3.0/image-to-video': Object.freeze({ kind: 'reference-video', id: 'alibaba/wan-3.0/image-to-video', label: 'Wan 3.0 · Reference to Video', company: 'Alibaba', release: 'Wan 3.0' }),
-})
+const fixture = routes as Readonly<Record<string, {
+  label: string; company: string; release: string; media: readonly string[]; omittedControls: readonly string[]
+}>>
+type HiggsfieldReferenceVideoEndpoint = string
+const routeMedia = Object.freeze(Object.fromEntries(Object.entries(fixture).map(([id, row]) => [id, Object.freeze([...row.media])])))
+const omittedStructuredControls = Object.freeze(Object.fromEntries(Object.entries(fixture).map(([id, row]) => [id, Object.freeze([...row.omittedControls])])))
+const registry = Object.freeze(Object.fromEntries(Object.entries(fixture).map(([id, row]) => [id, Object.freeze({
+  kind: 'reference-video' as const, id, label: row.label, company: row.company, release: row.release,
+})])))
 
 export const HIGGSFIELD_REFERENCE_VIDEO_MODELS = Object.freeze(Object.values(registry))
 
@@ -161,6 +141,7 @@ function assertNoUnboundUriSchema(endpointId: string, schema: FalSchemaNode): vo
     if (node.format === 'uri' && !allowedUri) throw new Error(`The current ${endpointId} schema adds an unbound media URI. Review this route before generating.`)
     for (const [key, child] of Object.entries(node.properties || {})) {
       const next = [...dataPath, key]
+      if (dataPath.length === 0 && ['file_url', 'link_url'].includes(key) && omittedStructuredControls[endpointId].includes(key)) continue
       if (mediaLike(key) && (!routeMediaBinding(endpointId, key) || dataPath.length > 0)) throw new Error(`The current ${endpointId} schema adds an unbound media field ${key}. Review this route before generating.`)
       visit(child, next, depth + 1)
     }
@@ -177,8 +158,13 @@ function assertCurrentSchema(endpointId: string, schema: FalSchemaNode): void {
   const id = requireModel(endpointId), properties = schema.properties as Record<string, FalSchemaNode>
   const baseline = higgsfieldReferenceVideoSchema(endpointId)
   for (const required of baseline.required || []) if (!owns(properties, required)) throw new Error(`The current ${endpointId} schema removed required input ${required}. Review the saved bindings.`)
-  assertNoUnboundUriSchema(id, schema)
   const omitted = omittedStructuredControls[id]
+  for (const key of omitted.filter(key => ['file_url', 'link_url'].includes(key))) {
+    const original = baseline.properties?.[key], current = properties[key]
+    if (current && (!original || !equalSchemaShape(original, current))) throw new Error(`The current ${endpointId} omitted control ${key} changed shape. Review this route before generating.`)
+    if ((schema.required as string[] | undefined)?.includes(key)) throw new Error(`The current ${endpointId} requires unsupported ${key}. Review this route before generating.`)
+  }
+  assertNoUnboundUriSchema(id, schema)
   for (const required of (schema.required as string[] | undefined) || []) if (omitted.includes(required)) throw new Error(`The current ${endpointId} schema requires unsupported structured control ${required}. Review this route before generating.`)
   for (const [key, field] of Object.entries(properties)) {
     if (omitted.includes(key)) {
@@ -278,7 +264,7 @@ export function planHiggsfieldReferenceVideoInput(request: HiggsfieldNativeReque
   if (request.allowSourceTrimming !== undefined) throw new Error('Reference routes do not accept Genjutsu source-trimming consent; the saved request was preserved.')
   if (request.fingerprint !== undefined && (typeof request.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(request.fingerprint))) throw new Error('Load and review the current Higgsfield Reference model inputs before generating.')
   if (!record(request.values) || !record(request.media)) throw new Error('Review Higgsfield Reference controls and media bindings.')
-  for (const key of omittedStructuredControls[endpointId]) if (owns(request.values, key)) throw new Error(`The saved ${endpointId} structured control ${key} is not implemented in Prism Reference; its authored value was preserved for review.`)
+  for (const key of omittedStructuredControls[endpointId]) if (owns(request.values, key)) throw new Error(`The saved ${endpointId} ${['file_url','link_url'].includes(key) ? 'document/web input' : 'structured control'} ${key} is not implemented in Prism Reference; its authored value was preserved for review.`)
   assertJson(request.values, 'Higgsfield Reference controls')
   const currentOwned = inputSchema !== undefined
   const schema = inputSchema ? clone(inputSchema) : higgsfieldReferenceVideoSchema(endpointId)

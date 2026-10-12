@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { GenerationRequest } from '../shared/types'
-import { generateElevenAudio, readElevenAvailability, readElevenSpeechModels, readElevenVoices } from './elevenLabsApi'
+import { generateElevenAudio, readElevenAvailability, readPublicElevenVoices, readElevenSpeechModels, readElevenVoices } from './elevenLabsApi'
 
 const key = 'safe-placeholder-not-a-real-key'
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -120,4 +120,19 @@ describe('direct ElevenLabs transport', () => {
     await expect(readElevenVoices({ fetch, key })).rejects.toThrow(/voice without an ID/)
   })
 
+})
+
+
+describe('public built-in voice previews', () => {
+  it('uses an unauthenticated bounded catalog read and strips all unrelated metadata without fetching samples', async () => {
+    const fetch = vi.fn().mockResolvedValue(json({ voices: [{ voice_id: 'voice', name: 'George', preview_url: 'https://storage.example.com/voice.mp3', samples: ['private'], settings: { stability: 0.4 } }, { voice_id: 'no-sample', name: 'No sample', preview_url: 'http://localhost/sample' }] }))
+    expect(await readPublicElevenVoices(fetch)).toEqual([{ id: 'voice', label: 'George', previewUrl: 'https://storage.example.com/voice.mp3' }, { id: 'no-sample', label: 'No sample' }])
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(fetch.mock.calls[0][0]).toBe('https://api.elevenlabs.io/v1/voices')
+    expect(fetch.mock.calls[0][1]).toMatchObject({ credentials: 'omit', redirect: 'error' })
+    expect(fetch.mock.calls[0][1].headers).toBeUndefined()
+  })
+  it('rejects malformed/oversized catalogs and HTTP errors rather than guessing a sample', async () => {
+    for (const response of [json({ voices: [{ name: 'Missing ID' }] }), json({ voices: Array.from({ length: 1001 }, () => ({})) }), json({}, 401), new Response('too big', { headers: { 'Content-Length': String(3 * 1024 * 1024) } })]) await expect(readPublicElevenVoices(vi.fn().mockResolvedValue(response))).rejects.toThrow()
+  })
 })

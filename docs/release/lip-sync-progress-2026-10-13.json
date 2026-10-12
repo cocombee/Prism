@@ -1,0 +1,21 @@
+{
+  "status": "installed_work_in_progress_audio_not_accepted",
+  "utc": "2026-10-12T23:16:43.425078+00:00",
+  "installedAsarSha256": "d24c7140b28216bedacd564a5370aed3810e6938094d3e5970b68a014e4b6b7e",
+  "fullTests": 3433,
+  "testFiles": 311,
+  "focusedTests": 142,
+  "typecheck": "passed",
+  "productionBuild": "passed",
+  "compiledFilesMatched": 25,
+  "canonicalInputs": 679,
+  "stageInputs": 678,
+  "stableSigning": "deep strict verified; five designated requirements unchanged",
+  "nativeFrameworkFilesPreserved": 275,
+  "unpackedDependenciesPreserved": 17,
+  "savedProjectReopen": "verified Locked prompt and7/7 results",
+  "providerUseAfterUpdate": "not separately exercised",
+  "audioFidelity": "unaccepted",
+  "git": "user explicitly requested commit and push; receipt recorded after operation",
+  "pending": "short original-audio fidelity, longer speech, Music-to-beat, wider24-item goal; new Assets padding/icon feedback"
+}

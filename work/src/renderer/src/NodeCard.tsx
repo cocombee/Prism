@@ -1,3 +1,4 @@
+import { AudioPlayer, type AudioPlayerProps } from './AudioPlayer'
 import { createContext, memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Position, type NodeProps } from '@xyflow/react'
@@ -755,12 +756,12 @@ const kindMeta = {
   assistant: { icon: NODE_KIND_ICONS.assistant!, label: 'Assistant', subtitle: 'Prompt Enhancement', tone: 'violet' },
 } as const
 
-function mediaPreview(data: StudioNodeData) {
+function mediaPreview(data: StudioNodeData, audioProps?: Omit<AudioPlayerProps, 'src'>) {
   const activeResult = data.generatedResults?.[Math.min(Math.max(data.activeResultIndex || 0, 0), Math.max((data.generatedResults?.length || 1) - 1, 0))]
   const url = activeResult?.url || data.outputUrl || data.assetUrl
   if (!url) return null
   const outputType = activeResult?.type || data.outputType
-  if (outputType === 'audio') return <div className="node-audio-player nodrag"><AudioLines size={16} strokeWidth={1.2} /><span className="node-audio-waveform" aria-hidden="true">{Array.from({ length: 30 }, (_, index) => <i key={index} style={{ height: `${5 + (index * 7 % 15)}px` }} />)}</span><audio className="node-audio" src={url} controls preload="metadata" /></div>
+  if (outputType === 'audio') return <AudioPlayer src={url} {...audioProps} />
   if (outputType === 'video' || data.kind === 'video-generator') {
     return <video className="node-media" src={url} controls preload="metadata" playsInline draggable={false} onDragStart={(event) => event.preventDefault()} />
   }
@@ -859,8 +860,17 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   }
   const activeGeneratedIndex = Math.min(Math.max(data.activeResultIndex || 0, 0), Math.max((data.generatedResults?.length || 1) - 1, 0))
   const activeGeneratedResult = data.generatedResults?.[activeGeneratedIndex]
+  const hasAudioPreview = (activeGeneratedResult?.type || data.outputType) === 'audio'
+  const previewMedia = () => mediaPreview(data, {
+    activeIndex: activeGeneratedIndex, total: data.generatedResults?.length || 1,
+    onPrevious: () => selectGeneratedResult(activeGeneratedIndex - 1),
+    onNext: () => selectGeneratedResult(activeGeneratedIndex + 1),
+    onReveal: activeGeneratedResult
+      ? () => runtime?.revealGeneratedMedia(id, activeGeneratedIndex)
+      : data.assetPath || data.outputPath ? () => { void window.prism.assets.revealPath((data.assetPath || data.outputPath)!) } : undefined,
+  })
   const generatedMediaActions = activeGeneratedResult ? <div className="generated-media-actions nodrag" aria-label="Generated Media Actions">
-    <button data-tooltip="Show In Finder" aria-label="Show Generated Media In Finder" onClick={(event) => { event.stopPropagation(); runtime?.revealGeneratedMedia(id, activeGeneratedIndex) }}><FolderOpen size={13} /></button>
+    {!hasAudioPreview && <button data-tooltip="Show In Finder" aria-label="Show Generated Media In Finder" onClick={(event) => { event.stopPropagation(); runtime?.revealGeneratedMedia(id, activeGeneratedIndex) }}><FolderOpen size={13} /></button>}
     <button data-tooltip="Rename" aria-label="Rename Generated Media" onClick={(event) => { event.stopPropagation(); setRenameName(activeMediaName(data)); setRenameNameOpen(true) }}><PencilLine size={13} /></button>
     <button data-tooltip={runtime?.generatedMediaFavorite(id, activeGeneratedIndex) ? 'Remove From Favorites' : 'Add To Favorites'} aria-label={runtime?.generatedMediaFavorite(id, activeGeneratedIndex) ? 'Remove Generated Media From Favorites' : 'Add Generated Media To Favorites'} className={runtime?.generatedMediaFavorite(id, activeGeneratedIndex) ? 'is-active' : ''} onClick={(event) => { event.stopPropagation(); runtime?.setGeneratedMediaFavorite(id, activeGeneratedIndex, !runtime.generatedMediaFavorite(id, activeGeneratedIndex)) }}><Heart size={13} fill={runtime?.generatedMediaFavorite(id, activeGeneratedIndex) ? 'currentColor' : 'none'} /></button>
     <button className="is-danger" data-tooltip="Delete" aria-label="Delete Generated Media" onClick={(event) => { event.stopPropagation(); runtime?.trashGeneratedMedia(id, activeGeneratedIndex) }}><Trash2 size={13} /></button>
@@ -916,7 +926,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const isMediaTile = ['upload', 'output', 'gallery'].includes(data.kind) || isSemanticReference
   const connectedTags = acceptsText ? runtime?.connectedReferenceTags(id) || [] : []
   const connectedInputRules = runtime?.connectedInputRules(id) || []
-  const fidelityInputRules = connectedInputRules.filter((rule) => rule.toggleable && rule.edgeId)
+  const fidelityInputRules = ['image-generator', 'video-generator'].includes(data.kind) ? [] : connectedInputRules.filter((rule) => rule.toggleable && rule.edgeId)
   const connectedPromptTags = [...new Set(connectedInputRules.flatMap((rule) => [rule.tag, ...(rule.aliases || [])]))]
   const availablePromptTags = runtime?.availablePromptTags(id) || connectedPromptTags
   const upscalerIsVideo = data.kind === 'upscaler' && data.upscalerModel === 'realesrgan-video'
@@ -1361,19 +1371,19 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       )}
 
       {!isSemanticReference && !isCanvasGenerator && data.kind !== 'upscaler' && (activeGeneratedResult
-        ? <div className={`generated-media-stage ${isMediaTile ? 'media-tile-preview' : ''}`} {...generatedMediaInteraction}>{mediaPreview(data)}{generatedMediaActions}</div>
-        : isMediaTile && mediaPreview(data)
-          ? <div className="media-tile-preview">{mediaPreview(data)}</div>
-          : mediaPreview(data))}
+        ? <div className={`generated-media-stage ${isMediaTile ? 'media-tile-preview' : ''}`} {...generatedMediaInteraction}>{previewMedia()}{generatedMediaActions}</div>
+        : isMediaTile && previewMedia()
+          ? <div className="media-tile-preview">{previewMedia()}</div>
+          : previewMedia())}
 
       {isCanvasGenerator && <>
         {fidelityInputRules.length > 0 && <div className="generator-connected-context nodrag">
           <div className="connected-input-rules" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={fidelityInputRules} onMode={runtime!.setInputFidelity} /></div>
         </div>}
         <div className="generator-stage" style={{ aspectRatio: stageRatio.replace(':', ' / ') }} {...generatedMediaInteraction}>
-          {mediaPreview(data)}
+          {previewMedia()}
           {generatedMediaActions}
-          {(data.generatedResults?.length || 0) > 1 && <div className="result-carousel nodrag" onPointerDown={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}><button data-tooltip="Previous Result" aria-label="Previous Result" disabled={activeGeneratedIndex === 0} onClick={() => selectGeneratedResult(activeGeneratedIndex - 1)}><ChevronLeft size={11} /></button><span>{activeGeneratedIndex + 1}/{data.generatedResults?.length}</span><button data-tooltip="Next Result" aria-label="Next Result" disabled={activeGeneratedIndex === (data.generatedResults?.length || 1) - 1} onClick={() => selectGeneratedResult(activeGeneratedIndex + 1)}><ChevronRight size={11} /></button></div>}
+          {!hasAudioPreview && (data.generatedResults?.length || 0) > 1 && <div className="result-carousel nodrag" onPointerDown={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}><button data-tooltip="Previous Result" aria-label="Previous Result" disabled={activeGeneratedIndex === 0} onClick={() => selectGeneratedResult(activeGeneratedIndex - 1)}><ChevronLeft size={11} /></button><span>{activeGeneratedIndex + 1}/{data.generatedResults?.length}</span><button data-tooltip="Next Result" aria-label="Next Result" disabled={activeGeneratedIndex === (data.generatedResults?.length || 1) - 1} onClick={() => selectGeneratedResult(activeGeneratedIndex + 1)}><ChevronRight size={11} /></button></div>}
           {!data.outputUrl && !data.outputPath && <div className="generator-input-slots nodrag" aria-label={`Available ${isImageGeneratorSurface ? 'Image' : 'Video'} Inputs`} data-input-count={inputPorts.length} data-stage-orientation={stageOrientation} style={{ '--generator-input-columns': stageOrientation === 'portrait' ? 1 : inputPorts.length >= 6 ? 3 : Math.min(2, Math.max(1, inputPorts.length)) } as CSSProperties}>
             {inputPorts.map((port) => <button key={port.id} type="button" aria-label={`Add ${port.label}`} title={`Add ${port.label}`} onClick={(event) => runtime?.openInputQuickConnect(id, port.id, event.clientX, event.clientY)}><GeneratorInputIcon id={port.id} signal={port.signal} kind={data.kind} /><span>{generatorInputLabel(port.id, port.label)}</span></button>)}
           </div>}

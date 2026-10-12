@@ -20,7 +20,7 @@ describe('visible provider prompt body parity', () => {
     for (const heading of ['REFERENCE AUTHORITY', 'FORMAT MODE', 'TIMELINE AND CONTINUOUS ACTION', 'IDENTITY AND ANATOMY CONTINUITY', 'NEGATIVE PROMPT']) expect(locked).toContain(heading)
     expect(locked).not.toMatch(/ASSISTANT TASK|EDIT CONTROL|EDITABLE VARIABLE REGISTRY/)
     expect(providerPromptPreview(request)).toBe(locked)
-    expect(providerSeedancePayloadCompilation(request).text).toBe(locked.replaceAll('@hero', '[Image1]'))
+    expect(providerSeedancePayloadCompilation(request).text).toBe(locked.replaceAll('@hero', '@Image1'))
   })
   it('returns User overrides byte-for-byte without rewrapping or duplication', () => {
     const user = 'ASSISTANT TASK\nUser-owned complete provider body.\nNEGATIVE PROMPT\nNo drift.'
@@ -29,15 +29,16 @@ describe('visible provider prompt body parity', () => {
     expect(providerPromptPreview(override)).toBe(user)
     expect(providerSeedancePayloadCompilation(override).text).toBe(user)
   })
-  it('uses documented bracket tokens for 2.5 and legacy at-tokens for 2.0 in attachment order', () => {
+  it('uses fal at-tokens for both versions and preserves BytePlus 2.5 syntax in attachment order', () => {
     const refs = [
       { role: 'character' as const, tag: '@hero', description: 'Hero', path: '/hero.png', mediaType: 'image' as const, slot: 'reference' as const },
       { role: 'reference' as const, tag: '@clip', description: 'Clip', path: '/clip.mp4', mediaType: 'video' as const, slot: 'reference' as const },
       { role: 'reference' as const, tag: '@sound', description: 'Sound', path: '/sound.wav', mediaType: 'audio' as const, slot: 'reference' as const },
     ]
     const body = 'Use @hero, then @clip, then @sound.'
-    expect(providerSeedancePayloadCompilation({ ...request, providerPromptOverride: body, references: refs }).text).toBe('Use [Image1], then [Video1], then [Audio1].')
+    expect(providerSeedancePayloadCompilation({ ...request, providerPromptOverride: body, references: refs }).text).toBe('Use @Image1, then @Video1, then @Audio1.')
     expect(providerSeedancePayloadCompilation({ ...request, videoEngine: 'bytedance/seedance-2.0/reference-to-video', providerPromptOverride: body, references: refs }).text).toBe('Use @Image1, then @Video1, then @Audio1.')
+    expect(providerSeedancePayloadCompilation({ ...request, videoEngine: 'byteplus/seedance-2.5/reference-to-video', providerPromptOverride: body, references: refs }).text).toBe('Use [Image1], then [Video1], then [Audio1].')
   })
 
   it('shows qualified skin instructions in the exact submitted body while preserving Manual/User bytes', () => {
@@ -55,7 +56,7 @@ describe('visible provider prompt body parity', () => {
     expect(visible.indexOf('NATURAL SKIN TEXTURE')).toBeLessThan(visible.indexOf('NEGATIVE PROMPT'))
     expect(compileProviderPromptForSubmission(qualified).text).toBe(visible)
     const payload = providerSeedancePayloadCompilation(qualified).text
-    expect(payload).toBe(visible.replaceAll('@hero', '[Image1]'))
+    expect(payload).toBe(visible.replaceAll('@hero', '@Image1'))
     expect(payload).toContain(`NATURAL SKIN TEXTURE\n${NATURAL_SKIN_POSITIVE_CLAUSES.join('\n\n')}`)
     for (const term of NATURAL_SKIN_NEGATIVE_TERMS) expect(payload).toContain(term)
 
@@ -98,10 +99,10 @@ describe('visible provider prompt body parity', () => {
     expect(irreducible.promptBudgetDiagnostic).toMatchObject({ modelId: 'bytedance/seedance-2.5/reference-to-video', limit: 500, limitSource: 'fixture-model-capability', blocking: true })
     expect(irreducible.promptBudgetDiagnostic?.blockingReason).toContain('mandatory continuity state was preserved without truncation')
     expect(() => compileProviderPromptForSubmission(typed, { family: 'seedance', ceiling: 500, ceilingSource: 'fixture-model-capability' })).toThrow(/blocks provider dispatch/i)
-    expect(irreducible.blocks.at(-1)?.label).toBe('Reference roles')
+    expect(irreducible.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
     const semanticMaster = visibleProviderPromptBody(typed)
     expect(providerPromptPreview(typed)).toBe(semanticMaster)
-    expect(providerSeedancePayloadCompilation(typed).text).toBe(semanticMaster.replaceAll('@hero', '[Image1]'))
+    expect(providerSeedancePayloadCompilation(typed).text).toBe(semanticMaster.replaceAll('@hero', '@Image1'))
   })
 
   it('budgets visible skin clauses before submission and preserves qualified Manual CRLF bytes', () => {

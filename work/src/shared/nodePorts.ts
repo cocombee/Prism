@@ -17,6 +17,11 @@ export interface NodeInputPortContract {
   maxConnections?: number
 }
 
+/** Display status is added once, even when an older snapshot saved a decorated label. */
+export function unavailableInputPortLabel(label: string): string {
+  return `Unavailable · ${label.replace(/^(?:Unavailable · )+/, '')}`
+}
+
 export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId' | 'falNative' | 'higgsfieldNative'>): NodeInputPortContract[] {
   const text = (): NodeInputPortContract => ({ id: 'text-in', signal: 'text', label: 'Text or Prompt', top: 54, icon: 'prompt' })
   const storyboard = (): NodeInputPortContract => ({ id: 'storyboard-in', signal: 'storyboard', label: 'Storyboard (Optional)', top: 94, maxConnections: 1 })
@@ -31,10 +36,10 @@ export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine'
       const bindings: NonNullable<typeof state.media> = state.media || describeHiggsfieldInputContract(state.endpointId, higgsfieldInputSchema(state.endpointId), '').media
       const ports: NodeInputPortContract[] = [text(), ...(!higgsfieldSourceOwnsTimeline(state.endpointId) ? [storyboard()] : []), style()]
       if (bindings.some(binding => binding.role === 'reference-image' && !binding.retired)) for (const kind of ['character', 'element', 'location'] as const) ports.push({ id: `${kind}-in`, signal: 'image', label: `${kind[0].toUpperCase()}${kind.slice(1)} Reference`, top: 0, icon: `${kind}-reference` })
-      for (const binding of bindings) ports.push({ id: binding.portId, signal: binding.type, label: binding.retired ? `Unavailable · ${binding.label}` : binding.label, top: 0,
+      for (const binding of bindings) ports.push({ id: binding.portId, signal: binding.type, label: binding.retired ? unavailableInputPortLabel(binding.label) : binding.label, top: 0,
         icon: binding.role === 'start-frame' ? 'start-frame' : binding.role === 'end-frame' ? 'end-frame' : binding.role === 'source-video' ? 'source-video' : binding.type === 'image' ? 'image-reference' : binding.type === 'video' ? 'reference-video' : 'reference-audio',
         maxConnections: binding.retired ? 0 : binding.multiple ? binding.maximum : 1 })
-      for (const retired of state.retiredPorts || []) if (!ports.some(port => port.id === retired.id)) ports.push({ ...retired, label: `Unavailable · ${retired.label}`, top: 0, maxConnections: 0 })
+      for (const retired of state.retiredPorts || []) if (!ports.some(port => port.id === retired.id)) ports.push({ ...retired, label: unavailableInputPortLabel(retired.label), top: 0, maxConnections: 0 })
       return ports.map((port, index) => ({ ...port, top: 54 + index * 40 }))
     }
     let maximum: number | undefined
@@ -44,7 +49,7 @@ export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine'
       { id: 'reference-in', signal: 'image', label: 'Image References', top: 0, icon: 'image-reference', maxConnections: maximum },
       ...(['character', 'element', 'location'] as const).map(kind => ({ id: `${kind}-in`, signal: 'image' as const, label: `${kind[0].toUpperCase()}${kind.slice(1)} Reference`, top: 0, icon: `${kind}-reference` as NodeInputPortContract['icon'], maxConnections: maximum })),
     ]
-    for (const retired of data.higgsfieldNative.retiredPorts || []) if (!ports.some(port => port.id === retired.id)) ports.push({ ...retired, label: `Unavailable · ${retired.label}`, top: 0, maxConnections: 0 })
+    for (const retired of data.higgsfieldNative.retiredPorts || []) if (!ports.some(port => port.id === retired.id)) ports.push({ ...retired, label: unavailableInputPortLabel(retired.label), top: 0, maxConnections: 0 })
     return ports.map((port, index) => ({ ...port, top: 54 + index * 40 }))
   }
   if (data.falNative && falNativeFlowForKind(data.kind) === data.falNative.flow) {
@@ -55,10 +60,10 @@ export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine'
       if (data.falNative.media.some(binding => binding.role === 'reference-image' && !binding.retired)) for (const kind of ['character', 'element', 'location'] as const) ports.push({ id: `${kind}-in`, signal: 'image', label: `${kind[0].toUpperCase()}${kind.slice(1)} Reference`, top: 0, icon: `${kind}-reference` })
       ports.push(style())
     }
-    for (const binding of data.falNative.media) ports.push({ id: binding.portId, signal: binding.type, label: binding.retired ? `Unavailable · ${binding.label}` : binding.label, top: 0,
+    for (const binding of data.falNative.media) ports.push({ id: binding.portId, signal: binding.type, label: binding.retired ? unavailableInputPortLabel(binding.label) : binding.label, top: 0,
       icon: binding.role === 'start-frame' ? 'start-frame' : binding.role === 'end-frame' ? 'end-frame' : binding.type === 'image' ? 'image-reference' : binding.type === 'video' ? 'reference-video' : 'reference-audio',
       maxConnections: binding.retired ? 0 : binding.multiple ? undefined : 1 })
-    for (const retired of data.falNative.retiredPorts || []) if (!ports.some(port => port.id === retired.id)) ports.push({ ...retired, label: `Unavailable · ${retired.label}`, top: 0, maxConnections: 0 })
+    for (const retired of data.falNative.retiredPorts || []) if (!ports.some(port => port.id === retired.id)) ports.push({ ...retired, label: unavailableInputPortLabel(retired.label), top: 0, maxConnections: 0 })
     return ports.map((port, index) => ({ ...port, top: 54 + index * 40 }))
   }
   switch (data.kind) {

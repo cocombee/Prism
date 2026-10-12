@@ -116,7 +116,7 @@ export function describeFalRuntimeInputs(contract: FalSchemaContract): FalRuntim
     return field
   })
   if (!fields.length && (contract.input.type !== 'object' || contract.input.additionalProperties)) unsupportedInputs.push({ key: '$', reason: 'The root input needs a supported structured adapter.' })
-  const timing = falProductionFlow(contract.category) === 'video' ? inferFalVideoTiming(fields) : undefined
+  const timing = falProductionFlow(contract.category) === 'video' ? inferFalVideoTiming(fields, true) : undefined
   if (timing) for (const field of fields) if (timing.kind === 'seconds' ? field.key === timing.field : [timing.framesField, timing.fpsField].includes(field.key)) field.placement = 'primary'
   const referenceKeys = contract.endpointId === 'bytedance/seedance-2.0/us/reference-to-video' ? ['image_urls','video_urls','audio_urls']
     : contract.endpointId === 'minimax/h3-max/reference-to-video' ? ['reference_image_urls','reference_video_urls','reference_audio_urls'] : undefined

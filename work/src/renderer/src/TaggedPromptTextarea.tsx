@@ -5,11 +5,12 @@ import { captureTextSelection, clampTextSelection, editorOwnsDestructiveOrSelect
 import { createControlledTextHistory, recordControlledText, redoControlledText, undoControlledText } from '../../shared/controlledTextHistory'
 import { measuredFloatingMenuWidth, selectorTriggerFontSize, useContinuousAnchor } from './useContinuousAnchor'
 
-export function TaggedPromptTextarea({ value, connectedTags, availableTags = connectedTags, className = '', onValueChange, ...props }: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> & {
+export function TaggedPromptTextarea({ value, connectedTags, availableTags = connectedTags, className = '', autoSize = true, onValueChange, ...props }: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> & {
   value: string
   connectedTags: string[]
   availableTags?: string[]
   className?: string
+  autoSize?: boolean
   onValueChange: (value: string) => void
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -60,43 +61,38 @@ export function TaggedPromptTextarea({ value, connectedTags, availableTags = con
     const textarea = textareaRef.current
     const highlight = highlightPreRef.current
     if (!textarea || !highlight) return
-    const syncTextViewport = () => {
-      const textareaStyle = window.getComputedStyle(textarea)
-      const highlightStyle = window.getComputedStyle(highlight)
-      const pixels = (value: string) => Number.parseFloat(value) || 0
-      // clientWidth excludes the live vertical scrollbar but includes padding.
-      // Convert that to the native textarea's real text width, then add the
-      // highlight layer's own padding/borders so both content boxes wrap alike.
-      const textWidth = textarea.clientWidth
-        - pixels(textareaStyle.paddingLeft)
-        - pixels(textareaStyle.paddingRight)
-      const highlightChrome = pixels(highlightStyle.paddingLeft)
-        + pixels(highlightStyle.paddingRight)
-        + pixels(highlightStyle.borderLeftWidth)
-        + pixels(highlightStyle.borderRightWidth)
+    let alive = true
+    const pixels = (value: string) => Number.parseFloat(value) || 0
+    let width = textarea.clientWidth
+    const syncTextViewport = (event?: ResizeObserverEntry[] | Event | FontFaceSet) => {
+      if (!alive || Array.isArray(event) && textarea.clientWidth === width) return
+      width = textarea.clientWidth
+      const style = window.getComputedStyle(textarea)
+      if (autoSize) {
+        highlight.style.borderStyle = 'solid'
+        highlight.style.borderColor = 'transparent'
+        for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) highlight.style[`border${side}Width`] = style[`border${side}Width`]
+      }
+      const preStyle = window.getComputedStyle(highlight)
+      const textWidth = textarea.clientWidth - pixels(style.paddingLeft) - pixels(style.paddingRight)
+      const highlightChrome = pixels(preStyle.paddingLeft) + pixels(preStyle.paddingRight) + pixels(preStyle.borderLeftWidth) + pixels(preStyle.borderRightWidth)
       highlight.style.width = `${Math.max(0, textWidth + highlightChrome)}px`
+      if (autoSize && textarea.clientWidth > 0) {
+        const line = pixels(style.lineHeight) || pixels(style.fontSize) * 1.5
+        const chrome = pixels(style.paddingTop) + pixels(style.paddingBottom) + pixels(style.borderTopWidth) + pixels(style.borderBottomWidth)
+        // Measure the natural highlight text, including a trailing empty line.
+        // This avoids collapsing the live editor or moving its caret to measure it.
+        const height = Math.min(line * 7 + chrome, Math.max(line * 3 + chrome, highlight.scrollHeight + pixels(style.borderTopWidth) + pixels(style.borderBottomWidth)))
+        textarea.style.height = `${Math.ceil(height)}px`
+      }
     }
     syncTextViewport()
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncTextViewport)
     observer?.observe(textarea)
     window.addEventListener('resize', syncTextViewport)
-    return () => {
-      observer?.disconnect()
-      window.removeEventListener('resize', syncTextViewport)
-    }
-  }, [])
-
-  useLayoutEffect(() => {
-    const textarea = textareaRef.current
-    const highlight = highlightPreRef.current
-    if (!textarea || !highlight) return
-    const textareaStyle = window.getComputedStyle(textarea)
-    const highlightStyle = window.getComputedStyle(highlight)
-    const pixels = (value: string) => Number.parseFloat(value) || 0
-    const textWidth = textarea.clientWidth - pixels(textareaStyle.paddingLeft) - pixels(textareaStyle.paddingRight)
-    const highlightChrome = pixels(highlightStyle.paddingLeft) + pixels(highlightStyle.paddingRight) + pixels(highlightStyle.borderLeftWidth) + pixels(highlightStyle.borderRightWidth)
-    highlight.style.width = `${Math.max(0, textWidth + highlightChrome)}px`
-  }, [value])
+    document.fonts?.ready.then(syncTextViewport)
+    return () => { alive = false; observer?.disconnect(); window.removeEventListener('resize', syncTextViewport) }
+  }, [value, autoSize])
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current
@@ -162,7 +158,7 @@ export function TaggedPromptTextarea({ value, connectedTags, availableTags = con
   })
   highlighted.push(value.slice(offset), value.endsWith('\n') ? '\u200b' : '')
 
-  return <div ref={shellRef} className={`tagged-prompt-shell ${className}`}>
+  return <div ref={shellRef} className={`tagged-prompt-shell ${className}`} data-prompt-autosize={autoSize || undefined}>
     <div className="tagged-prompt-highlight" aria-hidden="true"><pre ref={highlightPreRef} style={{ transform: `translate(${-scroll.left}px, ${-scroll.top}px)` }}>{highlighted}</pre></div>
     <textarea
       {...props}

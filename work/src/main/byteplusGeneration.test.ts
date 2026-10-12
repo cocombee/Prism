@@ -31,7 +31,7 @@ describe('compileBytePlusGenerationRequest', () => {
     const payload = await compileBytePlusGenerationRequest(request({
       videoEngine: 'byteplus/seedance-2.5/image-to-video',
       inputPath: '/project/start.png',
-      references: [{ role: 'reference', slot: 'end', path: '/project/end.png', mediaType: 'image' }],
+      references: [{ referenceDescription: 'Authored fixture reference purpose.', role: 'reference', slot: 'end', path: '/project/end.png', mediaType: 'image' }],
     }), resolveMedia)
     expect(payload.content).toEqual([
       { type: 'text', text: 'Exact provider prompt' },
@@ -45,9 +45,9 @@ describe('compileBytePlusGenerationRequest', () => {
       videoEngine: 'byteplus/seedance-2.5/reference-to-video',
       providerPromptOverride: 'Use @Look, @Motion, and @Beat exactly.',
       references: [
-        { role: 'reference', tag: '@Look', url: 'https://assets/look.png', mediaType: 'image' },
-        { role: 'reference', tag: '@Motion', url: 'https://assets/motion.mp4', mediaType: 'video' },
-        { role: 'reference', tag: '@Beat', url: 'https://assets/beat.wav', mediaType: 'audio' },
+        { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@Look', url: 'https://assets/look.png', mediaType: 'image' },
+        { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@Motion', url: 'https://assets/motion.mp4', mediaType: 'video' },
+        { referenceDescription: 'Authored fixture reference purpose.', role: 'reference', tag: '@Beat', url: 'https://assets/beat.wav', mediaType: 'audio' },
       ],
     }), async (source) => source.url!)
     expect(payload.content.map((item) => item.type)).toEqual(['text', 'image_url', 'video_url', 'audio_url'])
@@ -64,7 +64,7 @@ describe('compileBytePlusGenerationRequest', () => {
 
 it('blocks BytePlus overflow before resolving or uploading any media', async () => {
   const resolveMedia = vi.fn()
-  const references = Array.from({ length: 31 }, (_, i) => ({ role: 'reference' as const, path: `/fixture/${i}.png`, mediaType: 'image' as const }))
+  const references = Array.from({ length: 31 }, (_, i) => ({ referenceDescription: 'Authored fixture reference purpose.', role: 'reference' as const, path: `/fixture/${i}.png`, mediaType: 'image' as const }))
   await expect(compileBytePlusGenerationRequest(request({ videoEngine: 'byteplus/seedance-2.5/reference-to-video', references }), resolveMedia)).rejects.toThrow(/connected 31/)
   expect(resolveMedia).not.toHaveBeenCalled()
 })
@@ -74,7 +74,7 @@ it('blocks orphan typed cast before direct BytePlus media resolution', async () 
   const resolveMedia = vi.fn()
   await expect(compileBytePlusGenerationRequest(request({
     videoEngine: 'byteplus/seedance-2.5/reference-to-video', providerPromptOverride: undefined,
-    references: [{ role: 'character', tag: '@maya', path: '/fictional/maya.png' }],
+    references: [{ referenceDescription: 'Authored fixture reference purpose.', role: 'character', tag: '@maya', path: '/fictional/maya.png' }],
     storyboardShots: [{ prompt: 'The cup moves.', duration: 4, camera: 'static', shotSize: 'medium', characterStates: [{ characterTag: '@maya', visibility: 'off-camera' }] }],
   }), resolveMedia)).rejects.toThrow(/physical cast.*@maya/i)
   expect(resolveMedia).not.toHaveBeenCalled()

@@ -20,8 +20,8 @@ const canonical = (value: unknown): string => Array.isArray(value) ? `[${value.m
     : JSON.stringify(value)
 
 describe('Higgsfield text-to-video fixture and planner',()=>{
-  it('admits only the exact eight reviewed primary text routes and preserves their schema evidence',()=>{
-    expect(HIGGSFIELD_TEXT_VIDEO_MODELS.map(({id})=>id)).toEqual([
+  it('retains the established eight primary Text identities and all reviewed schema evidence',()=>{
+    expect(HIGGSFIELD_TEXT_VIDEO_MODELS.slice(0,8).map(({id})=>id)).toEqual([
       'kling-video/v3.0/std/text-to-video','kling-video/v2.6/pro/text-to-video','alibaba/wan-3.0/text-to-video',
       'minimax/h3/text-to-video','minimax/hailuo-2.3/standard/text-to-video','lightricks/ltx-2.5/text-to-video/pro','pixverse/v6/text-to-video',
       'wan/v2.7/text-to-video',

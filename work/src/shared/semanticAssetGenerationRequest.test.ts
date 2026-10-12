@@ -107,7 +107,7 @@ describe('semantic asset generation request boundary', () => {
     expect(JSON.stringify(request.references)).toContain('Approved element identity.')
     expect(JSON.stringify(request.references)).toContain('Approved location identity.')
     expect(composedPrompt).toContain('@character')
-    expect(adapterPayload).toContain('[Image1]')
+    expect(adapterPayload).toContain('@Image1')
   })
 
   it('excludes generation sentinels for every reusable kind from direct downstream provider payloads', () => {

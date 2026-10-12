@@ -1,6 +1,7 @@
 import type { AssistantProvider } from '../../shared/assistantModels'
 import type { StudioNode } from '../../shared/types'
 import type { Edge } from '@xyflow/react'
+import { sharedPromptContext } from '../../shared/promptConnectedContext'
 
 export interface PromptGraphSnapshot { project: string; canvas: string; page: string; nodes: StudioNode[]; edges: Edge[] }
 function stamp(graph: PromptGraphSnapshot, nodeId: string): string {
@@ -9,11 +10,15 @@ function stamp(graph: PromptGraphSnapshot, nodeId: string): string {
     changed = false
     for (const edge of graph.edges) if (included.has(edge.target) && !included.has(edge.source)) { included.add(edge.source); changed = true }
   }
+  const upstreamIds = new Set(included)
+  const shared = sharedPromptContext(nodeId, graph.nodes, graph.edges)
+  shared.contextNodeIds.forEach(id => included.add(id))
+  const sharedEdgeIds = new Set(shared.contextEdges.map(edge => edge.id))
   const target = graph.nodes.find(node => node.id === nodeId)
   if (!target) throw new DOMException('The prompt node no longer exists.', 'AbortError')
   return JSON.stringify([graph.project,graph.canvas,graph.page,
     graph.nodes.filter(node=>included.has(node.id)).map(node=>{const {runState,progress,error,notificationVersion,...data}=node.data;return [node.id,data]}),
-    graph.edges.filter(edge=>included.has(edge.target)).map(edge=>[edge.id,edge.source,edge.target,edge.sourceHandle,edge.targetHandle]),
+    graph.edges.filter(edge=>upstreamIds.has(edge.target)||sharedEdgeIds.has(edge.id)).map(edge=>[edge.id,edge.source,edge.target,edge.sourceHandle,edge.targetHandle]),
   ])
 }
 

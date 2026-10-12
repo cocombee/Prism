@@ -24,8 +24,8 @@ const request = (endpointId: string, values: Record<string, any> = {}, media: Re
 const urls = (count: number) => Array.from({ length: count }, (_, index) => `https://cdn.prism.example/reference-${index}`)
 
 describe('independent Higgsfield Reference input adapter', () => {
-  it('owns only the eight explicitly reviewed Reference routes and exact identities', () => {
-    expect(HIGGSFIELD_REFERENCE_VIDEO_MODELS.map(model => model.id)).toEqual([
+  it('retains the established eight Reference identities before reviewed additions', () => {
+    expect(HIGGSFIELD_REFERENCE_VIDEO_MODELS.slice(0, 8).map(model => model.id)).toEqual([
       'kling-video/v3.0/std/image-to-video',
       'kling-video/v2.6/pro/image-to-video',
       'minimax/h3/reference-to-video',
@@ -35,13 +35,14 @@ describe('independent Higgsfield Reference input adapter', () => {
       'wan/v2.7/reference-to-video',
       'alibaba/wan-3.0/image-to-video',
     ])
-    expect(HIGGSFIELD_REFERENCE_VIDEO_MODELS.map(model => [model.company, model.release])).toEqual([
+    expect(HIGGSFIELD_REFERENCE_VIDEO_MODELS.slice(0, 8).map(model => [model.company, model.release])).toEqual([
       ['Kling', 'Kling 3.0'], ['Kling', 'Kling 2.6'], ['MiniMax', 'MiniMax H3'], ['MiniMax', 'Hailuo 2.3'],
       ['Lightricks', 'LTX 2.5'], ['PixVerse', 'PixVerse V6'], ['Alibaba', 'Wan 2.7'], ['Alibaba', 'Wan 3.0'],
     ])
     expect(() => higgsfieldReferenceVideoSchema('bytedance/seedance-2.5/reference-to-video')).toThrow(/no verified input adapter/)
-    expect(() => higgsfieldReferenceVideoSchema('alibaba/wan-3.0/reference-to-video')).toThrow(/no verified input adapter/)
-    expect(() => higgsfieldReferenceVideoSchema('lightricks/ltx-2.5/image-to-video/fast')).toThrow(/no verified input adapter/)
+    expect(higgsfieldReferenceVideoSchema('alibaba/wan-3.0/reference-to-video').properties?.video_urls).toMatchObject({type:'array'})
+    expect(higgsfieldReferenceVideoSchema('lightricks/ltx-2.5/image-to-video/fast').properties?.image_url).toMatchObject({type:'string'})
+    expect(() => higgsfieldReferenceVideoSchema('unpublished/future/reference-to-video')).toThrow(/no verified input adapter/)
     expect(higgsfieldReferenceVideoOmittedControls('kling-video/v3.0/std/image-to-video')).toEqual(['elements', 'multi_prompt'])
     expect(higgsfieldReferenceVideoOmittedControls('kling-video/v2.6/pro/image-to-video')).toEqual([])
   })

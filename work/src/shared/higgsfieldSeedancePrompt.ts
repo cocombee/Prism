@@ -10,7 +10,7 @@ export function higgsfieldSeedanceReferenceMap(slots: readonly HiggsfieldPromptS
   return slots.map(({ binding, index, reference }) => {
     const label = binding.role === 'start-frame' ? 'Starting image' : binding.role === 'end-frame' ? 'Ending image'
       : binding.role === 'source-video' ? 'Source video' : `Reference ${binding.type} ${index + 1}`
-    const role = reference.role === 'reference' ? binding.role === 'reference-video' ? 'motion and camera reference'
+    const role = reference.role === 'reference' ? binding.role === 'reference-video' ? reference.mediaReferenceMode ? 'video reference' : 'motion and camera reference'
       : binding.role === 'reference-audio' ? 'audio reference' : binding.role === 'start-frame' ? 'opening frame'
       : binding.role === 'end-frame' ? 'ending frame' : binding.role === 'source-video' ? 'existing source shot' : 'visual reference'
       : reference.role === 'storyboard' ? 'Storyboard shot map' : reference.role[0].toUpperCase() + reference.role.slice(1)

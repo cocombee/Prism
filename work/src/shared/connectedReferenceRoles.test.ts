@@ -14,9 +14,11 @@ const request: GenerationRequest = { nodeId: 'fixture', kind: 'video-generator',
 ], connectionRules: [{ tag: '@movement', label: 'Video reference', rule: 'Use the first five seconds for walking rhythm only; retain authored geography.' }] }
 
 describe('connected media introductions and Storyboard routing', () => {
-  it('ends the generated body with required domain-specific roles and authored instructions', () => {
+  it('keeps required domain-specific roles before the final negative section', () => {
     const result = compileProviderPrompt(request)
-    expect(result.blocks.at(-1)?.id).toBe('reference-roles')
+    expect(result.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
+    expect(result.blocks.find(block => block.id === 'reference-roles')?.required).toBe(true)
+    expect(result.text.indexOf('REFERENCE ROLES')).toBeLessThan(result.text.indexOf('NEGATIVE PROMPT'))
     expect(result.blocks.at(-1)?.required).toBe(true)
     const appendix = result.text.split('REFERENCE ROLES\n')[1]
     expect(appendix).toContain('@movement is the Motion and Camera authority only')
@@ -29,19 +31,29 @@ describe('connected media introductions and Storyboard routing', () => {
   it.each(['bytedance/seedance-2.0/reference-to-video', 'bytedance/seedance-2.5/reference-to-video'])('uses the exact physical attachment mapping for %s', videoEngine => {
     const appendix = providerSeedancePayloadCompilation({ ...request, videoEngine }).text.split('REFERENCE ROLES\n')[1]
     expect(appendix).not.toMatch(/@actor|@coat|@movement|@sound/)
-    expect(appendix).toContain(videoEngine.includes('2.5') ? '[Video1]' : '@Video1')
-    expect(appendix).toContain(videoEngine.includes('2.5') ? '[Audio1]' : '@Audio1')
-    expect(appendix).toContain(videoEngine.includes('2.5') ? '[Image2]' : '@Image2')
+    expect(appendix).toContain('@Video1')
+    expect(appendix).toContain('@Audio1')
+    expect(appendix).toContain('@Image2')
   })
   it('preserves exact Manual bytes, including original whitespace', () => {
     const manual = 'Keep these exact bytes.\r\n'
     expect(compileProviderPrompt({ ...request, providerPromptOverride: manual, providerPromptOwnership: 'authored' }).text).toBe(manual)
   })
-  it('allows one final reference appendix and rejects later rendering instructions', () => {
-    const body = 'NEGATIVE PROMPT\nwatermarks\nREFERENCE ROLES\n@Video1 is motion only.'
-    expect(seedanceFinalSectionErrors(body)).toEqual([])
-    expect(seedanceFinalSectionErrors(body + '\nCAMERA\nOrbit.')).toEqual(expect.arrayContaining([expect.stringContaining('final appendix'), expect.stringContaining('CAMERA follows')]))
-    expect(seedanceFinalSectionErrors(body + '\nREFERENCE ROLES\nTwo.')).toContain('REFERENCE ROLES must occur once as the final appendix.')
+  it('rejects reference roles or introductions after the negative section', () => {
+    for (const heading of ['REFERENCE ROLES', 'REFERENCE INTRODUCTIONS']) {
+      const body = `NEGATIVE PROMPT\nwatermarks\n${heading}\n@Video1 is motion only.`
+      expect(seedanceFinalSectionErrors(body)).toEqual([expect.stringContaining(`${heading} follows`)])
+    }
+    expect(seedanceFinalSectionErrors('REFERENCE ROLES\nOne.\nREFERENCE ROLES\nTwo.\nNEGATIVE PROMPT\nwatermarks')).toContain('REFERENCE ROLES must occur once.')
+  })
+  it('places completed media introductions before the single final negative without dropping content', () => {
+    const described = { ...request, references: request.references!.map(reference => ({ ...reference, referenceDescription: `${reference.tag} is the sole reference for its assigned role.` })) }
+    const result = compileProviderPrompt(described)
+    expect(result.blocks.at(-1)?.label).toBe('NEGATIVE PROMPT')
+    expect(result.text.match(/^NEGATIVE PROMPT$/gm)).toHaveLength(1)
+    expect(result.text.indexOf('REFERENCE INTRODUCTIONS')).toBeLessThan(result.text.indexOf('NEGATIVE PROMPT'))
+    for (const reference of described.references) expect(result.text).toContain(reference.referenceDescription)
+    expect(seedanceFinalSectionErrors(result.text)).toEqual([])
   })
   it('automatically anchors active identity, assigned wardrobe and location while other media need authored use', () => {
     const make = (id: string, data: StudioNode['data']): StudioNode => ({ id, type: 'studio', position: { x: 0, y: 0 }, data })
@@ -79,7 +91,11 @@ describe('connected media introductions and Storyboard routing', () => {
     const compiled = buildGenerationRequest(video, nodes, edges)
     expect(compiled.references?.map(reference => reference.authority)).toEqual(['motion-camera', 'audio-timing'])
     const appendix = providerSeedancePayloadCompilation(compiled).text.split('REFERENCE ROLES\n')[1]
-    expect(appendix).toContain('@Video1 is the Motion and Camera authority only')
-    expect(appendix).toContain('@Audio1 is the Sound and Timing authority only')
+    expect(appendix).toContain('@Video1 is a supplied video reference.')
+    expect(appendix).toContain('Apply only that authored assignment')
+    expect(compiled.references![0].mediaReferenceMode).toBe('reference')
+    expect(compiled.references![1].mediaReferenceMode).toBe('sound')
+    expect(appendix).toContain('@Audio1 is a supplied audio reference.')
+    expect(appendix).not.toContain('@Audio1 is the Sound and Timing authority only')
   })
 })

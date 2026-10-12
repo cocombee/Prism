@@ -1,7 +1,15 @@
 import type { Edge } from '@xyflow/react'
 import type { StudioNode, StudioNodeData } from './types'
+import { nodeInputPorts } from './nodePorts'
 
 export type VideoPromptMode = 'auto' | 'manual'
+
+export function videoPromptInputsConnected(node: StudioNode, nodes: StudioNode[], edges: Edge[]): boolean {
+  const sourceIds = new Set(nodes.map(source => source.id))
+  const declaredInputs = new Set(nodeInputPorts(node.data).map(port => port.id))
+  return edges.some(edge => edge.target === node.id && sourceIds.has(edge.source)
+    && Boolean(edge.targetHandle && declaredInputs.has(edge.targetHandle)))
+}
 
 export function nextVideoPromptRovingMode(current: VideoPromptMode, key: string): VideoPromptMode {
   if (key === 'Home' || key === 'ArrowLeft') return 'auto'
@@ -52,13 +60,14 @@ function compilerData(data: StudioNodeData): unknown {
   }
   if (['character', 'wardrobe', 'element', 'location', 'style-reference', 'upload', 'prompt'].includes(data.kind)) return {
     kind: data.kind, title: data.title, referenceTag: data.referenceTag, prompt: data.prompt,
+    referenceDescription: data.referenceDescription, referenceDescriptionMode: data.referenceDescriptionMode,
     stylePrompt: data.stylePrompt, styleDescription: data.styleDescription,
     referenceAssets: data.referenceAssets?.map((asset) => ({ id: asset.id, name: asset.name, path: asset.path, url: asset.url, mimeType: asset.mimeType, metadata: asset.metadata })),
     generatedResults: data.generatedResults?.map((result) => ({ path: result.path, url: result.url, type: result.type, modelId: result.modelId, createdAt: result.createdAt })),
     activeResultIndex: data.activeResultIndex,
     outputPath: data.outputPath, outputUrl: data.outputUrl, outputType: data.outputType, assetPath: data.assetPath, assetUrl: data.assetUrl,
   }
-  return { kind: data.kind, title: data.title, videoEngine: data.videoEngine, aspectRatio: data.aspectRatio, duration: data.duration, frameRate: data.frameRate, motionCadence: data.motionCadence, shutterMode: data.shutterMode, shutterAngle: data.shutterAngle }
+  return { kind: data.kind, title: data.title, videoEngine: data.videoEngine, aspectRatio: data.aspectRatio, duration: data.duration, frameRate: data.frameRate, motionCadence: data.motionCadence, motionCadenceMode: data.motionCadenceMode, shutterMode: data.shutterMode, shutterAngle: data.shutterAngle }
 }
 
 export function videoPromptCompileFingerprint(target: StudioNode, nodes: StudioNode[], edges: Edge[]): string {

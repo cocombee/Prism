@@ -1,3 +1,4 @@
+import { nativeVideoDefaults } from './nativeVideoDefaults'
 import type { FalJson } from './falSchemaBinding'
 import type { ConnectionSignal } from './nodeConnections'
 import { higgsfieldContractRevision, higgsfieldInputSchema, higgsfieldModel } from './higgsfieldNative'
@@ -59,7 +60,7 @@ export function resetHiggsfieldBinding(state: HiggsfieldNodeState, contract?: Hi
   try { model = higgsfieldModel(state.endpointId) } catch { return state }
   if (contract && contract.endpointId !== state.endpointId) throw new Error('Selected Higgsfield input contract identity changed.')
   const current = contract || describeHiggsfieldInputContract(state.endpointId, higgsfieldInputSchema(state.endpointId), '')
-  return { ...state, contractRevision: higgsfieldContractRevision(state.endpointId), values: model.kind === 'genjutsu' ? { resolution: '720p' } : higgsfieldControlDefaults(current), drafts: {}, repairs: [], reviewedFingerprint: undefined, ...(model.kind === 'genjutsu' ? { allowSourceTrimming: false } : {}) }
+  return { ...state, contractRevision: higgsfieldContractRevision(state.endpointId), values: model.kind === 'genjutsu' ? { resolution: '720p' } : nativeVideoDefaults(current.fields, { values: {} }, higgsfieldControlDefaults(current), {}, current.timingScope === 'source-video'), drafts: {}, repairs: [], reviewedFingerprint: undefined, ...(model.kind === 'genjutsu' ? { allowSourceTrimming: false } : {}) }
 }
 
 /** Current defaults fill only unauthored controls; saved values and retired sockets are never discarded. */
@@ -68,7 +69,7 @@ export function reconcileHiggsfieldNodeBinding(state: HiggsfieldNodeState, contr
   const controls = contract.fields.filter(field => field.key !== 'prompt' && field.control !== 'media' && field.control !== 'unsupported')
   const primitive = Object.fromEntries(Object.entries(state.values).filter(([, value]) => value === null || typeof value !== 'object'))
   const reconciled = reconcileFalInputValues(undefined, { adapterRevision: contract.contractRevision, fields: controls, unsupportedInputs: contract.unsupportedInputs } as FalRuntimeInputs, primitive)
-  const values = { ...reconciled.values, ...structuredClone(state.values) }
+  const values = nativeVideoDefaults(controls, state, { ...reconciled.values, ...structuredClone(state.values) }, {}, contract.timingScope === 'source-video')
   const repairs = [...reconciled.repair, ...contract.unsupportedInputs.map(item => item.reason)]
   for (const key of Object.keys(state.values)) if (!controls.some(field => field.key === key)) repairs.push(`${key} is no longer a native control; its authored value is preserved for review.`)
   for (const field of controls) if (state.fieldControls?.[field.key] && state.fieldControls[field.key] !== field.control) repairs.push(`${field.label} changed its input type. Review its preserved value.`)

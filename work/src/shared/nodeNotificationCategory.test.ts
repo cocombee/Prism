@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   NODE_TRANSIENT_NOTICE_MS,
+  NODE_ERROR_NOTICE_MS,
+  nodeErrorNoticeKey,
+  scheduleNodeErrorNoticeExpiry,
   cancelNodeProgressExpiry,
   nodeLifecycleTransition,
   nodeNotificationCategory,
@@ -82,5 +85,38 @@ describe('node terminal progress expiry', () => {
     cancelNodeProgressExpiry('node', timers)
     vi.advanceTimersByTime(NODE_TRANSIENT_NOTICE_MS)
     expect(cleared).toEqual([])
+  })
+})
+
+// Successful later attempts must not retain an earlier failure.
+describe('node error lifecycle', () => {
+  it('clears a stale failure on success while retaining a new explicit failure', () => {
+    const old = { runState: 'error', error: 'Contract timeout', notificationVersion: 3 }
+    expect({ ...old, ...nodeLifecycleTransition(old, { runState: 'complete' }) }).toMatchObject({ runState: 'complete', error: undefined })
+    expect(nodeLifecycleTransition(old, { runState: 'complete', error: 'New failure' })).toMatchObject({ runState: 'error', error: 'New failure', notificationVersion: 4 })
+  })
+  it('versions repeated identical errors as separate occurrences', () => {
+    const old = { runState: 'error', error: 'Contract timeout', notificationVersion: 3 }
+    expect(nodeLifecycleTransition(old, { error: 'Contract timeout' })).toMatchObject({ notificationVersion: 4 })
+  })
+})
+
+describe('failed-attempt feedback lifetime', () => {
+  afterEach(() => vi.useRealTimers())
+  it('expires exactly at ten seconds without altering the failure', () => {
+    vi.useFakeTimers()
+    const state={error:'Timeout',runState:'error',notificationVersion:1}
+    const key=nodeErrorNoticeKey(state)!;const expire=vi.fn()
+    scheduleNodeErrorNoticeExpiry(key,()=>nodeErrorNoticeKey(state),expire)
+    vi.advanceTimersByTime(NODE_ERROR_NOTICE_MS-1);expect(expire).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1);expect(expire).toHaveBeenCalledOnce();expect(state.error).toBe('Timeout')
+  })
+  it('cannot expire a superseding identical error, success, running state, or cancelled owner', () => {
+    vi.useFakeTimers();let state={error:'Timeout',runState:'error',notificationVersion:1};const expire=vi.fn()
+    scheduleNodeErrorNoticeExpiry(nodeErrorNoticeKey(state)!,()=>nodeErrorNoticeKey(state),expire)
+    state={...state,notificationVersion:2};vi.advanceTimersByTime(10000);expect(expire).not.toHaveBeenCalled()
+    const cancel=scheduleNodeErrorNoticeExpiry(nodeErrorNoticeKey(state)!,()=>nodeErrorNoticeKey(state),expire);cancel()
+    vi.advanceTimersByTime(10000);expect(expire).not.toHaveBeenCalled()
+    for (const runState of ['queued','running','complete']) expect(nodeErrorNoticeKey({...state,runState})).toBeUndefined()
   })
 })

@@ -29,10 +29,10 @@ describe('typed provider-native shutter capability', () => {
       severity: 'info',
       blocking: false,
       status: 'semantic-prompt-only',
-      captureCadence: 'native-unverified',
+      captureCadence: 'native-verified',
       playbackCadence: 'not-separately-supported',
       shutter: 'native-unverified',
-      message: 'Native capture cadence and shutter fields are unverified for Seedance 2.5; filmic motion is semantic prompt intent only. Playback cadence is not a separate provider control.',
+      message: 'Native shutter fields are unverified for Seedance 2.5; filmic motion is semantic prompt intent only. Playback cadence is not a separate provider control.',
     })
     const wan = providerMotionControlDiagnostic(resolveVideoModel('wan-controlled'))
     expect(wan).toMatchObject({ blocking: false, status: 'semantic-prompt-only', captureCadence: 'native-verified', shutter: 'native-unverified' })

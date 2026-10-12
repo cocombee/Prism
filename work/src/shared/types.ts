@@ -1,3 +1,4 @@
+import type { VideoDraftReceipt } from './videoDraft'
 import type { HiggsfieldJobView, HiggsfieldJobCommand } from './higgsfieldJobs'
 import type { ElevenDialogueTurn, ElevenVoiceSegment } from './elevenDialogue'
 import type { ModelMenuMetadata } from './modelCatalogMenu'
@@ -174,6 +175,8 @@ export interface StoryboardPanel extends StoryboardTypedContinuity {
   asset?: ImportedAsset
 }
 
+export type MediaReferenceMode = 'reference' | 'blocking' | 'composition' | 'object' | 'background' | 'lip-sync' | 'sound' | 'timing'
+
 export interface StudioNodeData extends Record<string, unknown> {
   higgsfieldNative?: HiggsfieldNodeState
   higgsfieldNativePresets?: Record<string, HiggsfieldNodeState>
@@ -186,6 +189,11 @@ export interface StudioNodeData extends Record<string, unknown> {
   prompt?: string
   /** Reusable-asset Create/Edit/Rerun text. Local generation/history only; never downstream semantic authority. */
   assetGenerationPrompt?: string
+  /** Explicit user-authored reference purpose, state and relationships; independent of generation history. */
+  referenceDescription?: string
+  referenceDescriptionMode?: 'auto' | 'authored'
+  /** Editable Media reference template selection; never implicit native editing authority. */
+  mediaReferenceMode?: MediaReferenceMode
   promptMode?: 'auto' | 'manual'
   manualPromptDraft?: string
   manualPromptSeeded?: boolean
@@ -203,6 +211,11 @@ export interface StudioNodeData extends Record<string, unknown> {
   outputPath?: string
   outputUrl?: string
   outputType?: 'image' | 'video' | 'audio'
+  /** Finalization refers to a selected persisted result, never a resubmitted prompt. */
+  falDraftRecoveryRequestId?: string
+  videoDraftWarning?: string
+  draftCompletionPath?: string
+  videoDraft?: boolean
   generatedResults?: Array<{
     /** Stable provider/result identity. Legacy records migrate deterministically from path. */
     id?: string
@@ -214,6 +227,7 @@ export interface StudioNodeData extends Record<string, unknown> {
     name?: string
     createdAt?: string
     sourceLabels?: string[]
+    videoDraft?: VideoDraftReceipt
   }>
   activeResultIndex?: number
   /** Persisted stable identities and lifecycle selection for generatable semantic assets. */
@@ -296,6 +310,8 @@ export interface StudioNodeData extends Record<string, unknown> {
   frameRate?: number
   /** Perceived animation/update cadence; does not change encoded output FPS. */
   motionCadence?: number
+  /** Explicit selector intent. Missing keeps historical User prompt bytes untouched. */
+  motionCadenceMode?: 'native' | 'custom'
   /** Shutter UI presentation; canonical exposure selection remains shutterAngle. */
   shutterMode?: 'angle' | 'speed'
   /** Canonical persisted shutter angle. */
@@ -445,6 +461,11 @@ export interface HistoryEntry {
 }
 
 export interface GenerationRequest {
+  /** Display-only compilation; never accepted by the generation boundary. */
+  promptPreviewOnly?: true
+  falDraftRecovery?: { endpointId: string; requestId: string }
+  draftCompletion?: { provider: 'fal' | 'byteplus'; outputPath: string }
+  videoDraft?: boolean
   nodeId: string
   kind: NodeKind
   /** Explicit exact-endpoint schema execution. Never a static model alias or supplied schema. */
@@ -499,7 +520,7 @@ export interface GenerationRequest {
     title: string
     assetIds: string[]
   }>
-  connectionRules?: Array<{ tag: string; aliases?: string[]; label: string; rule: string }>
+  connectionRules?: Array<{ tag: string; aliases?: string[]; label: string; rule: string; referenceDescription?: string }>
   aspectRatio?: string
   quantity?: number
   scale?: number
@@ -511,6 +532,8 @@ export interface GenerationRequest {
   /** Live Video-node duration shown in EDIT CONTROL even when Storyboard owns timeline duration. */
   editControlDuration?: number
   autoDuration?: boolean
+  /** Compiler-only native output fact; null means unknown. Never a provider input field. */
+  nativeOutputFrameRate?: number | null
   frameRate?: number
   motionCadence?: number
   shutterMode?: 'angle' | 'speed'
@@ -601,6 +624,10 @@ export interface GenerationRequest {
     authority?: 'storyboard-map' | 'motion-camera' | 'audio-timing' | 'appearance'
     /** Authored semantic description used only by text-described authority; connected reference metadata never becomes appearance prose. */
     description?: string
+    /** Selected editable Media reference template; Description overrides its default scope. */
+    mediaReferenceMode?: MediaReferenceMode
+    /** Authored asset Description, including semantic @asset relationships. */
+    referenceDescription?: string
     /** Explicitly approved identity-only text; never populated by captions, AI descriptions, or asset generation prompts. */
     approvedIdentityDescription?: string
     /** Optional visual-authority representation; exact connected typed visuals default to reference-exclusive. */
@@ -613,6 +640,8 @@ export interface GenerationRequest {
 }
 
 export interface GenerationResult {
+  videoDraftWarning?: string
+  videoDraft?: VideoDraftReceipt
   requestId: string
   modelId: string
   outputPath: string
@@ -620,6 +649,40 @@ export interface GenerationResult {
   outputType: 'image' | 'video' | 'audio'
   /** All media from one provider-native request; legacy adapters keep the primary fields. */
   outputs?: Array<{ path: string; url: string; type: 'image' | 'video' | 'audio' }>
+}
+
+/** A local link to a console asset, not a claim of current provider approval. */
+export interface BytePlusPortraitBinding {
+  version: 1
+  provider: 'byteplus'
+  region: 'ap-southeast-1'
+  profileId: string
+  accountIdentifier: string
+  assetId: string
+  sourceSha256: string
+  mediaType: 'image' | 'video'
+  state: 'linked' | 'revoked'
+  linkedAt: string
+  /** Only a known provider expiry is recorded; unknown validity stays unknown. */
+  expiresAt?: string
+  /** User attestation from the console; Prism has not called GetAsset. */
+  consoleActiveConfirmed: true
+}
+
+export interface BytePlusPortraitLinkRequest {
+  assetId: string
+  profileId: string
+  consoleAssetId: string
+  consoleActiveConfirmed: boolean
+  expiresAt?: string
+}
+
+export interface BytePlusPortraitContext {
+  assetId: string
+  mediaType: 'image' | 'video'
+  available: boolean
+  profile?: ServiceProfile
+  binding?: BytePlusPortraitBinding
 }
 
 export interface ImportedAsset {
@@ -637,6 +700,7 @@ export interface ImportedAsset {
   trashTransactionId?: string
   fileSize?: number
   metadata?: {
+    byteplusPortrait?: BytePlusPortraitBinding
     assetName?: string
     identityDescription?: string
     defaultWardrobe?: string
@@ -657,6 +721,7 @@ export interface ImportedAsset {
     locationType?: 'interior' | 'exterior'
     timeOfDay?: 'day' | 'night'
     provider?: string
+    videoDraft?: VideoDraftReceipt
     modelId?: string
     /** Timing stays with managed audio through relocation and portable export. */
     audioTiming?: {
@@ -668,6 +733,8 @@ export interface ImportedAsset {
     audioOutputFormat?: string
     /** Reusable-asset Create/Edit/Rerun history. Never downstream semantic authority. */
     assetGenerationPrompt?: string
+    referenceDescription?: string
+    referenceDescriptionMode?: 'auto' | 'authored'
     prompt?: string
     styleDescription?: string
     /** Optional author- or detector-supplied crop focus for preview surfaces. */
@@ -857,6 +924,11 @@ export interface PrismAPI {
     save: (provider: ServiceProvider, key: string) => Promise<void>
     remove: (provider: ServiceProvider) => Promise<void>
     models: (provider: ServiceProvider) => Promise<ServiceModelAvailability>
+    browseVoices: (provider: import('./voiceBrowser').VoiceBrowserProvider, query: import('./voiceBrowser').VoiceBrowserQuery) => Promise<import('./voiceBrowser').VoiceBrowserPage>
+    voiceFacets: (provider: import('./voiceBrowser').VoiceBrowserProvider) => Promise<import('./voiceBrowser').VoiceBrowserFacets>
+    addSharedVoice: (voice: { id: string; ownerId: string; label: string }) => Promise<string>
+    removeVoice: (id: string) => Promise<void>
+    selectVoice: (provider: import('./voiceBrowser').VoiceBrowserProvider, id: string) => Promise<import('./voiceBrowser').BrowserVoice>
     modelSnapshot: (provider: ServiceProvider) => Promise<ServiceModelAvailability | undefined>
     higgsfieldPresets: (refresh?: boolean) => Promise<HiggsfieldPreset[]>
     higgsfieldSchema: (endpointId: string) => Promise<import('./higgsfieldInputContract').HiggsfieldInputContract>
@@ -891,6 +963,9 @@ export interface PrismAPI {
     list: () => Promise<ImportedAsset[]>
     rename: (id: string, name: string) => Promise<ImportedAsset>
     updateMetadata: (id: string, metadata: ImportedAsset['metadata']) => Promise<ImportedAsset>
+    byteplusPortraitContext: (id: string) => Promise<BytePlusPortraitContext>
+    linkByteplusPortrait: (request: BytePlusPortraitLinkRequest) => Promise<ImportedAsset>
+    revokeByteplusPortrait: (id: string) => Promise<ImportedAsset>
     updateState: (id: string, patch: { favorite?: boolean; trashedAt?: string | null }) => Promise<ImportedAsset>
     updateCollection: (ids: string[], patch: { assetName?: string; favorite?: boolean; trashedAt?: string | null }) => Promise<ImportedAsset[]>
     trashCollection: (ids: string[], workflow: WorkflowDocument) => Promise<ImportedAsset[]>

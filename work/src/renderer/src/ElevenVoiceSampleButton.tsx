@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { Play, Square } from 'lucide-react'
+import { Volume2, Square } from 'lucide-react'
 import type { ServiceModelAvailability } from '../../shared/types'
 import { elevenVoicePreviewUrl } from '../../shared/elevenVoicePreview'
 import { VoiceSamplePlayback, type VoiceSampleState } from './voiceSamplePlayback'
@@ -22,7 +22,7 @@ export function ElevenVoiceSampleButton({ voice, availability }: {
   const active = state === 'loading' || state === 'playing'
   return <>
     <button type="button" className="compact-settings compact-options" aria-label={active ? 'Stop voice sample' : 'Play voice sample'} disabled={!previewUrl} title={state === 'error' ? 'Could not play sample · try again' : previewUrl ? `Preview ${voice?.label || 'voice'}` : 'This voice has no catalog sample'} onClick={() => { if (active) player.current?.stop(); else if (previewUrl) void player.current?.play(previewUrl) }}>
-      {active ? <Square size={14} /> : <Play size={14} />}
+      {active ? <Square size={14} /> : <Volume2 size={14} />}
     </button>
     {state === 'error' && <span className="sr-only" role="status">Could not play sample · try again</span>}
   </>

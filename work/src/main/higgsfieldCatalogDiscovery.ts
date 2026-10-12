@@ -1,3 +1,4 @@
+import { higgsfieldPublishedSchema } from './higgsfieldPublishedSchema'
 import { createHash } from 'node:crypto'
 import type { ServiceModelAvailability } from '../shared/types'
 import type { ModelMenuMetadata } from '../shared/modelCatalogMenu'
@@ -176,7 +177,7 @@ export class HiggsfieldPublicCatalog {
     if (declared.id !== id) throw new Error('Higgsfield changed the declared model identity. No inputs were uploaded.')
     // Reuse the bounded worker compiler as a JSON-schema owner, never its transport.
     const contract = await compileFalContractIsolated(id, { paths: {
-      [`/${id}`]: { post: { requestBody: { content: { 'application/json': { schema: declared.schema } } } } },
+      [`/${id}`]: { post: { requestBody: { content: { 'application/json': { schema: higgsfieldPublishedSchema(id, declared.schema) } } } } },
       [`/${id}/requests/{request_id}`]: { get: { responses: { '200': { content: { 'application/json': { schema: { type: 'object' } } } } } } },
     } })
     assertCurrent()

@@ -1,5 +1,6 @@
 import { assertVideoProviderPromptPreflight } from '../shared/providerPromptPreflight'
 import { effectiveProviderPromptOwnership } from '../shared/providerPromptOwnership'
+import { nativeFalPromptTransport } from '../shared/nativeFalPromptTransport'
 import { requiresGeneratedDialogueAudio, VideoDialogueAudioConflictError } from '../shared/videoDialogueAudio'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
@@ -8,6 +9,21 @@ import type { GenerationRequest } from '../shared/types'
 import { describe, expect, it, vi } from 'vitest'
 
 const main = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
+
+it('refuses unknown and above-native custom cadence through actual main entry before service work', async () => {
+  const source = ts.createSourceFile('index.ts', main, ts.ScriptTarget.Latest, true)
+  const fn = source.statements.find((statement): statement is ts.FunctionDeclaration => ts.isFunctionDeclaration(statement) && statement.name?.text === 'runGeneration')!
+  const work = vi.fn()
+  const bindings = { assertGenerationRequirements, currentProject: null, loadCredential: work, createOwnedFalClient: work, uploadLocalAsset: work, runNativeFalGeneration: work, runNativeHiggsfieldGeneration: work }
+  const run = new Function(...Object.keys(bindings), ts.transpileModule(fn.getText(source), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText + '\nreturn runGeneration')(...Object.values(bindings)) as (request: GenerationRequest) => Promise<unknown>
+  for (const [nativeOutputFrameRate, motionCadence, error] of [[null, 16, /verify native output FPS/], [24, 35, /exceeds native output FPS/]] as const) {
+    const request: GenerationRequest = { nodeId: 'cadence-review', kind: 'video-generator', prompt: 'A bird turns.', nativeOutputFrameRate, motionCadence, falNative: { endpointId: 'fictional/native', flow: 'video', fingerprint: 'a'.repeat(64), promptField: 'prompt', values: { prompt: 'A bird turns.' }, media: {} } }
+    const before = JSON.stringify(request)
+    await expect(run(request)).rejects.toThrow(error)
+    expect(JSON.stringify(request)).toBe(before)
+  }
+  expect(work).not.toHaveBeenCalled()
+})
 
 describe('main-process generation readiness boundary', () => {
   it('rejects incomplete requests before project access, credentials, or provider submission', () => {
@@ -59,7 +75,7 @@ it('keeps a native typed-audio conflict local instead of poisoning provider fail
   const source=ts.createSourceFile('index.ts',main,ts.ScriptTarget.Latest,true)
   const fn=source.statements.find((statement):statement is ts.FunctionDeclaration=>ts.isFunctionDeclaration(statement)&&statement.name?.text==='runNativeFalGeneration')!
   const remember=vi.fn(),credential=vi.fn(),upload=vi.fn(),contract=vi.fn()
-  const bindings={assertVideoProviderPromptPreflight,effectiveProviderPromptOwnership,authoredTimelineSeconds:()=>undefined,requiresGeneratedDialogueAudio,VideoDialogueAudioConflictError,readOwnedFalSchema:contract,executeFalNativeGeneration:vi.fn(async()=>{throw new VideoDialogueAudioConflictError()}),rememberServiceFailure:remember,runtimeServiceFailures:{assertCurrent:vi.fn()},loadCredential:credential,uploadLocalAsset:upload}
+  const bindings={assertVideoProviderPromptPreflight,effectiveProviderPromptOwnership,nativeFalPromptTransport,authoredTimelineSeconds:()=>undefined,requiresGeneratedDialogueAudio,VideoDialogueAudioConflictError,readOwnedFalSchema:contract,executeFalNativeGeneration:vi.fn(async()=>{throw new VideoDialogueAudioConflictError()}),rememberServiceFailure:remember,runtimeServiceFailures:{assertCurrent:vi.fn()},loadCredential:credential,uploadLocalAsset:upload}
   const run=new Function(...Object.keys(bindings),ts.transpileModule(fn.getText(source),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText+'\nreturn runNativeFalGeneration')(...Object.values(bindings)) as(request:GenerationRequest)=>Promise<unknown>
   await expect(run({nodeId:'native-audio-qa',kind:'video-generator',prompt:'Exact body',falNative:{endpointId:'fixture/speech-video',flow:'video',fingerprint:'a'.repeat(64),promptField:'prompt',values:{prompt:'Exact body'},media:{}}})).rejects.toBeInstanceOf(VideoDialogueAudioConflictError)
   expect(remember).not.toHaveBeenCalled();expect(credential).not.toHaveBeenCalled();expect(upload).not.toHaveBeenCalled();expect(contract).not.toHaveBeenCalled()
@@ -99,7 +115,7 @@ function nativeIntegrityCases():Array<{label:string;request:GenerationRequest;er
  const conflict=base();conflict.providerPromptOwnership='authored'
  const invalid=base();invalid.falNative!.promptOwnership='invalid' as 'compiled'
  const missing=base();delete missing.falNative!.promptField
- const mismatch=base();mismatch.falNative!.values.prompt='Hidden body'
+ const mismatch=base();mismatch.falNative!.values.prompt='NEGATIVE PROMPT\nHidden body'
  const speech=base();speech.storyboardShots=[{panelId:'one',prompt:'Speak.',duration:5,shotSize:'medium',camera:'static',activeCharacterTags:['@maya'],dialogueSpans:[{id:'line',speakerTag:'@maya',text:'Salam.',startPanelId:'one',endPanelId:'one'}]}];speech.falNative!.values.generate_audio=false
  const malformed=base();malformed.storyboardShots=[{panelId:'one',prompt:'Speak.',duration:5,shotSize:'medium',camera:'static',dialogueSpans:[null] as never}]
  return[{label:'stale engine and nested-only final section',request:late,error:/final section/i},{label:'conflicting explicit owners',request:conflict,error:/owners conflict/i},{label:'invalid nested owner',request:invalid,error:/owner.*malformed/i},{label:'missing native field',request:missing,error:/prompt field binding/i},{label:'visible/body mismatch',request:mismatch,error:/match.*visible/i},{label:'nested-only compiled speech with audio off',request:speech,error:/dialogue.*audio/i},{label:'malformed typed speech',request:malformed,error:/typed dialogue.*malformed/i}]
