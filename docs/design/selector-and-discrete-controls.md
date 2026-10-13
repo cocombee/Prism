@@ -1,7 +1,17 @@
 # Selector and Discrete-Control Doctrine
 
+> Footer-specific rules are superseded by [Node Footer Hard Contract](node-footer-hard-contract.md), required 13 October 2026. Earlier rules below remain applicable outside node footers.
+
 > **Status:** Required contract baseline — confirm against renderer source, shared selector implementation, CSS, and packaged Flight Tester QA.
 > **Source:** Pre-branch `SKILL.md:198-203`, preserved verbatim below.
+
+## Single-line field paint — required 13 October 2026
+
+The user requires one shared height, fill and corner shape for every single-line text/number field and selector across Prism, including node bodies, node footers, Inspector, Settings, Connections, search and rename surfaces. Reuse the established `--node-control-height`, `--node-control-bg` and `--node-control-radius` tokens rather than independent per-surface values. The current baseline is 28px, #15131b and the existing pill radius. Keep authored values, legal options, accessibility and control behavior unchanged.
+
+A search field with an icon uses one painted outer frame; its inner input remains transparent and borderless. Headers remain in body and Inspector fields. Footer composition and header omission are owned solely by [Node Footer Hard Contract](node-footer-hard-contract.md). Checkbox, radio, range, file, hidden and color controls are not single-line text fields. Hover/focus/disabled semantics remain supported.
+
+The user explicitly chose to preserve existing multiline prompt/description sizing and shape. Do not flatten multiline editors or apply the single-line pill radius to them. Music text fields have no inter-field divider and reuse the established body inset without compounded nested padding. Music's new composition-plan UI remains a preview until accepted; field-token consolidation does not activate it.
 
 ## Protected selector behavior
 

@@ -1,3 +1,8 @@
+import { initialMusicPlanDrafts } from '../../shared/musicPlanDrafts'
+import { isDirectMusicNode, MUSIC_ENCODED_OUTPUT_FORMATS } from '../../shared/musicNodeState'
+import { type MusicModel } from '../../shared/musicRequest'
+import type { MusicSubmissionView, MusicSubmissionCommand } from '../../shared/musicSubmission'
+import { SOUND_EFFECT_MIN_SECONDS, defaultSoundEffectDuration, soundEffectDurationOptions } from '../../shared/soundEffectsDuration'
 import { BytePlusPortraitDialog } from './BytePlusPortraitDialog'
 import { mediaReferenceConnectionType } from '../../shared/mediaReferenceModes'
 import { videoDraftModelTransition } from '../../shared/videoDraft'
@@ -25,6 +30,7 @@ import { reconcileFalNodeBinding, preserveFalNativeSelection, type FalNativeNode
 import { falNativeFlowForKind } from '../../shared/falNativeExecution'
 import { falProductionFlow } from '../../shared/falModelFlow'
 import type { FalSchemaContract } from '../../shared/falSchemaBinding'
+import { flushSync } from 'react-dom'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import {
   addEdge,
@@ -139,7 +145,7 @@ import type {
   ElementView,
 } from '../../shared/types'
 import type { AssetBatchInspection, AssetBatchKind } from '../../shared/assetBatch'
-import { HiggsfieldRecoveryControls, HiggsfieldFields, videoModelGroups, type HiggsfieldPresetView, FalNativeFields, liveFalModelGroups, CompanyIcon, GeneratorInputIcon, generatorInputLabel, GroupedMenuSelect, hasMaterializedAsset, IMAGE_RATIOS, modelCompanyFor, NANO_IMAGE_RATIOS, NodeCard, NodeRuntimeContext, normalizedImageRatio, normalizedVideoDuration, PlayTooltip, RerunIcon, SimpleMenuSelect, StopIcon, videoDurationOptions, videoDurationMenuOptions, VIDEO_MODEL_MENU_GROUPS, VoiceModelSelect, SoundModelSelect, DirectElevenVoiceSelect, DirectElevenLanguageSelect, directAudioFormatLabel } from './NodeCardNext'
+import { HiggsfieldRecoveryControls, HiggsfieldFields, videoModelGroups, type HiggsfieldPresetView, FalNativeFields, liveFalModelGroups, CompanyIcon, GeneratorInputIcon, generatorInputLabel, GroupedMenuSelect, hasMaterializedAsset, IMAGE_RATIOS, modelCompanyFor, NANO_IMAGE_RATIOS, NodeCard, NodeRuntimeContext, normalizedImageRatio, normalizedVideoDuration, PlayTooltip, RerunIcon, SimpleMenuSelect, StopIcon, videoDurationOptions, videoDurationMenuOptions, musicDurationControl, VIDEO_MODEL_MENU_GROUPS, VoiceModelSelect, SoundModelSelect, DirectElevenVoiceSelect, DirectElevenLanguageSelect, directAudioFormatLabel } from './NodeCardNext'
 import { PortRouteContext } from './NodePort'
 import { ProviderPromptPreview } from './ProviderPromptPreview'
 import { TaggedPromptTextarea } from './TaggedPromptTextarea'
@@ -400,7 +406,7 @@ function normalizeLegacyImageRatio(value?: string): string {
   return ratios[value || ''] || value || 'auto'
 }
 
-function migrateRetiredProductNode(node: StudioNode): StudioNode {
+export function migrateRetiredProductNode(node: StudioNode): StudioNode {
   if (node.data.kind === 'video-generator' && node.style?.width !== 315) return { ...node, style: { ...node.style, width: 315 } }
   if (node.data.kind === 'storyboard' && (!node.data.title?.trim() || /^(Storyboard|Storyboard Creator)$/.test(node.data.title.trim()))) {
     return { ...node, data: { ...node.data, title: 'Storyboard' } }
@@ -427,7 +433,7 @@ function migrateRetiredProductNode(node: StudioNode): StudioNode {
       data: { ...node.data, aspectRatio, safetyTolerance: inheritedEditorSafety ? 4 : node.data.safetyTolerance },
     }
   }
-  if (node.data.kind === 'music-generator') {
+  if (node.data.kind === 'music-generator' && node.data.musicVersion !== 1) {
     const hasGeneratedAudio = Boolean(node.data.outputPath || node.data.outputUrl || node.data.generatedResults?.length)
     return {
       ...node,
@@ -529,7 +535,15 @@ const AUDIO_OUTPUT_FORMATS = ELEVEN_AUDIO_OUTPUT_FORMATS
 
 const makeStoryboardPanels = (count: number): StoryboardPanel[] => Array.from({ length: count }, () => createStoryboardPanel(crypto.randomUUID()))
 
-function initialData(kind: NodeKind): StudioNodeData {
+/** Adopt the recovered active output only; saved author fields and deleted older results never parent live state. */
+export function musicRecoveryOutputPatch(live: StudioNodeData, recovered: StudioNodeData): Partial<StudioNodeData> {
+  const result = recovered.generatedResults?.find(item => item.path === recovered.outputPath && item.type === 'audio')
+  if (!result || !recovered.outputPath || !recovered.outputUrl || recovered.outputType !== 'audio') throw new Error('The recovered Music output is unavailable in the saved workflow.')
+  const generatedResults = mergeLiveGeneratedResults(live.generatedResults || [], [result])
+  return { generatedResults, activeResultIndex: generatedResults.findIndex(item => item.path === recovered.outputPath), outputPath: recovered.outputPath, outputUrl: recovered.outputUrl, outputType: 'audio', modelId: recovered.modelId, runState: 'complete', progress: 'Recovered retained Music audio', error: undefined, runStartedAt: undefined }
+}
+
+export function initialData(kind: NodeKind): StudioNodeData {
   const item = palette.find((entry) => entry.kind === kind)
   const fallback = kind === 'output' ? 'Generated media' : kind.replaceAll('-', ' ')
   const creationDefaults = nodeCreationDefaults(kind)
@@ -544,7 +558,7 @@ function initialData(kind: NodeKind): StudioNodeData {
     creativity: kind === 'upscaler' ? 0.35 : undefined,
     resemblance: kind === 'upscaler' ? 0.6 : undefined,
     videoEngine: kind === 'video-generator' ? 'wan-controlled' : undefined,
-    duration: kind === 'video-generator' ? 1 : kind === 'sound-effects' ? 5 : kind === 'music-generator' ? 30 : undefined,
+    duration: kind === 'video-generator' ? 1 : kind === 'sound-effects' ? SOUND_EFFECT_MIN_SECONDS : kind === 'music-generator' ? 3 : undefined,
     frameRate: kind === 'video-generator' ? 24 : undefined,
     generateAudio: false,
     outputFormat: 'png',
@@ -563,7 +577,8 @@ function initialData(kind: NodeKind): StudioNodeData {
     videoQuality: 'high',
     voice: undefined,
     voiceEngine: kind === 'voiceover' ? 'elevenlabs-direct' : undefined,
-    audioProvider: kind === 'sound-effects' ? 'elevenlabs' : undefined,
+    audioProvider: kind === 'sound-effects' || kind === 'music-generator' ? 'elevenlabs' : undefined,
+    ...(kind === 'music-generator' ? { musicVersion: 1 as const, musicModelId: 'music_v2_5' as const, musicGenerationMode: 'prompt' as const, musicSeconds: '3', musicPlanDrafts: initialMusicPlanDrafts(), forceInstrumental: false } : {}),
     languageCode: undefined,
     fishModel: kind === 'voiceover' ? FISH_DEFAULT_MODEL : undefined,
     fishTemperature: kind === 'voiceover' ? 0.7 : undefined,
@@ -582,7 +597,7 @@ function initialData(kind: NodeKind): StudioNodeData {
     speed: kind === 'voiceover' ? 1 : undefined,
     voiceTimestamps: kind === 'voiceover' ? true : undefined,
     textNormalization: kind === 'voiceover' ? 'auto' : undefined,
-    audioOutputFormat: ['voiceover', 'sound-effects', 'music-generator'].includes(kind) ? 'mp3_44100_128' : undefined,
+    audioOutputFormat: kind === 'music-generator' ? 'auto' : ['voiceover', 'sound-effects'].includes(kind) ? 'mp3_44100_128' : undefined,
     promptInfluence: kind === 'sound-effects' ? 0.3 : undefined,
     sticker: kind === 'sticker' ? '✦' : undefined,
     storyboardPanelCount: kind === 'storyboard' || kind === 'storyboard-asset' ? 2 : undefined,
@@ -603,7 +618,7 @@ const RESETTABLE_NODE_SETTING_KEYS = [
   'fishTopP', 'fishVolume', 'fishNormalizeLoudness', 'fishNormalize', 'fishChunkLength', 'fishFormat',
   'fishSampleRate', 'fishMp3Bitrate', 'fishOpusBitrate', 'fishLatency', 'stability',
   'similarityBoost', 'voiceStyle', 'speed', 'languageCode', 'textNormalization', 'audioOutputFormat',
-  'previousText', 'nextText', 'voiceSeed', 'voiceTimestamps', 'promptInfluence',
+  'previousText', 'nextText', 'voiceSeed', 'voiceTimestamps', 'promptInfluence', 'removeBackgroundNoise',
   'directionLayer',
 ] as const satisfies readonly (keyof StudioNodeData)[]
 
@@ -623,6 +638,11 @@ function resetNodeSettingsPatch(data: StudioNodeData): Partial<StudioNodeData> {
     patch.inferenceSteps = model.family === 'wan' ? 40 : undefined
     patch.guidanceScale = model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : undefined
     patch.acceleration = model.family === 'wan' ? 'regular' : undefined
+  }
+  if (data.kind === 'music-generator' && data.musicVersion === 1) {
+    patch.musicSeconds = '3'
+    // Reset settings leaves the author's lyrics/styles/family drafts intact.
+    if (data.musicPlanDrafts) patch.musicPlanDrafts = { ...data.musicPlanDrafts, v1: { ...data.musicPlanDrafts.v1, respectDurations: true } }
   }
   return patch
 }
@@ -772,6 +792,10 @@ export function App() {
   const higgsfieldContractRevisions = useRef(new Map<string, number>())
   const [higgsfieldContracts, setHiggsfieldContracts] = useState<Record<string, HiggsfieldContractView & { current: () => boolean }>>({})
   const [higgsfieldJobState, setHiggsfieldJobState] = useState<HiggsfieldJobsView & { current?: () => boolean }>({})
+  const [musicSubmissionState, setMusicSubmissionState] = useState<{ entries?: MusicSubmissionView[]; loading?: boolean; busy?: string; error?: string; current?: () => boolean }>({})
+  const musicSubmissionOwner = useRef('')
+  const musicSubmissionRevision = useRef(0)
+  const [musicReviewConfirmation, setMusicReviewConfirmation] = useState<string | null>(null)
   const higgsfieldJobRevision = useRef(0)
   const higgsfieldJobOwner = useRef('')
   const [higgsfieldPresetState, setHiggsfieldPresetState] = useState<HiggsfieldPresetView & { current?: () => boolean }>({})
@@ -2229,6 +2253,55 @@ export function App() {
   }, [refreshHiggsfieldJobs, updateNode])
   useEffect(() => { if (project && projectReady) void refreshHiggsfieldJobs() }, [project?.id, project?.rootPath, projectReady, activeCanvasId, activePageId, serviceProfiles, refreshHiggsfieldJobs])
 
+  musicSubmissionOwner.current = JSON.stringify([project?.id, project?.rootPath, activeCanvasId, activePageId])
+  const refreshMusicSubmissions = useCallback(async () => {
+    if (!project) return
+    const owner = musicSubmissionOwner.current, owned = serviceResponseScope.current!.capture('elevenlabs'), revision = ++musicSubmissionRevision.current
+    const current = () => owned() && musicSubmissionOwner.current === owner
+    setMusicSubmissionState(previous => ({ ...(previous.current?.() ? previous : {}), loading: true, error: undefined, current }))
+    try {
+      const entries = await window.prism.musicSubmissions.list()
+      if (current() && revision === musicSubmissionRevision.current) setMusicSubmissionState(previous => ({ entries, loading: false, busy: previous.current?.() ? previous.busy : undefined, current }))
+    } catch (error) {
+      if (current() && revision === musicSubmissionRevision.current) setMusicSubmissionState(previous => ({ ...(previous.current?.() ? previous : {}), loading: false, error: error instanceof Error ? error.message : String(error), current }))
+    }
+  }, [project])
+  const musicSubmissions = useCallback(() => musicSubmissionState.current?.() ? musicSubmissionState : { loading: Boolean(project) }, [musicSubmissionState, project])
+  const applyMusicSubmissionAction = useCallback(async (command: MusicSubmissionCommand, action: 'review' | 'recover') => {
+    const owner = musicSubmissionOwner.current, owned = serviceResponseScope.current!.capture('elevenlabs')
+    const origin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
+    const current = () => owned() && musicSubmissionOwner.current === owner
+    setMusicSubmissionState(previous => ({ ...(previous.current?.() ? previous : {}), busy: command.submissionId, error: undefined, current }))
+    try {
+      if (action === 'recover') {
+        if (!project || !(await persistWorkflow()) || !current()) throw new Error('Save the current workflow before recovering the retained Music output.')
+        await window.prism.musicSubmissions.recover(command)
+        if (!current()) return
+        const stored = await window.prism.workflows.load(workflowSaveOwner(project))
+        if (!current()) return
+        const recovered = stored?.canvases?.find(canvas => canvas.id === origin.canvasId)?.pages.find(page => page.id === origin.pageId)?.nodes.find(node => node.id === command.nodeId)
+        const live = graphAtOrigin(origin).nodes.find(node => node.id === command.nodeId)
+        if (!live || !recovered) throw new Error('The original Music node is no longer available for output recovery.')
+        const patch = musicRecoveryOutputPatch(live.data, recovered.data)
+        // Commit only output fields before flushing; unsaved author edits remain in the live graph.
+        flushSync(() => { patchOriginNode(origin, command.nodeId, patch); userMutationArmed.current = true; mutationVersion.current += 1; saveLifecycle.current?.markDirty() })
+        if (!current()) return
+        const saved = await persistWorkflow()
+        if (!current()) return
+        if (!saved) throw new Error('The recovered Music output is visible, but the current workflow could not be saved.')
+      } else await window.prism.musicSubmissions.review({ ...command, confirmation: 'provider-history-reviewed' })
+      if (!current()) return
+      setMusicReviewConfirmation(null)
+      const [history, assets] = await Promise.all([window.prism.history.list(), window.prism.assets.list()])
+      if (current()) { setHistory(history); setAssets(assets); await refreshMusicSubmissions() }
+    } catch (error) {
+      if (current()) setMusicSubmissionState(previous => ({ ...(previous.current?.() ? previous : {}), error: error instanceof Error ? error.message : String(error), current }))
+    } finally {
+      if (current()) setMusicSubmissionState(previous => ({ ...previous, busy: undefined }))
+    }
+  }, [activeCanvasId, activePageId, graphAtOrigin, patchOriginNode, persistWorkflow, project, refreshMusicSubmissions])
+  useEffect(() => { if (project && projectReady) void refreshMusicSubmissions(); setMusicReviewConfirmation(null) }, [project?.id, project?.rootPath, projectReady, activeCanvasId, activePageId, serviceProfiles, refreshMusicSubmissions])
+
   const selectHiggsfieldModel = useCallback((nodeId: string, endpointId: string) => {
     const node = nodeLayoutRef.current.find(candidate => candidate.id === nodeId)
     if (!node || node.data.kind !== 'video-generator') return
@@ -2688,15 +2761,16 @@ export function App() {
     setEdges((current) => addEdge({ id: crypto.randomUUID(), source: nodeId, sourceHandle: 'media-out', target: listId, targetHandle: 'input', animated: false, style: { stroke: '#ff83a8', strokeWidth: 2 } }, current))
   }, [createNode, edges, nodes, setEdges, updateNode])
 
-  const addNode = useCallback((kind: NodeKind) => {
+  const addNode = useCallback((kind: NodeKind, variant?: 'voice-change') => {
     const visibleCanvasWidth = window.innerWidth - (assetBrowserOpen && appView === 'canvas' ? 378 : 0)
     const visibleCenter = screenToFlowPosition({ x: visibleCanvasWidth / 2, y: 64 + (window.innerHeight - 64) / 2 })
     const position = palettePosition || centeredNodePosition(visibleCenter, kind)
-    createNode(kind, position)
+    const createdId = createNode(kind, position)
+    if (variant === 'voice-change') updateNode(createdId, { title: 'Voice Change', voiceEngine: 'elevenlabs-direct', elevenSpeechMode: 'voice-change', voiceModelId: serviceModels.elevenlabs?.models.find(model => model.supportsVoiceConversion)?.id || 'eleven_multilingual_sts_v2', quantity: 1 })
     setPaletteOpen(false)
     setPaletteQuery('')
     setPalettePosition(null)
-  }, [appView, assetBrowserOpen, createNode, palettePosition, screenToFlowPosition, setEdges, updateNode])
+  }, [appView, assetBrowserOpen, createNode, palettePosition, screenToFlowPosition, serviceModels.elevenlabs, setEdges, updateNode])
 
   const createUploadAt = useCallback(async (position: XYPosition) => {
     const id = createNode('upload', position)
@@ -4392,7 +4466,11 @@ export function App() {
     }
     let request: GenerationRequest
     try {
+      if ((node.data.elevenSpeechMode === 'voice-change' || node.data.kind === 'music-generator' && node.data.musicVersion === 1) && !(await persistWorkflow())) throw new Error('Save the current audio connection before changing voice.')
+      if (isDirectMusicNode(node.data) && !ownsServiceOperation()) return
       request = buildGenerationRequest(node, semanticGraphNodes, edges)
+      if (node.data.elevenSpeechMode === 'voice-change') request.voiceChangeOrigin = { canvasId: activeCanvasId, pageId: activePageId }
+      if (request.kind === 'music-generator' && request.musicVersion === 1) request.musicOrigin = { canvasId: activeCanvasId, pageId: activePageId }
     }
     catch (error) {
       updateNode(id, { runState: 'error', progress: undefined, error: error instanceof Error ? error.message : String(error) })
@@ -4422,10 +4500,12 @@ export function App() {
     const repeatNativeVideo = request.kind === 'video-generator' && Boolean(request.falNative || request.higgsfieldNative)
       && (!request.higgsfieldNative || !higgsfieldSourceOwnsTimeline(request.higgsfieldNative.endpointId))
       && nativeVideoQuantityAvailable(nativeVideoFields)
-    const batchToken = repeatNativeVideo ? { cancelled: false } : undefined
+    const directMusicBatch = request.kind === 'music-generator' && request.musicVersion === 1 && request.audioProvider === 'elevenlabs'
+    const originOwnedBatch = repeatNativeVideo || directMusicBatch
+    const batchToken = originOwnedBatch ? { cancelled: false } : undefined
     const batchOrigin: GraphOrigin = { canvasId: activeCanvasId, pageId: activePageId }
     const patchGenerationNode = (patch: Partial<StudioNodeData>) => {
-      if (repeatNativeVideo) { if (ownsServiceOperation() && graphAtOrigin(batchOrigin).nodes.some(candidate => candidate.id === id)) patchOriginNode(batchOrigin, id, patch) }
+      if (originOwnedBatch) { if (ownsServiceOperation() && graphAtOrigin(batchOrigin).nodes.some(candidate => candidate.id === id)) patchOriginNode(batchOrigin, id, patch) }
       else updateNode(id, patch)
     }
     if (batchToken) nativeVideoBatchTokens.current.set(id, batchToken)
@@ -4462,7 +4542,7 @@ export function App() {
         })
         lastResult = result
         for (const media of generationResultMedia(result)) batchGeneratedResults.push({ id: crypto.randomUUID(), ...media, videoDraft: result.videoDraft, modelId: result.modelId, name: `${result.videoDraft ? result.videoDraft.status === 'draft' ? 'Draft 480p · ' : 'Final 1080p · ' : ''}${generatedResultName({ ...media, modelId: result.modelId }, node.data.title)}`, createdAt: new Date().toISOString(), sourceLabels })
-        if (repeatNativeVideo && ownsServiceOperation()) {
+        if (originOwnedBatch && ownsServiceOperation()) {
           const liveData = graphAtOrigin(batchOrigin).nodes.find(candidate => candidate.id === id)?.data || node.data
           const generatedResults = mergeLiveGeneratedResults(liveData.generatedResults || [], batchGeneratedResults)
           patchGenerationNode({ outputPath: result.outputPath, outputUrl: result.outputUrl, outputType: result.outputType,
@@ -4470,11 +4550,12 @@ export function App() {
           userMutationArmed.current = true; mutationVersion.current += 1; saveLifecycle.current?.markDirty()
         }
       }
-      if (repeatNativeVideo) await runNativeVideoBatch(batchSize, runBatchIteration, () => Boolean(batchToken?.cancelled) || !ownsServiceOperation() || !graphAtOrigin(batchOrigin).nodes.some(candidate => candidate.id === id))
+      if (originOwnedBatch) await runNativeVideoBatch(batchSize, runBatchIteration, () => Boolean(batchToken?.cancelled) || !ownsServiceOperation() || !graphAtOrigin(batchOrigin).nodes.some(candidate => candidate.id === id))
       else for (let index = 0; index < batchSize; index += 1) await runBatchIteration(index)
 
+      if (directMusicBatch && !ownsServiceOperation()) return
       if (!lastResult) throw new Error('The generation completed without returning media.')
-      const liveNodeData = (repeatNativeVideo ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data
+      const liveNodeData = (originOwnedBatch ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data
       const liveGeneratedResults = keepsGenerationHistory
         ? [...(liveNodeData.generatedResults || [])]
         : []
@@ -4496,18 +4577,25 @@ export function App() {
       userMutationArmed.current = true
       mutationVersion.current += 1
       saveLifecycle.current?.markDirty()
-      setHistory(await window.prism.history.list())
-      setAssets(await window.prism.assets.list())
+      if (directMusicBatch) {
+        const [history, assets] = await Promise.all([window.prism.history.list(), window.prism.assets.list()])
+        if (ownsServiceOperation()) { setHistory(history); setAssets(assets) }
+      } else {
+        setHistory(await window.prism.history.list())
+        setAssets(await window.prism.assets.list())
+      }
     } catch (error) {
+      if (directMusicBatch && !ownsServiceOperation()) return
       const message = error instanceof Error ? error.message : String(error)
       const stopped = !isHiggsfieldRemoteUncertainty(message) && (error instanceof DOMException && error.name === 'AbortError' || /abort|cancel|stopped/i.test(message))
-      const liveData = (repeatNativeVideo ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data
+      const liveData = (originOwnedBatch ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data
       const semanticStopped = semanticAssetKind ? semanticAssetGenerationStoppedPatch(liveData) : {}
       patchGenerationNode(stopped ? { runState: 'idle', progress: 'Stopped', error: undefined, runStartedAt: undefined, ...semanticStopped } : { runState: 'error', progress: undefined, error: message, runStartedAt: undefined, ...semanticStopped })
       userMutationArmed.current = true
       mutationVersion.current += 1
       saveLifecycle.current?.markDirty()
-      setHistory(await window.prism.history.list())
+      const updatedHistory = await window.prism.history.list()
+      if (!directMusicBatch || ownsServiceOperation()) setHistory(updatedHistory)
       if (!stopped) {
         void refreshServiceAccount(generationProvider, ownsServiceOperation)
         if (request.falNative && ownsServiceOperation()) {
@@ -4518,8 +4606,9 @@ export function App() {
     } finally {
       if (batchToken && nativeVideoBatchTokens.current.get(id) === batchToken) nativeVideoBatchTokens.current.delete(id)
       if (request.higgsfieldNative && ownsServiceOperation()) void refreshHiggsfieldJobs()
+      if (directMusicBatch && ownsServiceOperation()) void refreshMusicSubmissions()
     }
-  }, [activeCanvasId, activePageId, graphAtOrigin, patchOriginNode, higgsfieldJobs, refreshHiggsfieldJobs, falSchema, higgsfieldSchema, loadFalContract, history, incomingValue, nodes, openProviderConnections, refreshServiceAccount, semanticGraphNodes, serviceAccounts, serviceConnections, mediaProviderAvailable, serviceModels, setEdges, setNodes, updateNode, higgsfieldPresets])
+  }, [activeCanvasId, activePageId, graphAtOrigin, patchOriginNode, higgsfieldJobs, refreshHiggsfieldJobs, refreshMusicSubmissions, falSchema, higgsfieldSchema, loadFalContract, history, incomingValue, nodes, openProviderConnections, refreshServiceAccount, semanticGraphNodes, serviceAccounts, serviceConnections, mediaProviderAvailable, serviceModels, setEdges, setNodes, updateNode, higgsfieldPresets])
 
   const recoverFalDraft = useCallback(async (node: StudioNode) => {
     const endpointId = node.data.falNative?.endpointId
@@ -4734,7 +4823,7 @@ export function App() {
         return
       }
     }
-    const compatibleChoices = palette.filter((item) => compatibleNodeSources(target.data, targetHandleId).includes(item.kind))
+    const compatibleChoices = palette.filter((item) => !item.variant && compatibleNodeSources(target.data, targetHandleId).includes(item.kind))
     if (compatibleChoices.length === 1) {
       const kind = compatibleChoices[0].kind
       void deployBackwardQuickConnect(target, targetHandleId, kind, screenToFlowPosition({ x: clientX, y: clientY }))
@@ -4821,7 +4910,7 @@ export function App() {
           return target ? compatibleNodeSources(target.data, quickConnect.targetHandleId) : []
         })()
     const query = quickQuery.trim().toLowerCase()
-    return palette.filter((item) => kinds.includes(item.kind) && (!query || `${item.label} ${item.detail}`.toLowerCase().includes(query)))
+    return palette.filter((item) => !item.variant && kinds.includes(item.kind) && (!query || `${item.label} ${item.detail}`.toLowerCase().includes(query)))
   }, [nodes, quickConnect, quickQuery])
 
   const completeQuickConnect = useCallback(async (kind: NodeKind) => {
@@ -5295,6 +5384,12 @@ export function App() {
   }, [connectPromptTags, edges, nodes, updateNode])
 
   const connectedInputMedia = useCallback((nodeId: string, handleId: string) => {
+    if (handleId === 'audio-in') {
+      const bound = resolveWorkflowInput(nodeId, semanticGraphNodes, edges.filter(edge => edge.target !== nodeId || edge.targetHandle === handleId)).references
+      if (bound.length !== 1 || bound[0]?.mediaType !== 'audio') return undefined
+      const reference = bound[0], asset = assets.find(asset => asset.path === reference.path && !asset.trashedAt)
+      return { path: reference.path, url: asset && !missingAssetIds.includes(asset.id) ? asset.url || reference.url : undefined, title: asset?.name || reference.name, type: 'audio' as const }
+    }
     const edge = edges.find((candidate) => candidate.target === nodeId && candidate.targetHandle === handleId)
     const source = edge ? nodes.find((node) => node.id === edge.source) : undefined
     if (!source) return undefined
@@ -5306,7 +5401,7 @@ export function App() {
       title: source.data.title,
       type: activeResult?.type || source.data.outputType || (source.data.referenceAssets?.[0]?.mimeType?.startsWith('video/') ? 'video' : 'image'),
     }
-  }, [edges, nodes])
+  }, [assets, edges, missingAssetIds, nodes, semanticGraphNodes])
 
   const setInputFidelity = useCallback((edgeId: string, inputFidelity: InputFidelity) => {
     setEdges((current) => current.map((edge) => edge.id === edgeId ? { ...edge, data: { ...(edge.data || {}), inputFidelity } } : edge))
@@ -5558,7 +5653,11 @@ export function App() {
               : assetTypeFilter === 'audio' ? 'Voice, Music And Sound Assets'
                 : 'All Project Assets'
   const launcherProjects = launcherSection === 'recent' ? [...recentProjects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8) : recentProjects
-  const updateLauncherProject = useCallback((updated: ProjectWorkspace) => setRecentProjects((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item)), [])
+  const prepareProjectRename = useCallback((projectId: string) => project?.id === projectId ? persistWorkflow() : Promise.resolve(true), [persistWorkflow, project?.id])
+  const updateLauncherProject = useCallback((updated: ProjectWorkspace) => {
+    setRecentProjects(current => current.map(item => item.id === updated.id ? { ...item, ...updated } : item))
+    if (project?.id === updated.id) void activateProject(updated, false)
+  }, [activateProject, project?.id])
   const requestForgetProject = useCallback((item: ProjectWorkspace) => requestDelete({
     category: 'project',
     title: 'Remove Project From Prism?',
@@ -6037,6 +6136,12 @@ export function App() {
     const generationProvider = generationServiceProvider(node.data)
     const providerName = providerDisplayName(generationProvider)
     const failures: string[] = []
+    if (node.data.kind === 'music-generator' && node.data.musicVersion === 1) {
+      const receipts = musicSubmissions()
+      if (receipts.loading || !receipts.entries) failures.push('load Music submission status in Settings')
+      if (receipts.error) failures.push(receipts.error)
+      if (receipts.entries?.some(entry => entry.nodeId === nodeId && entry.recoveryRequired)) failures.push('review or recover the pending Music submission in Settings before running again')
+    }
     failures.push(...higgsfieldJobReadinessFailures(nodeId, higgsfieldJobs(), Boolean(node.data.higgsfieldNative || Object.keys(node.data.higgsfieldNativePresets || {}).length)))
     if (!node.data.draftCompletionPath) failures.push(...upstreamIncompleteSemanticReasons(nodeId, semanticGraphNodes, edges))
     const warnings = upstreamSemanticWarnings(nodeId, semanticGraphNodes, edges)
@@ -6075,11 +6180,11 @@ export function App() {
     return generationActionState(node.data) === 'rerun'
       ? { disabled: false, tooltip: `Rerun — generate again with the same inputs and settings.${warningSuffix}` }
       : { disabled: false, tooltip: `Run — all required inputs, settings, and provider access are ready.${warningSuffix}` }
-  }, [higgsfieldJobs, falSchema, higgsfieldSchema, edges, nodes, semanticGraphNodes, serviceAccounts, serviceConnections, serviceModels, higgsfieldPresets])
+  }, [higgsfieldJobs, musicSubmissions, falSchema, higgsfieldSchema, edges, nodes, semanticGraphNodes, serviceAccounts, serviceConnections, serviceModels, higgsfieldPresets])
 
   const estimateNode = useCallback(async (nodeId: string): Promise<GenerationCostEstimate | null> => {
     const node = nodes.find((candidate) => candidate.id === nodeId)
-    if (!node || (node.data.kind === 'voiceover' && node.data.voiceEngine === 'fish-audio') || isDirectElevenAudio(node.data)) return null
+    if (!node || (node.data.kind === 'voiceover' && node.data.voiceEngine === 'fish-audio') || isDirectElevenAudio(node.data) || node.data.kind === 'music-generator' && node.data.musicVersion === 1) return null
     const imageProvider = ['image-generator', 'image-editor', 'character', 'element', 'location', 'wardrobe'].includes(node.data.kind) ? node.data.imageProvider || 'fal' : 'fal'
     if (!serviceConnections[imageProvider]) return null
     const upstream = incomingValue(nodeId)
@@ -6290,6 +6395,10 @@ export function App() {
     : ''
   const inspectorImageModelLabel = inspectorNode?.data.falNative?.label || (/nano-banana/i.test(inspectorImageModelId) ? 'Nano Banana Pro' : /kontext/i.test(inspectorImageModelId) ? 'FLUX Kontext Pro' : /gpt-image-2/i.test(inspectorImageModelId) ? 'GPT Image 2' : /gemini/i.test(inspectorImageModelId) ? 'Gemini Image' : 'FLUX Schnell')
   const inspectorUsesNanoImage = inspectorImageModelId.includes('nano-banana')
+  const inspectorDirectMusic = Boolean(inspectorNode && isDirectMusicNode(inspectorNode.data))
+  const inspectorMusicPlan = inspectorDirectMusic && inspectorNode?.data.musicGenerationMode === 'plan'
+  const inspectorMusicDrafts = inspectorNode?.data.musicPlanDrafts === undefined ? initialMusicPlanDrafts() : inspectorNode.data.musicPlanDrafts
+  const inspectorMusicSubmissions = inspectorDirectMusic ? musicSubmissions() : {}
   const inspectorElevenDirect = inspectorNode?.data.voiceEngine === 'elevenlabs-direct'
   const inspectorElevenModel = serviceModels.elevenlabs?.models.find((model) => model.id === inspectorNode?.data.voiceModelId)
   const inspectorRunReadiness = inspectorNode && inspectorRunnable ? runReadiness(inspectorNode.id) : undefined
@@ -6392,10 +6501,10 @@ export function App() {
       </aside>
       <main className="launcher-main">
         {launcherSection === 'home' ? <><header><div><p>HOME</p><h1>Project Library</h1><span>Continue recent work or choose any project in your library.</span></div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={16} />New Project</button></header>
-        {recentProjects.length > 0 && <section className="launcher-project-section"><div className="launcher-section-title"><div><p>RECENT PROJECTS</p><h2>Continue Working</h2></div><button onClick={() => setLauncherSection('recent')}>View All</button></div><div className="project-library-grid home-recent-grid">{[...recentProjects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4).map((item) => <ProjectLibraryCard key={`recent-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div></section>}
-        <section className="launcher-project-section"><div className="launcher-section-title"><div><p>PROJECTS</p><h2>All Projects</h2></div><button onClick={() => setLauncherSection('projects')}>View All</button></div>{recentProjects.length ? <div className="project-library-grid">{recentProjects.map((item) => <ProjectLibraryCard key={`all-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty"><ProjectsIcon size={28} /><h2>No Projects Yet</h2><p>Create a new project or import an existing project folder.</p><div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button className="creation-action" onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</section></> : <>
+        {recentProjects.length > 0 && <section className="launcher-project-section"><div className="launcher-section-title"><div><p>RECENT PROJECTS</p><h2>Continue Working</h2></div><button onClick={() => setLauncherSection('recent')}>View All</button></div><div className="project-library-grid home-recent-grid">{[...recentProjects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4).map((item) => <ProjectLibraryCard key={`recent-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onBeforeRename={() => prepareProjectRename(item.id)} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div></section>}
+        <section className="launcher-project-section"><div className="launcher-section-title"><div><p>PROJECTS</p><h2>All Projects</h2></div><button onClick={() => setLauncherSection('projects')}>View All</button></div>{recentProjects.length ? <div className="project-library-grid">{recentProjects.map((item) => <ProjectLibraryCard key={`all-${item.id}`} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onBeforeRename={() => prepareProjectRename(item.id)} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty"><ProjectsIcon size={28} /><h2>No Projects Yet</h2><p>Create a new project or import an existing project folder.</p><div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button className="creation-action" onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</section></> : <>
         <header><div><p>PROJECT MANAGER</p><h1>{launcherSection === 'recent' ? 'Recent Projects' : 'Projects'}</h1><span>{launcherSection === 'recent' ? 'Continue your latest local productions.' : 'Create, import, arrange, and reopen local productions.'}</span></div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={16} />New Project</button></header>
-        {launcherProjects.length ? <div className="project-library-grid">{launcherProjects.map((item) => <ProjectLibraryCard key={item.id} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty">{launcherSection === 'recent' ? <RecentProjectsIcon size={28} /> : <ProjectsIcon size={28} />}<h2>{launcherSection === 'recent' ? 'No Recent Projects' : 'No Projects Yet'}</h2><p>{launcherSection === 'recent' ? 'Projects you open will appear here.' : 'Create a working folder or import an existing Prism Foundry project.'}</p><div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button className="creation-action" onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</>}
+        {launcherProjects.length ? <div className="project-library-grid">{launcherProjects.map((item) => <ProjectLibraryCard key={item.id} item={item} icon={<ProjectFolderIcon size={34} />} onOpen={() => void openRecentProject(item.rootPath)} onRenamed={updateLauncherProject} onBeforeRename={() => prepareProjectRename(item.id)} onRequestForget={() => requestForgetProject(item)} onError={setProjectError} />)}</div> : <div className="project-library-empty">{launcherSection === 'recent' ? <RecentProjectsIcon size={28} /> : <ProjectsIcon size={28} />}<h2>{launcherSection === 'recent' ? 'No Recent Projects' : 'No Projects Yet'}</h2><p>{launcherSection === 'recent' ? 'Projects you open will appear here.' : 'Create a working folder or import an existing Prism Foundry project.'}</p><div><button className="primary creation-action" onClick={() => void chooseProject('create')}><Plus size={15} />New Project</button><button className="creation-action" onClick={() => void chooseProject('open')}><ImportProjectIcon size={15} />Import Project</button></div></div>}</>}
         {projectError && <div className="project-gate-error">{projectError}</div>}
       </main>
       {deleteRequest && <div className="modal-backdrop delete-confirm-backdrop" onMouseDown={() => setDeleteRequest(null)}><section className="delete-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="launcher-delete-confirm-title" onMouseDown={(event) => event.stopPropagation()}><header><span><Trash2 size={18} /></span><div><strong id="launcher-delete-confirm-title">{deleteRequest.title}</strong><small>Project Library Entry</small></div><button title="Cancel" aria-label="Cancel Delete" onClick={() => setDeleteRequest(null)}><X size={16} /></button></header><p>{deleteRequest.message}</p><label><input type="checkbox" checked={skipDeleteReminder} onChange={(event) => setSkipDeleteReminder(event.target.checked)} /><span>Don’t ask again for project removal this session</span></label><footer><button onClick={() => setDeleteRequest(null)}>Cancel</button><button className="is-danger" onClick={confirmDelete}>{deleteRequest.confirmLabel}</button></footer></section></div>}
@@ -6986,7 +7095,7 @@ export function App() {
               </div><p className="reference-budget">{inspectorNode.data.higgsfieldNative?.label || inspectorVideoModel?.label} · {inspectorNode.data.higgsfieldNative ? 'connected media use this exact model’s declared inputs and limits.' : inspectorNode.data.falNative ? 'connected media use this exact model’s declared inputs.' : 'semantic inputs automatically select a legal reference-capable route.'}</p></> : <div className="inspector-reference-grid"><button onClick={() => addInspectorReference(inspectorNode.id, 'upload')}>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? <Video size={17} /> : <ImageIcon size={17} />}<span>{inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'Input video' : 'Input image'}</span><small>One {inspectorNode.data.kind === 'upscaler' && inspectorNode.data.upscalerModel === 'realesrgan-video' ? 'video' : inspectorNode.data.kind === 'upscaler' ? 'image' : 'or more images'}</small></button></div>}
             </section>}
 
-            {inspectorNode.data.kind !== 'upscaler' && !(isElevenDialogue(inspectorNode.data) && !inspectorNode.data.falNative) && <section className="inspector-section inspector-routine-prompt">
+            {inspectorNode.data.kind !== 'upscaler' && !inspectorMusicPlan && !(isElevenDialogue(inspectorNode.data) && !inspectorNode.data.falNative) && <section className="inspector-section inspector-routine-prompt">
               <label>PROMPT</label>
               <TaggedPromptTextarea value={inspectorNode.data.higgsfieldNative ? inspectorNode.data.manualPromptDraft ?? inspectorNode.data.prompt ?? '' : inspectorNode.data.prompt || ''} connectedTags={inspectorPromptTags} availableTags={inspectorAvailablePromptTags} placeholder={['image-generator', 'element', 'location', 'wardrobe'].includes(inspectorNode.data.kind) ? inspectorNode.data.kind === 'element' ? 'Describe the reusable object to create…' : inspectorNode.data.kind === 'location' ? 'Describe the reusable environment to create…' : inspectorNode.data.kind === 'wardrobe' ? 'Describe the reusable wardrobe to create…' : 'Describe the image you want to generate…' : inspectorNode.data.kind === 'voiceover' ? 'Enter the words to speak…' : inspectorNode.data.kind === 'sound-effects' ? 'Describe the sound effect…' : inspectorNode.data.kind === 'music-generator' ? 'Describe the music…' : 'Reference connected media using its @ tag…'} onValueChange={(prompt) => updatePrompt(inspectorNode.id, prompt)} />
             </section>}
@@ -7047,7 +7156,7 @@ export function App() {
               <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalize !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalize: event.target.checked })} /><span>Normalize text</span></label>
               {inspectorNode.data.fishModel !== 's1' && <label className="inspector-wide inspector-switch"><input type="checkbox" checked={inspectorNode.data.fishNormalizeLoudness !== false} onChange={(event) => updateNode(inspectorNode.id, { fishNormalizeLoudness: event.target.checked })} /><span>Normalize loudness</span></label>}
               <p className="reference-budget inspector-wide">Fish Audio uses its own API key and dynamic voice Reference ID. Only controls supported by Fish are shown.</p>
-            </section> : inspectorNode.data.kind === 'voiceover' ? <section className={`inspector-grid ${inspectorElevenDirect ? 'direct-eleven-settings' : ''}`}>
+            </section> : inspectorNode.data.kind === 'voiceover' && inspectorNode.data.elevenSpeechMode === 'voice-change' ? <section className="inspector-grid direct-eleven-settings"><label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Voice Change output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={ELEVEN_DIRECT_OUTPUT_FORMATS.filter(format => /^(mp3|wav|opus)_/.test(format)).map(format => ({ value: format, label: directAudioFormatLabel(format) }))} onChange={audioOutputFormat => updateNode(inspectorNode.id, { audioOutputFormat })} /></label><label><span>Seed</span><input type="number" min="0" max="4294967295" value={inspectorNode.data.voiceSeed ?? ''} onChange={event => updateNode(inspectorNode.id, { voiceSeed: event.target.value === '' ? undefined : Number(event.target.value) })} /></label><label className="inspector-wide inspector-switch"><input type="checkbox" checked={Boolean(inspectorNode.data.removeBackgroundNoise)} onChange={event => updateNode(inspectorNode.id, { removeBackgroundNoise: event.target.checked })} /><span>Remove background noise</span></label></section> : inspectorNode.data.kind === 'voiceover' ? <section className={`inspector-grid ${inspectorElevenDirect ? 'direct-eleven-settings' : ''}`}>
               {inspectorElevenDirect ? <>
                 <label><span>Language</span><DirectElevenLanguageSelect data={inspectorNode.data} availability={serviceModels.elevenlabs} onChange={(patch) => updateNode(inspectorNode.id, patch)} /></label>
               </> : <>
@@ -7066,14 +7175,31 @@ export function App() {
               <label className="inspector-wide"><span>Previous text · continuity context</span><textarea value={inspectorNode.data.previousText || ''} onChange={(event) => updateNode(inspectorNode.id, { previousText: event.target.value })} /></label>
               <label className="inspector-wide"><span>Next text · continuity context</span><textarea value={inspectorNode.data.nextText || ''} onChange={(event) => updateNode(inspectorNode.id, { nextText: event.target.value })} /></label>
             </section> : inspectorNode.data.kind === 'sound-effects' ? <section className="inspector-grid">
-              <label><span>Duration</span><SimpleMenuSelect ariaLabel="Sound effect duration" value={String(inspectorNode.data.duration || 5)} options={(inspectorNode.data.audioProvider === 'elevenlabs' ? [0.5,1,2,3,5,8,10,15,22,30] : [0.5,1,2,3,5,8,10,15,22]).map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value) })} /></label>
+              <label><span>Duration</span><SimpleMenuSelect ariaLabel="Sound effect duration" value={String(defaultSoundEffectDuration(inspectorNode.data.duration))} options={soundEffectDurationOptions(inspectorNode.data.duration, inspectorNode.data.audioProvider === 'elevenlabs' ? 'elevenlabs' : 'fal')} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value) })} /></label>
               <label className="inspector-switch"><input aria-label="Sound primary loop" type="checkbox" checked={Boolean(inspectorNode.data.loop)} onChange={(event) => updateNode(inspectorNode.id, { loop: event.target.checked })} /><span>Seamless loop</span></label>
               <label className="inspector-wide"><span>Prompt influence · {(inspectorNode.data.promptInfluence ?? 0.3).toFixed(2)}</span><input type="range" min="0" max="1" step="0.05" value={inspectorNode.data.promptInfluence ?? 0.3} onChange={(event) => updateNode(inspectorNode.id, { promptInfluence: Number(event.target.value) })} /></label>
               <label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Sound effect output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={(inspectorNode.data.audioProvider === 'elevenlabs' ? ELEVEN_DIRECT_OUTPUT_FORMATS : AUDIO_OUTPUT_FORMATS).map((format) => ({ value: format, label: inspectorNode.data.audioProvider === 'elevenlabs' ? directAudioFormatLabel(format) : format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
+            </section> : inspectorDirectMusic ? <section className="inspector-grid direct-eleven-settings">
+              <label className="inspector-wide"><span>Model</span><SimpleMenuSelect service="elevenlabs" ariaLabel="Inspector Music model" defaultLabel="Select Music model" value={inspectorNode.data.musicModelId || ''} options={[{ value: 'music_v1', label: 'Music v1' }, { value: 'music_v2', label: 'Music v2' }, { value: 'music_v2_5', label: 'Music v2.5' }]} onChange={musicModelId => updateNode(inspectorNode.id, { musicModelId: musicModelId as MusicModel, error: undefined })} /></label>
+              <label className="inspector-wide"><span>Generation mode</span><SimpleMenuSelect ariaLabel="Inspector Music generation mode" value={inspectorNode.data.musicGenerationMode || 'prompt'} options={[{ value: 'prompt', label: 'Prompt' }, { value: 'plan', label: 'Custom lyrics' }]} onChange={mode => updateNode(inspectorNode.id, { musicGenerationMode: mode as 'prompt' | 'plan', ...(mode === 'plan' && inspectorNode.data.musicPlanDrafts === undefined ? { musicPlanDrafts: inspectorMusicDrafts } : {}), error: undefined })} /></label>
+              {!inspectorMusicPlan && <><label><span>Duration</span><SimpleMenuSelect ariaLabel="Inspector Music duration" value={musicDurationControl(inspectorNode.data).value} options={musicDurationControl(inspectorNode.data).options} onChange={musicSeconds => updateNode(inspectorNode.id, { musicSeconds, duration: Number(musicSeconds), error: undefined })} /></label><label className="inspector-switch"><input aria-label="Inspector Instrumental Only" type="checkbox" checked={Boolean(inspectorNode.data.forceInstrumental)} onChange={event => updateNode(inspectorNode.id, { forceInstrumental: event.target.checked })} /><span>Instrumental only</span></label></>}
+              <label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Music output format" value={inspectorNode.data.audioOutputFormat ?? 'auto'} options={MUSIC_ENCODED_OUTPUT_FORMATS.map(format => ({ value: format, label: format === 'auto' ? 'Auto' : format }))} onChange={audioOutputFormat => updateNode(inspectorNode.id, { audioOutputFormat, error: undefined })} /></label>
+              {inspectorMusicPlan && <label><span>Seed</span><input aria-label="Music seed" type="number" min="0" max="2147483647" step="1" placeholder="Random" value={inspectorNode.data.seed ?? ''} onChange={event => updateNode(inspectorNode.id, { seed: event.target.value === '' ? undefined : Number(event.target.value), error: undefined })} /></label>}
+              {inspectorMusicPlan && inspectorNode.data.musicModelId === 'music_v1' && <label className="inspector-wide inspector-switch"><input aria-label="Respect Music section durations" type="checkbox" checked={inspectorMusicDrafts?.v1?.respectDurations ?? true} onChange={event => updateNode(inspectorNode.id, { musicPlanDrafts: { ...inspectorMusicDrafts, v1: { ...inspectorMusicDrafts?.v1, respectDurations: event.target.checked } }, error: undefined })} /><span>Respect section durations</span></label>}
             </section> : <section className="inspector-grid">
               <label><span>Duration</span><SimpleMenuSelect ariaLabel="Music duration" value={String(inspectorNode.data.duration || 30)} options={[10,15,30,45,60,90,120,180,300,600].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => updateNode(inspectorNode.id, { duration: Number(value) })} /></label>
               <label className="inspector-switch"><input type="checkbox" checked={Boolean(inspectorNode.data.forceInstrumental)} onChange={(event) => updateNode(inspectorNode.id, { forceInstrumental: event.target.checked })} /><span>Instrumental only</span></label>
               <label className="inspector-wide"><span>Output format</span><SimpleMenuSelect ariaLabel="Music output format" value={inspectorNode.data.audioOutputFormat || 'mp3_44100_128'} options={AUDIO_OUTPUT_FORMATS.map((format) => ({ value: format, label: format }))} onChange={(value) => updateNode(inspectorNode.id, { audioOutputFormat: value })} /></label>
+            </section>}
+            {inspectorDirectMusic && <section className="inspector-section" aria-label="Music submissions">
+              <div className="inspector-label-row"><label>Saved Music submissions</label><button type="button" disabled={Boolean(inspectorMusicSubmissions.loading || inspectorMusicSubmissions.busy)} onClick={() => { void refreshMusicSubmissions() }}>Refresh</button></div>
+              {inspectorMusicSubmissions.loading && <p role="status">Loading saved submissions…</p>}
+              {inspectorMusicSubmissions.error && <p role="alert">{inspectorMusicSubmissions.error}</p>}
+              {(inspectorMusicSubmissions.entries || []).filter(entry => entry.nodeId === inspectorNode.id && entry.recoveryRequired).map(entry => <div className="inspector-grid" key={entry.submissionId}>
+                <p className="inspector-wide">{entry.message || (entry.canRecover ? 'The completed audio is retained locally. Recover it without another generation.' : 'This submission needs review before another generation. Check its outcome in ElevenLabs history.')}</p>
+                {entry.canReview && <><label className="inspector-wide inspector-switch"><input aria-label={`Reviewed Music submission ${entry.submissionId}`} type="checkbox" checked={musicReviewConfirmation === entry.submissionId} onChange={event => setMusicReviewConfirmation(event.target.checked ? entry.submissionId : null)} /><span>I reviewed this submission in ElevenLabs history</span></label><button type="button" className="inspector-wide" disabled={musicReviewConfirmation !== entry.submissionId || Boolean(inspectorMusicSubmissions.busy)} onClick={() => { void applyMusicSubmissionAction({ nodeId: inspectorNode.id, submissionId: entry.submissionId }, 'review') }}>Confirm review</button></>}
+                {entry.canRecover && <button type="button" className="inspector-wide" disabled={Boolean(inspectorMusicSubmissions.busy)} onClick={() => { void applyMusicSubmissionAction({ nodeId: inspectorNode.id, submissionId: entry.submissionId }, 'recover') }}>Recover retained audio</button>}
+              </div>)}
             </section>}
             {inspectorRequest && !inspectorRequest.higgsfieldNative && ['image-generator', 'video-generator'].includes(inspectorRequest.kind) && <section className="inspector-section inspector-direction-layer">
               <label className="inspector-direction-layer-toggle">
@@ -7113,9 +7239,9 @@ export function App() {
             <div className="palette-list">
               {filteredPalette.map((item, index) => {
                 const Icon = item.icon
-                return <Fragment key={item.kind}>
+                return <Fragment key={`${item.kind}:${item.variant || 'default'}`}>
                   {!paletteQuery.trim() && index === POPULAR_NODE_KINDS.length && <div className="palette-fine-separator" role="separator" />}
-                  <button onClick={() => addNode(item.kind)}><span className="palette-icon"><Icon size={17} /></span><span><strong>{item.label}</strong><small>{item.detail}</small></span><Plus size={15} /></button>
+                  <button onClick={() => addNode(item.kind, item.variant)}><span className="palette-icon"><Icon size={17} /></span><span><strong>{item.label}</strong><small>{item.detail}</small></span><Plus size={15} /></button>
                 </Fragment>
               })}
             </div>

@@ -49,13 +49,13 @@ describe('active node-wide fluid control renderer contract', () => {
     expect(nodeCard).toContain('className="compact-image-footer-group compact-image-footer-row"')
     expect(nodeCard).toContain('className="primary-node-controls video-primary-controls nodrag"')
     expect(nodeCard).toContain('className="voice-primary-row voice-primary-row-two"')
-    expect(nodeCard).toContain('className="voice-primary-row voice-primary-row-three"')
+    expect(nodeCard).toContain('className="voice-primary-controls voice-primary-row voice-generator-footer-controls"')
     expect(utilityNodes).toContain('className="storyboard-panel-meta"')
     expect(utilityNodes).toContain('className="storyboard-footer-group"')
   })
 
-  it('preserves intrinsic Sound, exact fixed actions, and approved Save/Revamp anatomy', () => {
-    expect(nodeCard).toMatch(/id: 'sound', kind: 'intrinsic'[^\n]*intrinsicWidth: 28/)
+  it('preserves fixed Sound and other exact actions, and approved Save/Revamp anatomy', () => {
+    expect(nodeCard).toMatch(/id: 'sound', kind: 'fixed-action'[^\n]*intrinsicWidth: 28/)
     expect(nodeCard).toMatch(/id: 'settings', kind: 'fixed-action'[^\n]*intrinsicWidth: 28/)
     expect(nodeCard).toMatch(/id: 'run', kind: 'fixed-action'[^\n]*intrinsicWidth: 28/)
     expect(nodeCard).toContain('<Settings size={14} />')
@@ -68,16 +68,21 @@ describe('active node-wide fluid control renderer contract', () => {
     expect(styles).toMatch(/\.storyboard-footer-group button\.storyboard-revamp-all[^{}]*\{[^}]*border-radius:\s*999px/s)
   })
 
-  it('uses the confirmed Video 4/5 composition with no primary Bitrate while preserving Inspector Bitrate', () => {
+  it('uses automatic Video footer arrangement with no primary Bitrate while preserving Inspector Bitrate', () => {
     const footer = genericVideoFooter()
-    expect(footer).toContain("preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'resolution', 'sound', 'settings', 'run']]")
+    expect(footer).toContain('modelId="model" settingsId="settings" runId="run"')
+    expect(footer).toContain("iconIds={['sound']}")
+    expect(footer).not.toContain('preferredRows:')
+    expect(footer).not.toContain('preferredRow:')
     expect(footer).not.toContain("id: 'bitrate'")
     expect(nodeCard).not.toContain('ariaLabel="Video Bitrate"')
   })
 
-  it('forces the Storyboard footer into one full-width Model Budget Save Revamp row', () => {
+  it('adopts the shared Storyboard footer policy with Model first and Save beside terminal Revamp', () => {
     const footer = componentBody(utilityNodes, 'className="storyboard-footer-group"', '/>\n      </footer>')
-    expect(footer).toContain('allocation={{ minRows: 1, maxRows: 1')
+    expect(footer).toContain('modelId="assistant-model"')
+    expect(footer).toContain('runId="revamp"')
+    expect(footer).toContain("iconIds={['save']}")
     expect(footer.indexOf("id: 'assistant-model'")).toBeLessThan(footer.indexOf("id: 'budget'"))
     expect(footer.indexOf("id: 'budget'")).toBeLessThan(footer.indexOf("id: 'save'"))
     expect(footer.indexOf("id: 'save'")).toBeLessThan(footer.indexOf("id: 'revamp'"))

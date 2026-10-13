@@ -149,7 +149,7 @@ describe('global product-surface regressions', () => {
 
   it('never restores a deleted generated result from stale run state or a missing managed file', () => {
     expect(appSource).toContain('mergeLiveGeneratedResults(liveGeneratedResults, batchGeneratedResults)')
-    expect(appSource).toContain('const liveNodeData = (repeatNativeVideo ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data')
+    expect(appSource).toContain('const liveNodeData = (originOwnedBatch ? graphAtOrigin(batchOrigin).nodes : nodeLayoutRef.current).find((candidate) => candidate.id === id)?.data || node.data')
     expect(appSource).toContain('semanticAssetGenerationPatch(liveNodeData, batchGeneratedResults)')
     expect(mainSource).toContain('pruneMissingGeneratedResults(nodes, availableGeneratedPaths)')
     expect(mainSource).toContain('A deleted managed result must not survive project hydration.')
@@ -395,7 +395,11 @@ describe('global product-surface regressions', () => {
     expect(nodeCardSource).toContain('voiceModelSelectionPatch(selection, data, models, fishAvailability')
     expect(nodeCardSource).toContain('availability={runtime?.serviceAvailability?.(\'elevenlabs\')}')
     expect(nodeCardSource).toContain('className="voice-primary-row voice-primary-row-two"')
-    expect(nodeCardSource).toContain('className="voice-primary-row voice-primary-row-three"')
+    expect(nodeCardSource).toContain('const voiceFooterControls: FluidGroupControl<string>[] = nativeVoiceState ? [')
+    expect(nodeCardSource).toContain("voiceEngine === 'elevenlabs-direct' ? directElevenVoiceFooterFields(")
+    expect(nodeCardSource).toContain('<GeneratorFooterControlGroup className="voice-primary-controls voice-primary-row voice-generator-footer-controls" ariaLabel="Voice Footer Controls" modelId="model" settingsId="settings" runId="run" iconIds={[\'sample\']}')
+    expect(nodeCardSource).toContain('controls={voiceFooterControls}')
+    expect(nodeCardSource).not.toContain('className="voice-primary-row voice-primary-row-three"')
     expect(nodeCardSource).toContain('allocateMixedControlRows')
     expect(nodeCardSource).toContain("value={normalizedElevenV3LanguageCode(data.languageCode) || 'eng'}")
     expect(nodeCardSource).toContain('options={[...ELEVEN_V3_LANGUAGES]}')
@@ -1412,7 +1416,7 @@ describe('global product-surface regressions', () => {
 
   it('never exposes an internal image route or drops its provider icon when a saved model is temporarily absent from the menu', () => {
     expect(nodeCardSource).toContain("const fallbackModelId = value.replace(/^[^:]+::/, '')")
-    expect(nodeCardSource).toContain("const selectedLabel = displayLabel || selected?.label || modelDisplayName(fallbackModelId)")
+    expect(nodeCardSource).toContain("const selectedLabel = displayLabel || selected?.label || (inFooter && !value ? `Select ${title || ariaLabel}` : modelDisplayName(fallbackModelId))")
     expect(nodeCardSource).toContain('const selectedCompany = catalogModelCompany(selected, value)')
     expect(nodeCardSource).not.toContain('selected?.label || value')
   })
@@ -1629,16 +1633,18 @@ describe('global product-surface regressions', () => {
     expect(mainSource).toContain('const originalAssets = await loadProjectAssets()')
   })
 
-  it('renames only the .prismflow document and removes project cards without deleting project files', () => {
+  it('renames the coordinated project container and document while keeping Remove From List non-destructive', () => {
     expect(mainSource).toContain("ipcMain.handle('projects:rename-document'")
-    expect(mainSource).toContain("extname(currentPath).toLocaleLowerCase('en-US') !== '.prismflow'")
-    expect(mainSource).toContain('await rename(currentPath, nextPath)')
+    expect(mainSource).toContain("extname(currentPath).toLowerCase() !== '.prismflow'")
+    expect(mainSource).toContain('await ensureProjectContainer(rootPath, manifest, currentPath, name)')
     expect(mainSource).toContain("ipcMain.handle('projects:forget'")
     expect(mainSource).toContain('recent.filter((project) => resolve(project.rootPath) !== rootPath)')
     expect(appSource).toContain('<ProjectLibraryCard')
     expect(projectLibraryCardSource).toContain('project-library-hover-actions')
     expect(projectLibraryCardSource).toContain('project-library-title-row')
-    expect(projectLibraryCardSource).toContain('Rename Project Document')
+    expect(projectLibraryCardSource).toContain('Rename Project')
+    expect(projectLibraryCardSource).toContain('renameInFlight.current')
+    expect(projectLibraryCardSource).toContain('onBeforeRename')
     expect(rendererFiles).not.toContain('project-library-card-controls')
     expect(rendererFiles).toContain('Its folder and every physical file will remain untouched.')
   })

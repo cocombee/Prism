@@ -78,7 +78,7 @@ export async function readElevenSpeechModels(options: ElevenApiOptions): Promise
   for (const record of raw) {
     if (!record || typeof record !== 'object') throw new Error('ElevenLabs returned an invalid model record.')
     const model = record as Record<string, unknown>
-    if (model.can_do_text_to_speech !== true) continue
+    if (model.can_do_text_to_speech !== true && model.can_do_voice_conversion !== true) continue
     if (typeof model.model_id !== 'string' || !model.model_id.trim()) throw new Error('ElevenLabs returned a speech model without an ID.')
     if (seen.has(model.model_id)) continue
     seen.add(model.model_id)
@@ -92,6 +92,7 @@ export async function readElevenSpeechModels(options: ElevenApiOptions): Promise
       ...(languages ? { languages } : {}),
       ...(typeof model.maximum_text_length_per_request === 'number' && Number.isFinite(model.maximum_text_length_per_request) && model.maximum_text_length_per_request > 0 ? { maxTextLength: model.maximum_text_length_per_request } : {}),
       ...(typeof model.can_do_text_to_dialogue === 'boolean' ? { supportsDialogue: model.can_do_text_to_dialogue } : {}),
+      ...(model.can_do_text_to_speech !== true ? { supportsTextToSpeech: false } : {}), ...(model.can_do_voice_conversion === true ? { supportsVoiceConversion: true } : {}),
       supportsStyle: model.can_use_style === true, supportsSpeakerBoost: model.can_use_speaker_boost === true })
   }
   return models

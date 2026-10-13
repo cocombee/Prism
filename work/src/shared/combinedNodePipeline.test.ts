@@ -107,6 +107,7 @@ describe('ordered semantic production pipeline', () => {
       node('video-route', 'router', { routeSignal: 'video' }),
       node('voice', 'voiceover', { referenceDescription: 'Maya’s authored speech and its timing.', prompt: 'Tunggu di sini.', outputPath: '/fixture/voice.wav', outputType: 'audio' }),
       node('sfx', 'sound-effects', { referenceDescription: 'The sound of the case latch clicking.', prompt: 'Case latch click.', outputPath: '/fixture/sfx.wav', outputType: 'audio' }),
+      node('music', 'music-generator', { musicVersion: 1, audioProvider: 'elevenlabs', musicModelId: 'music_v2_5', musicGenerationMode: 'prompt', musicSeconds: '3', prompt: '  Authored beat\r\nPulse  ', referenceDescription: 'The authored Music beat and timing.', outputPath: '/fixture/music.mp3', outputType: 'audio' }),
       node('audio-list', 'list', { listSignal: 'audio' }),
       node('gallery', 'gallery'),
       node('note', 'sticky-note', { prompt: 'ANNOTATION_MUST_NOT_BECOME_PROVIDER_TEXT' }),
@@ -115,10 +116,13 @@ describe('ordered semantic production pipeline', () => {
     edges.push(edge('prompt', 'text-route', 'input', 'text-out'), edge('text-route', 'video', 'text-in', 'output'),
       edge('image', 'edit', 'image-in'), edge('edit', 'upscale', 'image-in'), edge('upscale', 'image-list', 'input'), edge('image-list', 'video', 'reference-in'),
       edge('clip', 'video-route', 'input'), edge('video-route', 'video', 'video-reference-in', 'output'),
-      edge('voice', 'audio-list', 'input'), edge('sfx', 'audio-list', 'input'), edge('audio-list', 'video', 'audio-reference-in'), edge('video', 'gallery', 'media-in'))
+      edge('voice', 'audio-list', 'input'), edge('sfx', 'audio-list', 'input'), edge('music', 'audio-list', 'input'), edge('audio-list', 'video', 'audio-reference-in'), edge('video', 'gallery', 'media-in'))
     const request = buildGenerationRequest(video, nodes, edges)
     const kinds = new Set(nodes.map((item) => item.data.kind))
     expect(NODE_PALETTE.every((item) => kinds.has(item.kind))).toBe(true)
+    const music = nodes.find(item => item.id === 'music')!
+    expect(buildGenerationRequest(music, nodes, edges).musicRequest).toMatchObject({ mode: 'prompt', modelId: 'music_v2_5', prompt: '  Authored beat\r\nPulse  ', durationMs: 3000 })
+    expect(request.references).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/fixture/music.mp3', mediaType: 'audio' })]))
     expect(generationRequirementFailures(request)).toEqual([])
     expect(request.references).toEqual(expect.arrayContaining([
       expect.objectContaining({ tag: '@coat', boundCharacterTag: '@maya' }),

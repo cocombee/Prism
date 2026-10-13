@@ -1,0 +1,19 @@
+{
+  "include": [
+    "src/**",
+    "scripts/**",
+    "native/**"
+  ],
+  "exclude": [
+    "node_modules/**",
+    "out/**",
+    "outputs/**",
+    "build/**",
+    "release-candidates/**",
+    "backups/**",
+    "obsidian-sync-outbox/**",
+    ".design-inspector/**",
+    ".hermes/**",
+    ".codegraph/**"
+  ]
+}

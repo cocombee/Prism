@@ -1,3 +1,5 @@
+import { isDirectMusicNode, buildMusicRequestFromData } from './musicNodeState'
+import { defaultSoundEffectDuration } from './soundEffectsDuration'
 import { resolvedAssetReferenceDescription } from './assetReferenceDescriptions'
 import { visualMotionCadenceInstruction } from './filmicMotion'
 import { nativeFalPromptTransport } from './nativeFalPromptTransport'
@@ -112,7 +114,7 @@ function joinSpeech(...parts: Array<string | undefined>): string | undefined {
   return parts.filter((part): part is string => typeof part === 'string' && Boolean(part.trim())).join('\n\n') || undefined
 }
 function preservesSpeech(data: StudioNode['data']): boolean {
-  return !data.falNative && (isDirectElevenAudio(data) || data.kind === 'voiceover' && data.voiceEngine === 'fish-audio')
+  return !data.falNative && (isDirectMusicNode(data) || isDirectElevenAudio(data) || data.kind === 'voiceover' && data.voiceEngine === 'fish-audio')
 }
 function joinPrompt(...parts: Array<string | undefined>): string | undefined {
   // Deduplicate at block level, not part level. One Style or Location asset feeding
@@ -842,6 +844,13 @@ function buildGenerationRequestWithPreview(node: StudioNode, nodes: StudioNode[]
     }
   }
   validateUpstream(node.id)
+  if (node.data.kind === 'music-generator' && node.data.musicVersion === 1) {
+    if (!isDirectMusicNode(node.data)) throw new Error('Choose one direct ElevenLabs Music route without another provider binding.')
+    const upstream = resolveWorkflowInput(node.id, nodes, edges, new Set(), previewOnly)
+    if (upstream.references.length || upstream.inputPath || upstream.inputUrl || upstream.storyboardShots?.length || upstream.stylePrompt || upstream.offlineSemanticSources.length) throw new Error('Music accepts text only; disconnect media, Style and Storyboard inputs.')
+    const prompt = joinSpeech(node.data.prompt, upstream.prompt) ?? ''
+    return { nodeId: node.id, kind: 'music-generator', musicVersion: 1, audioProvider: 'elevenlabs', musicRequest: buildMusicRequestFromData(node.data, prompt), prompt: node.data.musicGenerationMode === 'plan' ? undefined : prompt, quantity: node.data.quantity, ...(previewOnly ? { promptPreviewOnly: true as const } : {}) }
+  }
   if (node.data.higgsfieldNative) return buildHiggsfieldGraphRequest(node, nodes, edges, previewOnly)
   if (node.data.falNative) return buildFalNativeGraphRequest(node, nodes, edges, previewOnly)
   const storyboardConnected = edges.some((edge) => edge.target === node.id && edge.targetHandle === 'storyboard-in')
@@ -922,7 +931,7 @@ function buildGenerationRequestWithPreview(node: StudioNode, nodes: StudioNode[]
     creativity: node.data.creativity,
     resemblance: node.data.resemblance,
     videoEngine: effectiveVideoEngine,
-    duration: storyboardDuration || node.data.duration,
+    duration: node.data.kind === 'sound-effects' ? defaultSoundEffectDuration(node.data.duration) : storyboardDuration || node.data.duration,
     editControlDuration: node.data.kind === 'video-generator' ? node.data.duration : undefined,
     autoDuration: node.data.kind === 'video-generator' ? false : storyboardDuration ? false : node.data.autoDuration,
     frameRate: node.data.frameRate,
@@ -959,6 +968,7 @@ function buildGenerationRequestWithPreview(node: StudioNode, nodes: StudioNode[]
     voiceEngine: node.data.voiceEngine,
     voiceModelId: node.data.voiceModelId,
     elevenSpeechMode: node.data.elevenSpeechMode,
+    removeBackgroundNoise: node.data.removeBackgroundNoise,
     elevenDialogueTurns: node.data.elevenDialogueTurns,
     audioProvider: node.data.audioProvider,
     voiceStyle: node.data.voiceStyle,

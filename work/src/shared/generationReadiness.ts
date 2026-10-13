@@ -1,3 +1,6 @@
+import { compileMusicRequest } from './musicRequest'
+import { MUSIC_ENCODED_OUTPUT_FORMATS } from './musicNodeState'
+import { validateSoundEffectDuration } from './soundEffectsDuration'
 import {higgsfieldStoryboardTimingFailures} from './higgsfieldVideoTiming'
 import { providerPromptOwnershipErrors } from './providerPromptOwnership'
 import { referenceDescriptionReadinessFailures } from './assetReferenceDescriptions'
@@ -29,9 +32,19 @@ function hasMedia(reference: NonNullable<GenerationRequest['references']>[number
  */
 export function generationRequirementFailures(request: GenerationRequest): string[] {
   if (request.promptPreviewOnly) return ['review the live controls; this request is a display-only prompt preview']
+  if (request.musicVersion !== undefined || request.musicRequest !== undefined) {
+    if (request.kind !== 'music-generator' || request.musicVersion !== 1 || request.audioProvider !== 'elevenlabs' || request.falNative || request.higgsfieldNative || !request.musicRequest) return ['choose one current direct ElevenLabs Music route']
+    try {
+      const compiled = compileMusicRequest(request.musicRequest)
+      if (!(MUSIC_ENCODED_OUTPUT_FORMATS as readonly string[]).includes(compiled.outputFormat)) return ['choose an encoded Music output format']
+      if (request.inputPath || request.inputUrl || request.references?.length || request.storyboardShots?.length || request.stylePrompt) return ['Music accepts text only; disconnect media, Style and Storyboard inputs']
+      if (request.quantity !== undefined && (!Number.isInteger(request.quantity) || request.quantity < 1 || request.quantity > 4)) return ['choose a Music quantity from 1 to 4']
+      return []
+    } catch (error) { return [error instanceof Error ? error.message : 'check the Music fields'] }
+  }
   if (request.falDraftRecovery) return request.kind === 'video-generator' && request.quantity === 1 && typeof request.falDraftRecovery.requestId === 'string' && typeof request.falDraftRecovery.endpointId === 'string' ? [] : ['choose one original fal draft request']
   if (request.draftCompletion) return request.kind === 'video-generator' && request.quantity === 1 && ['fal', 'byteplus'].includes(request.draftCompletion.provider) && typeof request.draftCompletion.outputPath === 'string' && request.draftCompletion.outputPath ? [] : ['choose one valid linked draft result']
-  const failures: string[] = [...providerPromptOwnershipErrors(request), ...referenceDescriptionReadinessFailures(request), ...storyboardPhysicalCastReadinessFailures(request), ...videoDialogueAudioReadinessFailures(request), ...seedancePromptIntegrityFailures(request)]
+  const failures: string[] = [...providerPromptOwnershipErrors(request), ...(request.kind === 'voiceover' && request.elevenSpeechMode === 'voice-change' ? [] : referenceDescriptionReadinessFailures(request)), ...storyboardPhysicalCastReadinessFailures(request), ...videoDialogueAudioReadinessFailures(request), ...seedancePromptIntegrityFailures(request)]
   const nativeVideo = request.kind === 'video-generator' && (request.falNative || request.higgsfieldNative)
   if (nativeVideo && request.motionCadence !== undefined) {
     const fps = request.nativeOutputFrameRate === null ? undefined : nativeVideoOutputFrameRate(nativeVideo.endpointId, request.nativeOutputFrameRate)
@@ -107,11 +120,20 @@ export function generationRequirementFailures(request: GenerationRequest): strin
       break
     }
     case 'voiceover':
-      if (!prompt) failures.push('add voiceover text')
+      if (request.elevenSpeechMode === 'voice-change') {
+        if (request.voiceEngine !== 'elevenlabs-direct') failures.push('choose direct ElevenLabs for Voice Change')
+        if (references.length !== 1 || references[0]?.mediaType !== 'audio' || !references[0]?.path) failures.push('connect one original audio recording')
+        if (!request.voice?.trim()) failures.push('choose a target voice')
+        if (!request.voiceModelId?.trim()) failures.push('choose a Voice Change model')
+      } else if (!prompt) failures.push('add voiceover text')
       if (request.voiceEngine === 'fish-audio' && !request.fishReferenceId?.trim()) failures.push('add a Fish Audio voice Reference ID')
       break
     case 'sound-effects':
       if (!prompt) failures.push('describe the sound effect')
+      if (!isDirectElevenAudio(request)) {
+        try { validateSoundEffectDuration(request.duration, 'fal') }
+        catch (error) { failures.push(error instanceof Error ? error.message : 'check the Sound Effect duration') }
+      }
       break
     case 'music-generator':
       if (!prompt) failures.push('describe the music')
@@ -123,7 +145,7 @@ export function generationRequirementFailures(request: GenerationRequest): strin
     try { compileFishAudioRequest(request) }
     catch (error) { failures.push(error instanceof Error ? error.message : 'check the Fish Audio settings') }
   }
-  if (isDirectElevenAudio(request)) {
+  if (isDirectElevenAudio(request) && request.elevenSpeechMode !== 'voice-change') {
     try { compileElevenAudioRequest(request) }
     catch (error) { failures.push(error instanceof Error ? error.message : 'check the ElevenLabs audio settings') }
   }

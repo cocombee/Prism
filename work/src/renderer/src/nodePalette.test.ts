@@ -8,7 +8,8 @@ describe('Add Node palette', () => {
     expect(remainingLabels).toEqual([...remainingLabels].sort((left, right) => left.localeCompare(right, 'en')))
   })
 
-  it('gives every listed node its own unique icon', () => {
-    expect(new Set(NODE_PALETTE.map((item) => item.icon)).size).toBe(NODE_PALETTE.length)
+  it('gives every node kind a unique icon and reuses its voice icon for Voice Change', () => {
+    expect(NODE_PALETTE.find(item => item.variant === 'voice-change')?.icon).toBe(NODE_PALETTE.find(item => item.kind === 'voiceover' && !item.variant)?.icon)
+    expect(new Set(NODE_PALETTE.map((item) => item.icon)).size).toBe(new Set(NODE_PALETTE.map(item => item.kind)).size)
   })
 })

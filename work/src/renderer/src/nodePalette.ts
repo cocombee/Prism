@@ -4,6 +4,7 @@ import { NODE_KIND_ICONS } from './iconSystem'
 
 export type NodePaletteItem = {
   kind: NodeKind
+  variant?: 'voice-change'
   label: string
   detail: string
   icon: LucideIcon
@@ -20,6 +21,8 @@ export const NODE_PALETTE: NodePaletteItem[] = [
   { kind: 'list', label: 'List', detail: 'Synchronized image, video, or audio output batch', icon: NODE_KIND_ICONS.list! },
   { kind: 'storyboard', label: 'Storyboard', detail: 'Reusable model-aware shot sequence', icon: NODE_KIND_ICONS.storyboard! },
   { kind: 'voiceover', label: 'Voiceover', detail: 'ElevenLabs Eleven v3 / Fish Audio S1 + S2 Pro', icon: NODE_KIND_ICONS.voiceover! },
+  { kind: 'voiceover', variant: 'voice-change', label: 'Voice Change', detail: 'ElevenLabs · Change the speaker of original audio', icon: NODE_KIND_ICONS.voiceover! },
+  { kind: 'music-generator', label: 'Music', detail: 'ElevenLabs · Prompt or custom lyrics', icon: NODE_KIND_ICONS['music-generator']! },
   { kind: 'sound-effects', label: 'Sound Effects', detail: 'fal.ai · ElevenLabs SFX v2', icon: NODE_KIND_ICONS['sound-effects']! },
   { kind: 'router', label: 'Router', detail: 'Local pass-through connection utility', icon: NODE_KIND_ICONS.router! },
   { kind: 'image-generator', label: 'Image Generator', detail: 'fal.ai · GPT Image · Gemini Image', icon: NODE_KIND_ICONS['image-generator']! },

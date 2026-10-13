@@ -65,6 +65,14 @@ export const STYLE_PRESETS: readonly StylePreset[] = [
     thumbnail: './style-thumbnails/retro-35mm.jpg',
     focalPosition: 'center 12%',
   },
+  {
+    "id": "handcrafted-paper-sculpture",
+    "title": "Paper Sculpture",
+    "description": "Tactile layered cardstock, folded paper depth, and blank human faces with a paper mouth.",
+    "prompt": "Apply a photographed handcrafted paper-sculpture aesthetic to the supplied subject or scene. Preserve its composition, subject roles, recognizable silhouettes, clothing choices, colours, props, actions and spatial relationships while translating every visible element into dimensional paper construction.\n\nBuild figures, clothing, hair, head coverings, accessories, objects, vegetation, architecture and terrain from layered matte cardstock, cut and stacked pieces, folds, curls and gently curved paper. Show visible cut-edge thickness, subtle paper fibres, overlapping layers, small construction imperfections and believable miniature depth. Use simple readable silhouettes, clean colour masses, coherent soft directional light and delicate contact shadows. Clothing and soft forms must look constructed from paper rather than woven fabric. Keep important tactile detail readable without glossy surfaces or excessive blur. Derive palette, framing and setting from the supplied content; do not impose a fixed scene, camera, aspect ratio or animation timing.\n\nHARD RULE FOR EVERY HUMAN, wherever present: the paper face is completely blank except for one small paper mouth, movable when animated. No eyes, eye dots, eye holes, eyelids, eyelashes, eyebrows, eye sockets, noses, nostrils, glasses or eye-like shadows. Referenced human facial features must not carry into the paper face. Express emotion through mouth shape, head angle and body language only. This restriction applies to humans; preserve the established design of non-human subjects in the same paper material.\n\nAvoid flat vector illustration, clay dolls, plastic toys, glossy CGI, realistic human skin, fabric puppets and sterile digital edges.",
+    "thumbnail": "./style-thumbnails/handcrafted-paper-sculpture.png",
+    "focalPosition": "center top"
+  },
 ]
 
 function normalizedPresetIdentity(value: string | undefined): string {

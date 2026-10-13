@@ -1,3 +1,6 @@
+import type { MusicModel, MusicRequest } from './musicRequest'
+import type { MusicPlanDrafts } from './musicPlanDrafts'
+import type { MusicSubmissionView, MusicSubmissionCommand, MusicSubmissionReview } from './musicSubmission'
 import type { VideoDraftReceipt } from './videoDraft'
 import type { HiggsfieldJobView, HiggsfieldJobCommand } from './higgsfieldJobs'
 import type { ElevenDialogueTurn, ElevenVoiceSegment } from './elevenDialogue'
@@ -178,6 +181,13 @@ export interface StoryboardPanel extends StoryboardTypedContinuity {
 export type MediaReferenceMode = 'reference' | 'blocking' | 'composition' | 'object' | 'background' | 'lip-sync' | 'sound' | 'timing'
 
 export interface StudioNodeData extends Record<string, unknown> {
+  /** Explicit current Music authoring; unversioned legacy Music keeps its retirement migration. */
+  musicVersion?: 1
+  musicModelId?: MusicModel
+  musicGenerationMode?: 'prompt' | 'plan'
+  musicPlanDrafts?: MusicPlanDrafts
+  /** Exact prompt-mode decimal seconds, independent of plan-family durations. */
+  musicSeconds?: string
   higgsfieldNative?: HiggsfieldNodeState
   higgsfieldNativePresets?: Record<string, HiggsfieldNodeState>
   /** Compact exact-model inputs; full schemas remain ephemeral and main-owned. */
@@ -345,7 +355,8 @@ export interface StudioNodeData extends Record<string, unknown> {
   voice?: string
   voiceEngine?: 'elevenlabs' | 'elevenlabs-direct' | 'fish-audio'
   voiceModelId?: string
-  elevenSpeechMode?: 'speech' | 'dialogue'
+  elevenSpeechMode?: 'speech' | 'dialogue' | 'voice-change'
+  removeBackgroundNoise?: boolean
   elevenDialogueTurns?: ElevenDialogueTurn[]
   audioProvider?: 'fal' | 'elevenlabs'
   fishModel?: string
@@ -461,6 +472,12 @@ export interface HistoryEntry {
 }
 
 export interface GenerationRequest {
+  musicVersion?: 1
+  musicRequest?: MusicRequest
+  /** Saved owner for direct Music; never a provider field. */
+  musicOrigin?: { canvasId: string; pageId: string }
+  /** Saved Canvas/page owner for graph-bound Voice Change; never a provider field. */
+  voiceChangeOrigin?: { canvasId: string; pageId: string }
   /** Display-only compilation; never accepted by the generation boundary. */
   promptPreviewOnly?: true
   falDraftRecovery?: { endpointId: string; requestId: string }
@@ -567,7 +584,8 @@ export interface GenerationRequest {
   voice?: string
   voiceEngine?: 'elevenlabs' | 'elevenlabs-direct' | 'fish-audio'
   voiceModelId?: string
-  elevenSpeechMode?: 'speech' | 'dialogue'
+  elevenSpeechMode?: 'speech' | 'dialogue' | 'voice-change'
+  removeBackgroundNoise?: boolean
   elevenDialogueTurns?: ElevenDialogueTurn[]
   audioProvider?: 'fal' | 'elevenlabs'
   fishModel?: string
@@ -730,6 +748,13 @@ export interface ImportedAsset {
       normalizedAlignment?: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] }
     }
     elevenDialogueInputs?: Array<{ text: string; voiceId: string }>
+    audioOperation?: string
+    originalAudio?: { assetId: string; revision: string; sha256: string; byteLength: number; durationSeconds: number; origin: string }
+    requestSnapshot?: Record<string, unknown>
+    providerProfileId?: string
+    submissionId?: string
+    encoded?: { sha256: string; byteLength: number; codec: string; sampleRates: number[]; channels: number[]; durationSeconds: number }
+    requestedOutputFormat?: string
     audioOutputFormat?: string
     /** Reusable-asset Create/Edit/Rerun history. Never downstream semantic authority. */
     assetGenerationPrompt?: string
@@ -803,6 +828,9 @@ export interface AssetLinkStatus {
 }
 
 export interface ProjectWorkspace {
+  /** One project-owned child beneath the user-chosen folder. */
+  projectFolderVersion?: 1
+  chosenFolder?: string
   schemaVersion: 1
   id: string
   name: string
@@ -869,6 +897,8 @@ export interface ServiceModelAvailability {
     nativeContractFingerprint?: string
     languages?: Array<{ id: string; label: string }>
     maxTextLength?: number
+    supportsVoiceConversion?: boolean
+    supportsTextToSpeech?: boolean
     supportsStyle?: boolean
     supportsDialogue?: boolean
     supportsSpeakerBoost?: boolean
@@ -990,6 +1020,11 @@ export interface PrismAPI {
     configure: (provider: import('./assistantModels').AssistantProvider, mode: import('./promptConnection').PromptBillingMode, signIn: boolean) => Promise<import('./promptConnection').PromptConnectionView>
     cancel: (requestId: string) => Promise<boolean>
     rewrite: (provider: 'omniroute' | 'openai' | 'anthropic' | 'google' | 'deepseek' | 'moonshot', text: string, instruction?: string, model?: string, options?: import('./promptConnection').PromptRewriteOptions) => Promise<string>
+  }
+  musicSubmissions: {
+    list: () => Promise<MusicSubmissionView[]>
+    review: (command: MusicSubmissionReview) => Promise<MusicSubmissionView>
+    recover: (command: MusicSubmissionCommand) => Promise<MusicSubmissionView>
   }
   generation: {
     higgsfieldJobs: () => Promise<HiggsfieldJobView[]>

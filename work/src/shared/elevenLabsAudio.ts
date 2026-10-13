@@ -1,3 +1,4 @@
+import { validateSoundEffectDuration } from './soundEffectsDuration'
 import { isElevenDialogue, compileElevenDialogueInputs } from './elevenDialogue'
 import type { GenerationRequest, ServiceModelAvailability, StudioNodeData } from './types'
 import { ELEVEN_AUDIO_OUTPUT_FORMATS } from './providerOptions'
@@ -31,7 +32,7 @@ export function elevenSpeechModelsByVersion(models: ElevenSpeechModel[], savedId
     return [Number(match?.[1] || 0), Number(match?.[2] || 0)]
   }
   const seen = new Set<string>()
-  const sorted = [...models].sort((a, b) => {
+  const sorted = models.filter(model => model.supportsTextToSpeech !== false).sort((a, b) => {
     const left = version(a.id), right = version(b.id)
     return right[0] - left[0] || right[1] - left[1] || a.id.localeCompare(b.id)
   }).filter((model) => { if (seen.has(model.id)) return false; seen.add(model.id); return true })
@@ -65,12 +66,14 @@ export function directElevenAvailabilityError(request: GenerationRequest, availa
   if (request.kind !== 'voiceover' || request.voiceEngine !== 'elevenlabs-direct' || !availability?.verified) return undefined
   const model = availability.models.find((item) => item.id === request.voiceModelId)
   if (!model) return 'The selected ElevenLabs speech model is unavailable; choose another live model.'
+  if (request.elevenSpeechMode === 'voice-change') return model.supportsVoiceConversion ? undefined : 'Choose an available Voice Change model.'
   try { compileElevenAudioRequest(request, model) }
   catch (error) { return error instanceof Error ? error.message : 'Check the ElevenLabs settings.' }
   return undefined
 }
 
-export function audioGenerationLabel(data: Pick<StudioNodeData, 'kind' | 'voiceEngine' | 'voiceModelId' | 'fishModel'>, availability?: ServiceModelAvailability): string | undefined {
+export function audioGenerationLabel(data: Pick<StudioNodeData, 'kind' | 'voiceEngine' | 'voiceModelId' | 'fishModel' | 'musicVersion' | 'musicModelId'>, availability?: ServiceModelAvailability): string | undefined {
+  if (data.kind === 'music-generator' && data.musicVersion === 1) return ({ music_v1: 'ElevenLabs Music v1', music_v2: 'ElevenLabs Music v2', music_v2_5: 'ElevenLabs Music v2.5' } as const)[data.musicModelId!] || 'ElevenLabs Music'
   if (data.kind === 'sound-effects') return 'ElevenLabs Sound Effects v2'
   if (data.kind !== 'voiceover') return undefined
   if (data.voiceEngine === 'fish-audio') return (availability?.provider === 'fish' ? availability.models.find(model => model.id === data.fishModel)?.label : undefined) || `Fish Audio ${data.fishModel || 's2-pro'}`
@@ -103,7 +106,7 @@ export function compileElevenAudioRequest(request: GenerationRequest, model?: El
     return {
       url: `${ELEVENLABS_API}/v1/sound-generation?${query}`, modelId: ELEVEN_SOUND_MODEL, outputFormat, timestamps: false,
       body: { text: request.prompt, model_id: ELEVEN_SOUND_MODEL, loop: Boolean(request.loop),
-        duration_seconds: boundedNumber(request.duration, 5, 0.5, 30, 'Effect duration'),
+        duration_seconds: validateSoundEffectDuration(request.duration, 'elevenlabs'),
         prompt_influence: boundedNumber(request.promptInfluence, 0.3, 0, 1, 'Prompt influence') },
     }
   }

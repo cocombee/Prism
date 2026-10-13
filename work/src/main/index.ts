@@ -1,3 +1,12 @@
+import type { StudioNodeData, StudioNode } from '../shared/types'
+import { runMusicComposition, MusicCompositionOutputFailure } from './elevenMusicComposition'
+import { compileMusicRequest, type MusicRequest } from './elevenMusicContract'
+import { assertEncodedElevenOutputFormat } from './elevenEncodedOutput'
+import { buildMusicRequestFromData, isDirectMusicNode } from '../shared/musicNodeState'
+import { MusicSubmissionStore, musicRequestFingerprint, musicSubmissionRequiresRecovery, type MusicSubmissionScope, type MusicSubmissionRecord } from './musicSubmissionStore'
+import type { MusicSubmissionView, MusicSubmissionCommand, MusicSubmissionReview } from '../shared/musicSubmission'
+import { realpath, open } from 'node:fs/promises'
+import { validateSoundEffectDuration } from '../shared/soundEffectsDuration'
 import { projectFolderPath, projectScaffoldPaths, type ProjectFolder } from './projectFolders'
 import { browseElevenVoices, readVoiceFacets, addElevenSharedVoice, removeElevenVoice, getElevenBrowserVoice, readFalBrowserVoices } from './elevenVoiceBrowser'
 import { VoiceRecentStore } from './voiceRecentStore'
@@ -87,6 +96,9 @@ import { ProjectProfileRecoveryState } from './projectProfileTransaction'
 import { ProviderRequestState } from './providerRequestState'
 import { generationServiceProvider } from '../shared/generationServiceProvider'
 import { readProviderCatalogPages } from './providerCatalogPages'
+import { moveProjectContainer, recoverProjectContainers, projectContainerName, materializePortableContainer, resolveProjectContainerSelection } from './projectContainer'
+import { originalAudioDecoder } from './elevenEncodedAudioInspection'
+import { runGraphVoiceChange } from './elevenVoiceChangeComposition'
 import { generateElevenAudio, readElevenAvailability, readPublicElevenVoices } from './elevenLabsApi'
 import { persistElevenAudio } from './elevenLabsAudioPersistence'
 import { isDirectElevenAudio } from '../shared/elevenLabsAudio'
@@ -173,6 +185,7 @@ const MODEL_IDS: Partial<Record<NodeKind, string>> = {
 }
 
 let mainWindow: BrowserWindow | null = null
+let voiceChangeWorkflow: WorkflowDocument | null = null
 let currentProject: ProjectWorkspace | null = null
 let currentProjectDocumentPath: string | null = null
 let pendingProjectDocumentPath: string | null = null
@@ -200,7 +213,7 @@ const workspacePointerPath = () => join(dataRoot(), 'current-project.json')
 const recentProjectsPath = () => join(dataRoot(), 'recent-projects.json')
 const projectManifestPath = (root: string) => join(root, 'Prism Foundry Project.json')
 const projectDocumentFolder = (root: string) => projectFolderPath(root, 'Project')
-const defaultProjectDocumentPath = (root: string) => join(projectDocumentFolder(root), `${safeFolderName(basename(root), 'Untitled Project')}.prismflow`)
+const defaultProjectDocumentPath = (root: string) => join(projectDocumentFolder(root), `${safeFolderName(basename(root).replace(/\s*\(Prism\)$/i, ''), 'Untitled Project')}.prismflow`)
 const projectPath = (...parts: string[]) => {
   const generation = generationContext.getStore()
   const rootPath = generation?.rootPath || currentProject?.rootPath
@@ -619,6 +632,7 @@ async function serviceAccountStatus(provider: ServiceProvider): Promise<ServiceA
 }
 
 function estimateModelId(request: GenerationRequest): string | undefined {
+  if (request.kind === 'music-generator' && request.musicVersion === 1) return `elevenlabs/${compileMusicRequest(assertMusicRequestShape(request)).modelId}`
   if (request.kind === 'voiceover' && request.voiceEngine === 'fish-audio' || isDirectElevenAudio(request)) return undefined
   if ((request.kind === 'image-generator' || request.kind === 'image-editor') && request.imageProvider && request.imageProvider !== 'fal') return request.imageModelId
   if (request.kind === 'video-generator') {
@@ -630,6 +644,11 @@ function estimateModelId(request: GenerationRequest): string | undefined {
 }
 
 async function estimateGenerationCost(request: GenerationRequest) {
+  if (request.kind === 'music-generator' && request.musicVersion === 1) {
+    // Validate the exact model/duration carrier locally. No verified Music quote is available.
+    compileMusicRequest(assertMusicRequestShape(request))
+    return null
+  }
   if ((request.kind === 'image-generator' || request.kind === 'image-editor') && request.imageProvider && request.imageProvider !== 'fal') return null
   if (request.kind === 'video-generator' && resolveVideoModel(request.videoEngine).provider === 'byteplus') return null
   const modelId = estimateModelId(request)
@@ -641,8 +660,48 @@ async function estimateGenerationCost(request: GenerationRequest) {
   return publishedFalEstimate(request, modelId)
 }
 
+async function projectHasUnresolvedRemoteJobs(project: ProjectWorkspace, documentPath: string): Promise<boolean> {
+  if (await pathExists(join(dataRoot(), 'provider-jobs', 'music.json')) && (await musicSubmissionStore().list(project.id)).some(musicSubmissionRequiresRecovery)) return true
+  if (!await pathExists(join(dataRoot(), 'provider-jobs', 'higgsfield.json'))) return false
+  const jobs = await higgsfieldJobStore().list({ projectId: project.id, rootPath: project.rootPath, documentPath })
+  return jobs.some(job => higgsfieldJobView(job).recoveryRequired)
+}
+
+async function ensureProjectContainer(root: string, project: ProjectWorkspace, documentPath: string, name?: string): Promise<ProjectWorkspace & { documentPath: string }> {
+  await recoverProjectContainers(dataRoot())
+  await projectProfileRecovery.recover(dataRoot())
+  await recoverSemanticAssetTransactions(root)
+  if (await projectHasUnresolvedRemoteJobs(project, documentPath)) throw new Error('Resolve the saved provider submission in Settings before moving or renaming this project. Its current folder was preserved.')
+  const previousProject = currentProject, previousDocument = currentProjectDocumentPath
+  const movingActiveProject = previousProject?.id === project.id
+  if (movingActiveProject) {
+    generationLifecycle.activate(null)
+    currentProject = null; currentProjectDocumentPath = null; voiceChangeWorkflow = null
+    activateProviderRequestProject()
+  }
+  try {
+    return await moveProjectContainer({ dataRoot: dataRoot(), rootPath: root, project, documentPath, name,
+      recentPath: recentProjectsPath(), pointerPath: workspacePointerPath() })
+  } catch (error) {
+    // Never keep a stale active root after an interrupted rename. Recovery proves the old state first.
+    await recoverProjectContainers(dataRoot())
+    if (movingActiveProject && previousProject && await pathExists(projectManifestPath(previousProject.rootPath))) {
+      currentProject = previousProject; currentProjectDocumentPath = previousDocument
+      activateProviderRequestProject(); activateCurrentProject()
+    }
+    throw error
+  }
+}
+
 async function scaffoldProject(root: string, existing?: ProjectWorkspace, documentPath?: string): Promise<ProjectWorkspace> {
-  return projectCommands.run(() => scaffoldProjectUnlocked(root, existing, documentPath))
+  return projectCommands.run(async () => {
+    if (existing && !(existing.projectFolderVersion === 1 && basename(resolve(root)) === projectContainerName(existing.name))
+      && !await projectHasUnresolvedRemoteJobs(existing, documentPath || defaultProjectDocumentPath(root))) {
+      const relocated = await ensureProjectContainer(root, existing, documentPath || defaultProjectDocumentPath(root))
+      return scaffoldProjectUnlocked(relocated.rootPath, relocated, relocated.documentPath)
+    }
+    return scaffoldProjectUnlocked(root, existing, documentPath)
+  })
 }
 
 async function scaffoldProjectUnlocked(root: string, existing?: ProjectWorkspace, documentPath?: string): Promise<ProjectWorkspace> {
@@ -660,7 +719,7 @@ async function scaffoldProjectUnlocked(root: string, existing?: ProjectWorkspace
     createdAt: now,
     updatedAt: now,
   }
-  const updated = { ...project, name: basename(resolvedRoot), rootPath: resolvedRoot, updatedAt: now }
+  const updated = { ...project, name: existing?.name || basename(resolvedRoot).replace(/\s*\(Prism\)$/i, ''), rootPath: resolvedRoot, updatedAt: now }
   currentProject = updated
   currentProjectDocumentPath = documentPath ? resolve(documentPath) : defaultProjectDocumentPath(resolvedRoot)
   activateProviderRequestProject()
@@ -682,16 +741,16 @@ async function restoreCurrentProject(): Promise<void> {
 }
 
 async function restoreCurrentProjectUnlocked(): Promise<void> {
+  await recoverProjectContainers(dataRoot())
   await projectProfileRecovery.recover(dataRoot())
   const stored = await readJson<StoredProjectWorkspace | null>(workspacePointerPath(), null)
   if (!stored?.rootPath) return
   const manifest = await readJson<ProjectWorkspace | null>(projectManifestPath(stored.rootPath), null)
   if (manifest?.schemaVersion === 1) {
-    currentProject = { ...manifest, rootPath: resolve(stored.rootPath) }
-    currentProjectDocumentPath = stored.documentPath ? resolve(stored.documentPath) : defaultProjectDocumentPath(currentProject.rootPath)
-    activateProviderRequestProject()
-    await recoverSemanticAssetTransactions(currentProject.rootPath)
-    activateCurrentProject()
+    const restored = await scaffoldProject(stored.rootPath, manifest, stored.documentPath || defaultProjectDocumentPath(stored.rootPath))
+    currentProject = restored
+    currentProjectDocumentPath = restored.documentPath || defaultProjectDocumentPath(restored.rootPath)
+    activateProviderRequestProject(); activateCurrentProject()
     try { await rmdir(join(currentProject.rootPath, '04. Styles')) } catch { /* Preserve a non-empty legacy folder for explicit migration. */ }
     await removeLegacyImport()
   }
@@ -1024,12 +1083,20 @@ async function openProjectDocument(path: string): Promise<ProjectWorkspace> {
 
 async function openProjectDocumentUnlocked(path: string): Promise<ProjectWorkspace> {
   await projectProfileRecovery.recover(dataRoot())
-  const documentPath = resolve(path)
+  let documentPath = resolve(path)
   if (isDocumentsPath(documentPath)) throw new Error('Project documents under Documents are not supported. Move the project folder elsewhere first.')
-  const document = await readStrictJson<ProjectDocument>(documentPath, 'The portable project document')
+  let document = await readStrictJson<ProjectDocument>(documentPath, 'The portable project document')
   if (!document || document.fileType !== 'prism-foundry-project' || document.schemaVersion !== 1) throw new Error('That is not a valid Prism Foundry .prismflow project.')
   generationLifecycle.activate(null)
-  const root = ['Project', '00. Project'].includes(basename(dirname(documentPath))) ? dirname(dirname(documentPath)) : dirname(documentPath)
+  let root = ['Project', '00. Project'].includes(basename(dirname(documentPath))) ? dirname(dirname(documentPath)) : dirname(documentPath)
+  let rootManifest = await readStrictJsonOr<ProjectWorkspace | null>(projectManifestPath(root), null, 'The project manifest')
+  if (!rootManifest || rootManifest.id !== document.project.id) return openProjectDocument(await materializePortableContainer(document, documentPath, root))
+  if (!(rootManifest.projectFolderVersion === 1 && basename(root) === projectContainerName(rootManifest.name))
+    && !await projectHasUnresolvedRemoteJobs(rootManifest, documentPath)) {
+    const relocated = await ensureProjectContainer(root, rootManifest, documentPath)
+    root = relocated.rootPath; documentPath = relocated.documentPath; rootManifest = relocated
+    document = await readStrictJson<ProjectDocument>(documentPath, 'The relocated project document')
+  }
   const canonicalWorkflow = projectFolderPath(root, 'Canvas', 'workflow.json')
   const canonicalAssets = projectFolderPath(root, 'Canvas', 'assets.json')
   const portableMtime = (await stat(documentPath)).mtimeMs
@@ -1037,7 +1104,7 @@ async function openProjectDocumentUnlocked(path: string): Promise<ProjectWorkspa
     try { return (await stat(candidate)).mtimeMs } catch (error) { if (isMissingFileError(error)) return undefined; throw error }
   }
   const [workflowMtime, assetsMtime] = await Promise.all([canonicalMtime(canonicalWorkflow), canonicalMtime(canonicalAssets)])
-  const existing: ProjectWorkspace = { ...document.project, rootPath: root }
+  const existing: ProjectWorkspace = { ...document.project, ...rootManifest, rootPath: root }
   const project = await scaffoldProject(root, existing, documentPath)
   const mapping = new Map<string, string>()
   const assets = (document.assets || []).map((asset) => {
@@ -1579,6 +1646,7 @@ async function runElevenLabsAudio(request: GenerationRequest, signal?: AbortSign
   const key = await loadServiceCredential('elevenlabs')
   mainWindow?.webContents.send('generation:progress', { nodeId: request.nodeId, message: 'Submitting securely to ElevenLabs…', status: 'queued' })
   try {
+    if (request.elevenSpeechMode === 'voice-change') return await runCurrentVoiceChange(request, key, signal)
     const response = await generateElevenAudio({ fetch, key, signal, assertSubmission: () => runtimeServiceFailures.assertCurrent('elevenlabs') }, request)
     assertGenerationCommit()
     const result = await persistElevenAudio(request, response, {
@@ -1589,6 +1657,206 @@ async function runElevenLabsAudio(request: GenerationRequest, signal?: AbortSign
     runtimeServiceFailures.delete('elevenlabs')
     return result
   } catch (error) { rememberServiceFailure('elevenlabs', error); throw error }
+}
+
+async function runCurrentVoiceChange(request: GenerationRequest, key: string, signal?: AbortSignal): Promise<GenerationResult> {
+  const owner = currentProjectOwner(), projectId = currentProject!.id
+  const check = () => { signal?.throwIfAborted(); assertGenerationCommit(); runtimeServiceFailures.assertCurrent('elevenlabs'); if (currentProjectOwner() !== owner) throw new Error('The original audio project changed.') }
+  check()
+  voiceChangeWorkflow = await loadWorkflowDocument()
+  check()
+  const getGraph = () => {
+    check()
+    const document = voiceChangeWorkflow
+    if (!document) throw new Error('Save the original audio connection first.')
+    const origin = request.voiceChangeOrigin
+    if (!origin || typeof origin.canvasId !== 'string' || typeof origin.pageId !== 'string' || document.activeCanvasId !== origin.canvasId || document.activePageId !== origin.pageId) throw new Error('The saved Voice Change Canvas changed. Resolve its current input before running.')
+    const canvas = document.canvases?.find(canvas => canvas.id === origin.canvasId)
+    const page = canvas?.pages.find(page => page.id === origin.pageId)
+    const node = page?.nodes.find(node => node.id === request.nodeId)
+    if (!page || !node) throw new Error('The current Voice Change node is unavailable.')
+    if (node.data.elevenSpeechMode !== 'voice-change' || node.data.voiceEngine !== 'elevenlabs-direct') throw new Error('The saved node is not a Voice Change owner.')
+    return { nodeId: request.nodeId, nodes: page.nodes, edges: page.edges }
+  }
+  const registry = await serviceProfileStore().listProfiles('elevenlabs', false)
+  check()
+  const profileId = projectServiceProfileSelection(registry, { serviceProfileOverrides: runtimeServiceFailures.overrides('elevenlabs', currentProject?.serviceProfileOverrides) }, 'elevenlabs').profile?.id || 'legacy'
+  const readAssets = async () => (await readStrictJsonOr<ImportedAsset[]>(assetsIndexPath(), [], 'The audio asset registry')).filter(asset => asset.category === 'audio' && asset.origin && !asset.trashedAt).map(asset => ({ ...asset, category: asset.category!, origin: asset.origin! }))
+  const result = await runGraphVoiceChange({
+    graph: { getGraph, readAssets, assertCurrent: check, resolveAsset: async id => (await readAssets()).find(asset => asset.id === id), assertManagedPath: assertManagedMediaPath, decoderBinary: originalAudioDecoder, maximumBytes: 100 * 1024 * 1024 },
+    transport: { fetch, key, signal, assertCurrent: check, assertSubmission: check, maximumResponseBytes: 100 * 1024 * 1024 },
+    storage: { projectId, nodeId: request.nodeId, providerProfileId: profileId, submissionId: randomUUID(), outputStem: join(categoryFolder('audio', true), `${Date.now()}-${randomUUID().slice(0, 8)}-voice-change`), assertCommit: check,
+      assertOutputPath: async path => { check(); const folder = await realpath(dirname(path)); check(); if (folder !== await realpath(categoryFolder('audio', true))) throw new Error('The derivative output escaped its project.'); return join(folder, basename(path)) },
+      register: (path, metadata, onIndexed) => registerGeneratedAsset(path, metadata, onIndexed).then(() => undefined), localUrl: localAssetUrl,
+      history: entry => appendHistory({ id: randomUUID(), nodeId: request.nodeId, nodeTitle: 'Voice Change', modelId: entry.modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath: entry.outputPath, outputUrl: localAssetUrl(entry.outputPath) }) },
+  }, { voiceId: request.voice, modelId: request.voiceModelId, settings: { stability: request.stability ?? 0.5, similarityBoost: request.similarityBoost ?? 0.75 }, outputFormat: request.audioOutputFormat || 'mp3_44100_128', ...(request.voiceSeed !== undefined ? { seed: request.voiceSeed } : {}), ...(request.removeBackgroundNoise !== undefined ? { removeBackgroundNoise: request.removeBackgroundNoise } : {}) })
+  check(); runtimeServiceFailures.delete('elevenlabs'); return result
+}
+
+let musicSubmissionStoreInstance: MusicSubmissionStore | undefined
+const activeMusicSubmissions = new Set<string>()
+function musicSubmissionStore(): MusicSubmissionStore { return musicSubmissionStoreInstance ||= new MusicSubmissionStore(dataRoot()) }
+function currentMusicScope(nodeId: string): MusicSubmissionScope {
+  assertGenerationCommit()
+  if (!currentProject || !currentProjectDocumentPath || typeof nodeId !== 'string' || !nodeId.trim()) throw new Error('Choose the original Music project and node first.')
+  return { projectId: currentProject.id, nodeId, rootPath: resolve(currentProject.rootPath), documentPath: resolve(currentProjectDocumentPath) }
+}
+function savedMusicNode(request: GenerationRequest): StudioNodeData {
+  const origin = request.musicOrigin, document = voiceChangeWorkflow
+  if (!origin || !document || typeof origin.canvasId !== 'string' || typeof origin.pageId !== 'string' || document.activeCanvasId !== origin.canvasId || document.activePageId !== origin.pageId) throw new Error('Save and select the original Music Canvas before running.')
+  const node = document.canvases?.find(canvas => canvas.id === origin.canvasId)?.pages.find(page => page.id === origin.pageId)?.nodes.find(node => node.id === request.nodeId)
+  if (!node || !isDirectMusicNode(node.data)) throw new Error('The original direct Music node is unavailable.')
+  return node.data
+}
+function assertMusicRequestShape(request: GenerationRequest): MusicRequest {
+  if (request.kind !== 'music-generator' || request.musicVersion !== 1 || request.audioProvider !== 'elevenlabs' || request.falNative || request.higgsfieldNative || request.falDraftRecovery || request.draftCompletion || !request.musicRequest) throw new Error('Choose a current direct ElevenLabs Music node.')
+  const compiled = compileMusicRequest(request.musicRequest)
+  assertEncodedElevenOutputFormat('music', compiled.outputFormat === 'auto' ? compiled.modelId === 'music_v1' ? 'mp3_44100_128' : 'mp3_48000_192' : compiled.outputFormat)
+  return structuredClone(request.musicRequest)
+}
+async function reserveCurrentMusic(request: GenerationRequest): Promise<MusicSubmissionRecord> {
+  const draft = assertMusicRequestShape(request), scope = currentMusicScope(request.nodeId), owner = currentProjectOwner()
+  if (generationLifecycle.isRunning(request.nodeId)) throw new Error('Stop the current Music run before starting another.')
+  voiceChangeWorkflow = await loadWorkflowDocument()
+  if (currentProjectOwner() !== owner) throw new Error('The Music project changed before reservation.')
+  const saved = buildMusicRequestFromData(savedMusicNode(request))
+  if (musicRequestFingerprint(saved) !== musicRequestFingerprint(draft)) throw new Error('Save the current Music draft before running; its authored request changed.')
+  const record = await musicSubmissionStore().reserve(scope, draft, request.musicOrigin!)
+  if (currentProjectOwner() !== owner || generationLifecycle.isRunning(request.nodeId)) { await musicSubmissionStore().rejected(scope, record.submissionId); throw new Error('The original Music owner changed before its run began.') }
+  activeMusicSubmissions.add(record.submissionId)
+  return record
+}
+async function runCurrentMusic(request: GenerationRequest, signal: AbortSignal | undefined, reservation: MusicSubmissionRecord | undefined): Promise<GenerationResult> {
+  const draft = assertMusicRequestShape(request), scope = currentMusicScope(request.nodeId), owner = currentProjectOwner()
+  if (!reservation || reservation.projectId !== scope.projectId || reservation.nodeId !== scope.nodeId || reservation.rootPath !== scope.rootPath || reservation.documentPath !== scope.documentPath || reservation.fingerprint !== musicRequestFingerprint(draft)) throw new Error('The original Music submission reservation is unavailable.')
+  const check = () => { signal?.throwIfAborted(); assertGenerationCommit(); runtimeServiceFailures.assertCurrent('elevenlabs'); if (currentProjectOwner() !== owner || musicRequestFingerprint(buildMusicRequestFromData(savedMusicNode(request))) !== reservation.fingerprint) throw new Error('The original Music project or authored draft changed.') }
+  check()
+  // Both compiler and encoded-format preflight above precede credential lookup.
+  const registry = await serviceProfileStore().listProfiles('elevenlabs', false)
+  check()
+  const profileId = projectServiceProfileSelection(registry, { serviceProfileOverrides: runtimeServiceFailures.overrides('elevenlabs', currentProject?.serviceProfileOverrides) }, 'elevenlabs').profile?.id || 'legacy'
+  const key = await loadServiceCredential('elevenlabs')
+  check()
+  const outputFolder = categoryFolder('audio', true)
+  let attempted = false, postStatus: number | undefined, requestId: string | undefined
+  try {
+    const result = await runMusicComposition({
+      transport: { key, signal, decoderBinary: originalAudioDecoder, maximumResponseBytes: 100 * 1024 * 1024, assertCurrent: check, assertSubmission: check,
+        fetch: async (url, init) => { check(); attempted = true; const response = await net.fetch(url instanceof URL ? url.toString() : url, init); postStatus = response.status; return response } },
+      submission: {
+        beforeSubmit: async () => { check(); await musicSubmissionStore().submitting(scope, reservation.submissionId, profileId); check() },
+        completed: async result => { requestId = result.requestId; await musicSubmissionStore().completed(scope, reservation.submissionId, { requestId, saveState: 'not-indexed' }) },
+      },
+      storage: { projectId: scope.projectId, nodeId: scope.nodeId, providerProfileId: profileId, submissionId: reservation.submissionId, outputStem: join(outputFolder, `${Date.now()}-${randomUUID().slice(0, 8)}-music`), assertCommit: check,
+        assertOutputPath: async path => { check(); const folder = await realpath(dirname(path)); check(); if (folder !== await realpath(outputFolder)) throw new Error('Music output escaped its original managed Audio folder.'); check(); return join(folder, basename(path)) },
+        register: async (path, metadata, onIndexed) => {
+          let indexed = false
+          try { await registerGeneratedAsset(path, metadata, () => { indexed = true; onIndexed() }) }
+          finally { if (indexed) await musicSubmissionStore().completed(scope, reservation.submissionId, { requestId, saveState: 'indexed-history-pending', retainedOutputPath: path }) }
+        },
+        localUrl: localAssetUrl,
+        history: async entry => { check(); await appendHistory({ id: randomUUID(), nodeId: scope.nodeId, nodeTitle: 'Music', modelId: entry.modelId, status: 'complete', createdAt: new Date().toISOString(), outputPath: entry.outputPath, outputUrl: localAssetUrl(entry.outputPath) }); await musicSubmissionStore().completed(scope, reservation.submissionId, { requestId, saveState: 'indexed-history-saved', retainedOutputPath: entry.outputPath }) },
+      },
+    }, draft)
+    check(); await musicSubmissionStore().saved(scope, reservation.submissionId, result.outputPath); check()
+    runtimeServiceFailures.delete('elevenlabs')
+    return result
+  } catch (error) {
+    const record = await musicSubmissionStore().get(scope, reservation.submissionId)
+    if (error instanceof MusicCompositionOutputFailure) {
+      await musicSubmissionStore().completed(scope, reservation.submissionId, { requestId: error.requestId, saveState: error.saveState, retainedOutputPath: error.retainedOutputPath })
+    } else if (record.state === 'saved') {
+      await musicSubmissionStore().completed(scope, reservation.submissionId, { requestId: record.requestId, saveState: 'indexed-history-saved', retainedOutputPath: record.retainedOutputPath })
+    } else if (record.state === 'reserved' || !attempted && record.state === 'submitting') {
+      await musicSubmissionStore().rejected(scope, reservation.submissionId)
+    } else if (record.state === 'submitting' || record.state === 'unknown') {
+      if (postStatus !== undefined && postStatus >= 400 && postStatus < 500 && ![408,409].includes(postStatus)) await musicSubmissionStore().rejected(scope, reservation.submissionId)
+      else await musicSubmissionStore().unknown(scope, reservation.submissionId)
+    }
+    // The private blocking receipt, rather than an Electron-serialized error property, owns replay safety.
+    if (attempted) throw new Error((error instanceof Error ? error.message : 'Music generation failed.') + ' The original Music submission was recorded; check Music Settings before another Run.')
+    throw error
+  }
+}
+function musicSubmissionView(record: MusicSubmissionRecord): MusicSubmissionView {
+  const recoveryRequired = musicSubmissionRequiresRecovery(record), running = generationLifecycle.isRunning(record.nodeId) || activeMusicSubmissions.has(record.submissionId)
+  const canRecover = record.state === 'complete' && !!record.retainedOutputPath && record.saveState !== 'not-indexed' && !running
+  return { submissionId: record.submissionId, projectId: record.projectId, nodeId: record.nodeId, state: record.state, modelId: record.modelId, ...(record.requestId ? { requestId: record.requestId } : {}), ...(record.saveState ? { saveState: record.saveState } : {}), recoveryRequired, canRecover, canReview: recoveryRequired && !running, outputRetained: !!record.retainedOutputPath, createdAt: record.createdAt, updatedAt: record.updatedAt,
+    ...(recoveryRequired ? { message: canRecover ? 'Music completed. Restore its saved audio locally without generating again.' : 'Review the original ElevenLabs Music history before another paid Run.' } : {}) }
+}
+function musicSubmissionCommand(raw: unknown, review: boolean): MusicSubmissionCommand | MusicSubmissionReview {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ![Object.prototype,null].includes(Object.getPrototypeOf(raw))) throw new Error('Invalid Music submission command.')
+  const value = raw as Record<string, unknown>, allowed = review ? ['nodeId','submissionId','confirmation'] : ['nodeId','submissionId']
+  if (Object.keys(value).some(key => !allowed.includes(key)) || typeof value.nodeId !== 'string' || !value.nodeId.trim() || value.nodeId.length > 512 || typeof value.submissionId !== 'string' || !value.submissionId.trim() || value.submissionId.length > 512 || review && value.confirmation !== 'provider-history-reviewed') throw new Error('Review the exact original Music submission first.')
+  return value as unknown as MusicSubmissionCommand | MusicSubmissionReview
+}
+async function listCurrentMusicSubmissions(): Promise<MusicSubmissionView[]> {
+  if (!currentProject) return []
+  const owner = currentProjectOwner(), records = await musicSubmissionStore().list(currentProject.id)
+  if (currentProjectOwner() !== owner) throw new Error('The Music project changed during submission review.')
+  return records.map(musicSubmissionView)
+}
+async function reviewCurrentMusicSubmission(raw: unknown): Promise<MusicSubmissionView> {
+  const command = musicSubmissionCommand(raw, true) as MusicSubmissionReview
+  if (generationLifecycle.isRunning(command.nodeId) || activeMusicSubmissions.has(command.submissionId)) throw new Error('Stop the active Music run before reviewing its submission.')
+  const scope = currentMusicScope(command.nodeId), owner = currentProjectOwner()
+  return projectCommands.runForOwner(owner, currentProjectOwner, async () => {
+    if (generationLifecycle.isRunning(command.nodeId) || activeMusicSubmissions.has(command.submissionId)) throw new Error('Stop the active Music run before reviewing its submission.')
+    return musicSubmissionView(await musicSubmissionStore().review(scope, command.submissionId, command.confirmation))
+  })
+}
+async function restoreCurrentMusicOutput(record: MusicSubmissionRecord, asset: ImportedAsset, path: string): Promise<void> {
+  assertGenerationCommit()
+  const restoredModelId = `elevenlabs/${record.modelId}`
+  await projectJsonMutations.run(workflowPath(), async () => {
+    const document = await readStrictJson<WorkflowDocument>(workflowPath(), 'The original Music workflow')
+    assertGenerationCommit()
+    const canvas = document.canvases?.find(canvas => canvas.id === record.canvasId), page = canvas?.pages.find(page => page.id === record.pageId), node = page?.nodes.find(node => node.id === record.nodeId)
+    if (!node || !isDirectMusicNode(node.data)) throw new Error('The original Music node is no longer in its saved Canvas. Its audio remains available for explicit review.')
+    const restore = (source: StudioNode): StudioNode => {
+      if (source.id !== record.nodeId) return source
+      const generatedResults = [...(source.data.generatedResults || [])], existing = generatedResults.findIndex(result => result.path === path)
+      if (existing < 0) generatedResults.push({ path, url: localAssetUrl(path), type: 'audio', modelId: restoredModelId, createdAt: asset.createdAt })
+      return { ...source, data: { ...source.data, generatedResults, activeResultIndex: existing >= 0 ? existing : generatedResults.length - 1, outputPath: path, outputUrl: localAssetUrl(path), outputType: 'audio', modelId: restoredModelId, runState: 'complete', error: undefined, progress: 'Complete', runStartedAt: undefined } }
+    }
+    const recovered: WorkflowDocument = { ...document, updatedAt: new Date().toISOString(), canvases: document.canvases!.map(item => item.id === record.canvasId ? { ...item, pages: item.pages.map(item => item.id === record.pageId ? { ...item, nodes: item.nodes.map(restore) } : item) } : item),
+      ...(document.activeCanvasId === record.canvasId ? { pages: document.pages?.map(item => item.id === record.pageId ? { ...item, nodes: item.nodes.map(restore) } : item), ...(document.activePageId === record.pageId ? { nodes: document.nodes.map(restore) } : {}) } : {}) }
+    assertGenerationCommit(); await atomicJson(workflowPath(), recovered); assertGenerationCommit(); await writeProjectDocument(); assertGenerationCommit(); voiceChangeWorkflow = structuredClone(recovered)
+  })
+}
+async function recoverCurrentMusicSubmission(raw: unknown): Promise<MusicSubmissionView> {
+  const command = musicSubmissionCommand(raw, false)
+  if (generationLifecycle.isRunning(command.nodeId) || activeMusicSubmissions.has(command.submissionId)) throw new Error('Stop the active Music run before restoring saved audio.')
+  const scope = currentMusicScope(command.nodeId), owner = currentProjectOwner()
+  return projectCommands.runForOwner(owner, currentProjectOwner, async () => {
+    if (generationLifecycle.isRunning(command.nodeId) || activeMusicSubmissions.has(command.submissionId)) throw new Error('Stop the active Music run before restoring saved audio.')
+    const { identity, controller } = generationLifecycle.begin(command.nodeId)
+    activeMusicSubmissions.add(command.submissionId)
+    try { return await generationContext.run(identity, async () => {
+      const check = () => { controller.signal.throwIfAborted(); assertGenerationCommit(); if (currentProjectOwner() !== owner) throw new Error('The original Music project changed during local recovery.') }
+      check(); const record = await musicSubmissionStore().get(scope, command.submissionId); check()
+      if (record.state !== 'complete' || !record.retainedOutputPath || record.saveState === 'not-indexed') throw new Error('This Music submission has no indexed audio to restore locally. Review its original provider history.')
+      const assets = await readStrictJsonOr<ImportedAsset[]>(assetsIndexPath(), [], 'The original Music asset registry'); check()
+      const asset = assets.find(asset => resolve(asset.path) === resolve(record.retainedOutputPath!) && asset.metadata?.submissionId === record.submissionId && asset.metadata?.providerProfileId === record.profileId && asset.metadata?.audioOperation === 'music' && !asset.trashedAt)
+      const encoded = asset?.metadata?.encoded
+      if (asset?.metadata?.modelId !== `elevenlabs/${record.modelId}` || createHash('sha256').update(JSON.stringify({ modelId: record.modelId, outputFormat: asset.metadata.requestedOutputFormat, body: asset.metadata.requestSnapshot })).digest('hex') !== record.fingerprint) throw new Error('The original Music request receipt changed. Preserve it for review.')
+      if (!asset || !encoded || !/^[a-f0-9]{64}$/.test(encoded.sha256) || !Number.isSafeInteger(encoded.byteLength) || encoded.byteLength <= 0 || encoded.byteLength > 100 * 1024 * 1024) throw new Error('The original Music audio receipt changed. Its submission remains blocked for review.')
+      const path = await assertManagedMediaPath(asset.path); check()
+      if (resolve(path) !== resolve(record.retainedOutputPath)) throw new Error('The retained Music path changed.')
+      const file = await open(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+      try { const before = await file.stat(); if (!before.isFile() || before.size !== encoded.byteLength) throw new Error('The saved Music output changed.'); const bytes = await file.readFile(); const after = await file.stat(); if (before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || createHash('sha256').update(bytes).digest('hex') !== encoded.sha256) throw new Error('The saved Music bytes changed. Preserve the submission for review.') } finally { await file.close() }
+      check()
+      await historyJsonMutations.run(historyPath(), async () => {
+        check(); const entries = await readStrictJsonOr<HistoryEntry[]>(historyPath(), [], 'The Music generation history'); check()
+        if (!Array.isArray(entries)) throw new Error('The Music generation history changed. Preserve its existing contents.')
+        if (entries.some(entry => entry.outputPath === path && entry.nodeId === scope.nodeId && entry.status === 'complete')) return
+        const entry: HistoryEntry = { id: randomUUID(), nodeId: scope.nodeId, nodeTitle: 'Music', modelId: asset.metadata!.modelId || `elevenlabs/${record.modelId}`, status: 'complete', createdAt: new Date().toISOString(), outputPath: path, outputUrl: localAssetUrl(path) }
+        await atomicJson(historyPath(), [entry, ...entries].slice(0,200)); check()
+      })
+      check(); await restoreCurrentMusicOutput(record, asset, path); check()
+      return musicSubmissionView(await musicSubmissionStore().saved(scope, record.submissionId, path))
+    }) } finally { generationLifecycle.complete(command.nodeId, controller); activeMusicSubmissions.delete(command.submissionId) }
+  })
 }
 
 async function uploadLocalAsset(path: string, client: FalClient): Promise<string> {
@@ -2160,12 +2428,14 @@ async function runLinkedVideoDraftCompletion(request: GenerationRequest, signal?
   return result
 }
 
-async function runGeneration(request: GenerationRequest, signal?: AbortSignal): Promise<GenerationResult> {
+async function runGeneration(request: GenerationRequest, signal?: AbortSignal, musicReservation?: MusicSubmissionRecord): Promise<GenerationResult> {
   if (request.falDraftRecovery) return runRecoveredFalDraft(request, signal)
   if (request.draftCompletion) return runLinkedVideoDraftCompletion(request, signal)
   assertGenerationRequirements(request)
   assertVideoProviderPromptPreflight(request)
   if (!currentProject) throw new Error('Choose or open a project folder first.')
+  if (request.kind === 'music-generator' && request.musicVersion === 1) return runCurrentMusic(request, signal, musicReservation)
+  if (request.musicRequest !== undefined) throw new Error('Music authoring cannot run through another provider route.')
   if (request.higgsfieldNative) return runNativeHiggsfieldGeneration(request, signal)
   if (request.falNative) return runNativeFalGeneration(request, signal)
   if (request.kind === 'voiceover' && request.voiceEngine === 'fish-audio') return runFishAudio(request, signal)
@@ -2457,7 +2727,7 @@ async function runGeneration(request: GenerationRequest, signal?: AbortSignal): 
       if (!prompt) throw new Error('Describe the sound effect before generating audio.')
       input = {
         text: prompt,
-        duration_seconds: Math.min(Math.max(request.duration || 5, 0.5), 22),
+        duration_seconds: validateSoundEffectDuration(request.duration, 'fal'),
         prompt_influence: Math.min(Math.max(request.promptInfluence ?? 0.3, 0), 1),
         loop: Boolean(request.loop),
         output_format: request.audioOutputFormat || 'mp3_44100_128',
@@ -2758,29 +3028,21 @@ function registerIpc(): void {
   })
   ipcMain.handle('projects:rename-document', async (_event, rawRootPath: unknown, rawName: unknown): Promise<ProjectWorkspace> => {
     return projectCommands.run(async () => {
-      if (typeof rawRootPath !== 'string' || typeof rawName !== 'string') throw new Error('Invalid project document rename.')
+      if (typeof rawRootPath !== 'string' || typeof rawName !== 'string') throw new Error('Invalid project rename.')
       const rootPath = resolve(rawRootPath)
+      if (isDocumentsPath(rootPath)) throw new Error('Projects inside Documents are not supported.')
       const recent = await readStrictJsonOr<StoredProjectWorkspace[]>(recentProjectsPath(), [], 'The recent projects index')
-      const item = recent.find((project) => resolve(project.rootPath) === rootPath)
+      const item = recent.find(project => resolve(project.rootPath) === rootPath)
       if (!item) throw new Error('This project is no longer in Prism’s project library.')
+      const manifest = await readStrictJson<ProjectWorkspace>(projectManifestPath(rootPath), 'The project manifest')
+      if (manifest.id !== item.id || manifest.schemaVersion !== 1) throw new Error('The project identity changed before rename.')
       const currentPath = item.documentPath || defaultProjectDocumentPath(rootPath)
-      if (extname(currentPath).toLocaleLowerCase('en-US') !== '.prismflow') throw new Error('Only a .prismflow project document can be renamed here.')
-      const name = safeFolderName(normalizeLogicalAssetName(rawName.replace(/\.prismflow$/i, '')), 'Untitled Project')
-      const nextPath = join(dirname(currentPath), `${name}.prismflow`)
-      return projectJsonMutations.run(resolve(currentPath), async () => {
-        if (resolve(nextPath) !== resolve(currentPath)) {
-          if (await pathExists(nextPath)) throw new Error(`A project document named “${name}.prismflow” already exists.`)
-          await rename(currentPath, nextPath)
-        }
-        const updatedRecent = recent.map((project) => resolve(project.rootPath) === rootPath ? { ...project, documentPath: nextPath } : project)
-        await atomicJson(recentProjectsPath(), updatedRecent)
-        if (currentProject && resolve(currentProject.rootPath) === rootPath) {
-          currentProjectDocumentPath = nextPath
-          activateProviderRequestProject()
-          await atomicJson(workspacePointerPath(), { ...currentProject, documentPath: nextPath })
-        }
-        return { ...item, documentPath: nextPath }
-      })
+      if (extname(currentPath).toLowerCase() !== '.prismflow') throw new Error('Choose a Prism project document.')
+      const name = projectContainerName(rawName.replace(/\.prismflow$/i, '')).replace(/ \(Prism\)$/, '')
+      const wasCurrent = currentProject?.id === item.id
+      const updated = await ensureProjectContainer(rootPath, manifest, currentPath, name)
+      if (wasCurrent) return scaffoldProject(updated.rootPath, updated, updated.documentPath)
+      return updated
     })
   })
   ipcMain.handle('projects:forget', async (_event, rawRootPath: unknown): Promise<void> => {
@@ -2805,9 +3067,13 @@ function registerIpc(): void {
     })
     if (result.canceled || !result.filePaths[0]) return null
     return projectCommands.run(async () => {
-      const root = resolve(result.filePaths[0])
-      if (isDocumentsPath(root)) throw new Error('Choose a working folder outside Documents.')
-      const project = await scaffoldProject(root)
+      const chosenFolder = resolve(result.filePaths[0])
+      if (isDocumentsPath(chosenFolder)) throw new Error('Choose a working folder outside Documents.')
+      const name = safeFolderName(basename(chosenFolder), 'Untitled Project')
+      const root = join(chosenFolder, projectContainerName(name))
+      try { await mkdir(root) } catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('A project container with that name already exists. Open it or choose another folder.'); throw error }
+      const now = new Date().toISOString()
+      const project = await scaffoldProject(root, { schemaVersion: 1, id: randomUUID(), name, rootPath: root, chosenFolder, projectFolderVersion: 1, createdAt: now, updatedAt: now })
       await writeProjectDocument()
       return project
     })
@@ -2820,8 +3086,9 @@ function registerIpc(): void {
     })
     if (result.canceled || !result.filePaths[0]) return null
     return projectCommands.run(async () => {
-      const root = resolve(result.filePaths[0])
-      if (isDocumentsPath(root)) throw new Error('Choose a project folder outside Documents.')
+      const selectedRoot = resolve(result.filePaths[0])
+      if (isDocumentsPath(selectedRoot)) throw new Error('Choose a project folder outside Documents.')
+      const root = await resolveProjectContainerSelection(selectedRoot)
       await projectProfileRecovery.recover(dataRoot())
       const portableDocument = await findProjectDocument(root)
       if (portableDocument) return openProjectDocument(portableDocument)
@@ -2873,7 +3140,7 @@ function registerIpc(): void {
   ipcMain.handle('workflows:save', (_event, document: WorkflowDocument, owner: WorkflowSaveOwner) => saveOwnedWorkflow(document, owner, {
     currentOwner: () => currentProject && currentProjectDocumentPath ? { projectId: currentProject.id, rootPath: currentProject.rootPath, documentPath: currentProjectDocumentPath } : null,
     runForOwner: (key, action) => projectCommands.runForOwner(key, currentProjectOwner, action),
-    saveCanonical: saved => atomicJson(workflowPath(), saved),
+    saveCanonical: async saved => { await atomicJson(workflowPath(), saved); voiceChangeWorkflow = structuredClone(saved) },
     savePortable: writeProjectDocument,
   }))
 
@@ -3639,11 +3906,18 @@ function registerIpc(): void {
     assertGenerationRequirements(request)
     assertVideoProviderPromptPreflight(request)
     higgsfieldJobActions.assertIdle(higgsfieldJobScope(request.nodeId))
-    const { identity, controller } = generationLifecycle.begin(request.nodeId)
+    const musicReservation = request.kind === 'music-generator' && request.musicVersion === 1 ? await reserveCurrentMusic(request) : undefined
+    let generation: ReturnType<GenerationLifecycle['begin']>
+    try { generation = generationLifecycle.begin(request.nodeId) }
+    catch (error) {
+      if (musicReservation) { activeMusicSubmissions.delete(musicReservation.submissionId); await musicSubmissionStore().rejected(musicReservation, musicReservation.submissionId) }
+      throw error
+    }
+    const { identity, controller } = generation
     const startedAt = Date.now()
     try {
       return await generationContext.run(identity, async () => {
-        const result = await withProviderRequest(generationServiceProvider(request), () => runGeneration(request, controller.signal), false)
+        const result = await withProviderRequest(generationServiceProvider(request), () => runGeneration(request, controller.signal, musicReservation), false)
         generationLifecycle.assertActive(identity)
         const entries = await readJson<HistoryEntry[]>(historyPath(), [])
         const match = entries.findIndex((entry) => entry.outputPath === result.outputPath)
@@ -3662,12 +3936,32 @@ function registerIpc(): void {
         return result
       })
     }
-    finally { generationLifecycle.complete(request.nodeId, controller) }
+    catch (error) {
+      if (musicReservation) {
+        const record = await musicSubmissionStore().get(musicReservation, musicReservation.submissionId)
+        if (record.state === 'saved') {
+          await musicSubmissionStore().completed(musicReservation, musicReservation.submissionId, { requestId: record.requestId, saveState: 'indexed-history-saved', retainedOutputPath: record.retainedOutputPath })
+          throw new Error((error instanceof Error ? error.message : 'Music result delivery failed.') + ' The saved Music output requires local recovery in Music Settings before another Run.')
+        }
+      }
+      throw error
+    }
+    finally {
+      generationLifecycle.complete(request.nodeId, controller)
+      if (musicReservation) {
+        activeMusicSubmissions.delete(musicReservation.submissionId)
+        const record = await musicSubmissionStore().get(musicReservation, musicReservation.submissionId)
+        if (record.state === 'reserved') await musicSubmissionStore().rejected(musicReservation, musicReservation.submissionId)
+      }
+    }
   })
   ipcMain.handle('generation:cancel', (_event, nodeId: unknown) => {
     if (typeof nodeId !== 'string') return false
     return generationLifecycle.cancel(nodeId)
   })
+  ipcMain.handle('music-submissions:list', () => listCurrentMusicSubmissions())
+  ipcMain.handle('music-submissions:review', (_event, command: unknown) => reviewCurrentMusicSubmission(command))
+  ipcMain.handle('music-submissions:recover', (_event, command: unknown) => recoverCurrentMusicSubmission(command))
   ipcMain.handle('generation:estimate', (_event, request: GenerationRequest) => estimateGenerationCost(request))
 }
 

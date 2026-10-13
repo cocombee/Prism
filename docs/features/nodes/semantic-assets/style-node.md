@@ -26,3 +26,7 @@
 - Selecting Create Style clears any built-in selection before exposing reference and custom prompt fields.
 - Style chooser cards show thumbnails and names in one stable full-width horizontal rail. Wheel, trackpad, and pointer grab-drag scroll it without bleeding outside the node; never add Previous/Next buttons or hover/focus padding that shrinks or shifts the rail.
 - A Storyboard requires a Style input; create and connect the same reusable Style node automatically. Change `Style Required` to `Connected` once valid.
+
+## Approved Paper Sculpture addition — 13 October 2026
+
+Append handcrafted-paper-sculpture without changing the seven existing presets. Generic layered matte cardstock aesthetic; human faces blank except a small movable paper mouth; no eyes, nose or eye-like shading. Approved original thumbnail retained. Explicit center-top focal position applies to compact and expanded previews; styles have no automatic face detector. Tested crops retain both heads at 375/315/250px.

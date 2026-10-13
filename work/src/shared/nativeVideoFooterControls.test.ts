@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { compileFalSchemaContract } from './falSchemaBinding'
-import { projectFalNativeVideoFooterControls, projectNativeVideoFooterFields, nativeVideoSoundChoice } from './nativeVideoFooterControls'
+import { compileFalSchemaContract, validateFalSchema, type FalSchemaContract, type FalSchemaNode } from './falSchemaBinding'
+import { projectFalNativeVideoFooterControls, projectNativeVideoFooterFields, projectHiggsfieldNativeVideoFooterControls, nativeVideoSoundChoice } from './nativeVideoFooterControls'
 import { describeFalRuntimeInputs } from './falRuntimeInputs'
 import { editNativeInputValue } from './nativeInputValue'
 
@@ -214,4 +214,69 @@ describe('explicit aspect ratio choices', () => {
     const [ratio]=projectNativeVideoFooterFields(fields,{values:{aspect_ratio:'auto'}},{},true)
     expect(ratio.options).toContainEqual(expect.objectContaining({value:'auto',kind:'value'}))
   })
+})
+
+
+describe('verified continuous native seconds choices', () => {
+  const secondsContract = (schema: FalSchemaNode, key = 'clip_length', description = 'Duration of the generated video in seconds.'): FalSchemaContract => ({
+    endpointId: 'fixture/continuous/text-to-video', category: 'text-to-video', schemaPath: '/fixture',
+    input: { type: 'object', properties: { [key]: { ...schema, description } } }, output: { type: 'object' },
+  })
+  const values = (control: ReturnType<typeof projectFalNativeVideoFooterControls>[number]) => control.options.filter(option => option.kind === 'value').map(option => option.value)
+  it('samples only verified seconds while keeping exact accepted authored/default fractions', () => {
+    const c = secondsContract({ type: 'number', minimum: 1, maximum: 12, default: 3.25 })
+    const state = { values: { clip_length: 3.125, seed: 0 }, drafts: { clip_length: ' 3.125 ' } }
+    const before = JSON.stringify([c, state]); const [control] = projectFalNativeVideoFooterControls(c, state)
+    expect(control).toMatchObject({ key: 'duration', fieldKey: 'clip_length', control: 'choice', value: 3.125, draft: ' 3.125 ', defaultValue: 3.25, selectedToken: 'value:3.125' })
+    expect(values(control)).toEqual([1, 1.5, 2, 2.5, 3, 3.125, 3.25, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12])
+    expect(control.options.find(option => option.value === 3.125)).toMatchObject({ kind: 'value', label: '3.1s' }); expect(control.options.find(option => option.value === 3.125)?.disabled).not.toBe(true)
+    expect(JSON.stringify([c, state])).toBe(before)
+  })
+  it('filters inclusive/exclusive allOf constraints without rounding authored seconds', () => {
+    const c = secondsContract({ type: 'number', allOf: [{ minimum: 2, exclusiveMinimum: true }, { maximum: 4, exclusiveMaximum: true }] })
+    const [control] = projectFalNativeVideoFooterControls(c, { values: { clip_length: 3.125 } })
+    expect(values(control)).toEqual([2.5, 3, 3.125, 3.5]); values(control).forEach(value => validateFalSchema(control.schema, value))
+  })
+  it('retains absent/default/null/draft states and disabled invalid values', () => {
+    const c = secondsContract({ anyOf: [{ type: 'number', minimum: 1, maximum: 12 }, { type: 'null' }], default: 3.25 })
+    const absent = { values: {}, drafts: { clip_length: 'invalid draft' } }; const before = JSON.stringify(absent)
+    expect(projectFalNativeVideoFooterControls(c, absent)[0]).toMatchObject({ hasValue: false, hasDraft: true, defaultValue: 3.25, selectedToken: '@default' })
+    expect(projectFalNativeVideoFooterControls(c, { values: { clip_length: null } })[0]).toMatchObject({ value: null, selectedToken: 'value:null' })
+    expect(projectFalNativeVideoFooterControls(c, { values: { clip_length: 13 } })[0].options.at(-1)).toMatchObject({ kind: 'unavailable', value: 13, disabled: true })
+    expect(JSON.stringify(absent)).toBe(before)
+  })
+  it('keeps enums, integers and declared multipleOf exact', () => {
+    for (const [schema, expected] of [[{ type: 'integer', minimum: 1, maximum: 4 }, [1, 2, 3, 4]], [{ type: 'number', minimum: 1, maximum: 2, multipleOf: 0.25 }, [1, 1.25, 1.5, 1.75, 2]], [{ type: 'number', enum: [4, 8, 12] }, [4, 8, 12]]] as Array<[FalSchemaNode, number[]]>) {
+      expect(values(projectFalNativeVideoFooterControls(secondsContract(schema), { values: {} })[0]).filter(value => value !== null)).toEqual(expected)
+    }
+  })
+  it('requires explicit verified seconds and leaves frame/unknown-unit numeric ranges unsupported', () => {
+    const unknown = secondsContract({ type: 'number', minimum: 1, maximum: 12 }, 'duration', 'Provider-owned opaque quantity.')
+    expect(projectFalNativeVideoFooterControls(unknown, { values: { duration: 3.125 } })).toEqual([])
+    const fields = describeFalRuntimeInputs(secondsContract({ type: 'number', minimum: 1, maximum: 12 }, 'duration')).fields
+    expect(projectNativeVideoFooterFields(fields, { values: { duration: 3.125 } })).toEqual([])
+    expect(projectNativeVideoFooterFields(fields, { values: { duration: 3.125 } }, {}, true)).toEqual([])
+    const frames = secondsContract({ type: 'number', minimum: 1, maximum: 12 }, 'duration', 'Frame duration in milliseconds.')
+    expect(projectFalNativeVideoFooterControls(frames, { values: { duration: 3.125 } })).toEqual([])
+  })
+  it('caps before allocation and preserves the existing unbounded input route', () => {
+    expect(projectFalNativeVideoFooterControls(secondsContract({ type: 'number', minimum: 1, maximum: 1e12 }), { values: {} })).toEqual([])
+    const [unbounded] = projectFalNativeVideoFooterControls(secondsContract({ type: 'number', minimum: 1 }), { values: { clip_length: 3.125 } })
+    expect(unbounded).toMatchObject({ control: 'number', value: 3.125, selectedToken: 'value:3.125' })
+    expect(values(projectFalNativeVideoFooterControls(secondsContract({ type: 'number', minimum: 1, maximum: 600 }), { values: { clip_length: 3.125 } })[0])).toHaveLength(1200)
+  })
+})
+
+it('samples only the explicitly verified Higgsfield PixVerse text endpoint and keeps exact authored fractions', () => {
+  const fields = describeFalRuntimeInputs({endpointId:'fixture',schemaPath:'/fixture',category:'text-to-video',input:{type:'object',properties:{duration:{type:'number',minimum:1,maximum:15,default:5}}},output:{type:'object'}} as FalSchemaContract).fields
+  const state = deepFreeze({values:{duration:3.125}})
+  const control = projectHiggsfieldNativeVideoFooterControls('pixverse/v6/text-to-video', fields, state)[0]
+  expect(control.control).toBe('choice')
+  expect(control.options.filter(option=>option.kind==='value').map(option=>option.value)).toEqual([1,1.5,2,2.5,3,3.125,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,14,14.5,15])
+  expect(control.options.find(option=>option.value===3.125)).toMatchObject({label:'3.1s'})
+  expect(projectHiggsfieldNativeVideoFooterControls('pixverse/v6/image-to-video', fields, state)).toEqual([])
+  expect(projectHiggsfieldNativeVideoFooterControls('unverified/text-to-video', fields, state)).toEqual([])
+  const sourceFields = [...fields, { ...fields[0], key:'source_video', control:'media' as const, media:{type:'video' as const,role:'source-video' as const,multiple:false,provenance:'verified-adapter' as const} }]
+  expect(projectHiggsfieldNativeVideoFooterControls('pixverse/v6/text-to-video', sourceFields, state)).toEqual([])
+  expect(state).toEqual({values:{duration:3.125}})
 })

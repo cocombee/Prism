@@ -6,7 +6,8 @@ import * as React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { FluidControlGroup, type FluidGroupControl } from './FluidControlGroup'
 import { knownOutputFrameRate, motionCadenceOptions, normalizedMotionCadence, resolveVideoModel } from '../../shared/videoModels'
-import { allocateMixedControlRows, validateControlLayout, type MixedControlInput } from '../../shared/controlGroupLayout'
+import { type MixedControlInput } from '../../shared/controlGroupLayout'
+import { allocateFooterControlRows, validateFooterControlLayout, type FooterControlLayoutOptions } from '../../shared/footerControlLayout'
 
 const source = ts.createSourceFile('NodeCardNext.tsx', readFileSync(new URL('./NodeCardNext.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 let expression: ts.ObjectLiteralExpression | undefined
@@ -31,21 +32,23 @@ function render(control: FluidGroupControl) {
 
 describe('production Motion FPS availability through shared control allocator', () => {
   it('fits the restored operational controls inside a 250px node using the actual footer allocation', () => {
-    let allocation: ts.Expression | undefined
+    let options: FooterControlLayoutOptions<string> | undefined
     const visitAllocation = (node: ts.Node): void => {
-      if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(source) === 'FluidControlGroup' && node.attributes.properties.some(p => ts.isJsxAttribute(p) && p.name.getText(source) === 'ariaLabel' && p.initializer?.getText(source) === '"Video Footer Controls"')) {
-        const attribute = node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === 'allocation') as ts.JsxAttribute
-        if (attribute.initializer && ts.isJsxExpression(attribute.initializer)) allocation = attribute.initializer.expression
+      if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(source) === 'GeneratorFooterControlGroup' && node.attributes.properties.some(p => ts.isJsxAttribute(p) && p.name.getText(source) === 'ariaLabel' && p.initializer?.getText(source) === '"Video Footer Controls"')) {
+        const readRole = (name: string): string | undefined => {
+          const attribute = node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === name) as ts.JsxAttribute | undefined
+          return attribute?.initializer && ts.isStringLiteral(attribute.initializer) ? attribute.initializer.text : undefined
+        }
+        options = { modelId: readRole('modelId'), settingsId: readRole('settingsId'), runId: readRole('runId') }
       }
       ts.forEachChild(node, visitAllocation)
     }
     visitAllocation(source)
-    if (!allocation) throw new Error('Actual Video Footer allocation missing')
-    const options = new Function(`return ${allocation.getText(source)}`)()
-    // Native failure's measured border-box minima; 250px node has 232px footer.
+    if (!options) throw new Error('Actual Video Footer policy owner missing')
+    // A 250px node leaves224px after its2px shell and12px outer insets.
     const controls: MixedControlInput[] = [['model', 80], ['motion', 66], ['ratio', 56], ['duration', 54], ['quantity', 66], ['resolution', 53], ['settings', 28], ['run', 28]].map(([id, width]) => ({ id: String(id), kind: ['settings', 'run'].includes(String(id)) ? 'fixed-action' : id === 'quantity' ? 'bounded-elastic' : 'selector', intrinsicWidth: Number(width), minimumWidth: Number(width), maximumExtraWidth: id === 'quantity' ? 24 : undefined }))
-    const rows = allocateMixedControlRows(controls, 232, 6, options)
-    expect(validateControlLayout('Actual Video Footer', controls, rows, 232)).toEqual({ valid: true, reasons: [] })
+    const rows = allocateFooterControlRows(controls, 224, 7, options)
+    expect(validateFooterControlLayout('Actual Video Footer', controls, rows, 224, options)).toEqual({ valid: true, reasons: [] })
     expect(rows.length).toBeGreaterThanOrEqual(2); expect(rows.length).toBeLessThanOrEqual(3)
     expect(rows[0].controls[0].id).toBe('model'); expect(rows.at(-1)?.controls.slice(-2).map(c => c.id)).toEqual(['settings', 'run'])
   })

@@ -11,7 +11,7 @@ const QUICK_CONNECT_TARGET_KINDS: NodeKind[] = [
   'character', 'wardrobe', 'element', 'location', 'storyboard', 'router',
 ]
 
-type TargetConnectionData = Pick<StudioNodeData, 'kind' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId' | 'falNative' | 'higgsfieldNative'>
+type TargetConnectionData = Pick<StudioNodeData, 'kind' | 'voiceEngine' | 'elevenSpeechMode' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId' | 'falNative' | 'higgsfieldNative'>
 
 export function outputSignalFor(data: SourceConnectionData, sourceHandleId?: string | null): ConnectionSignal {
   if (sourceHandleId?.includes('storyboard')) return 'storyboard'
@@ -160,7 +160,7 @@ export function connectionCompatibilityError(
   if (['storyboard', 'storyboard-asset'].includes(source.kind) && handle !== 'storyboard-in') return 'A Storyboard retains panel timing, camera guidance, and model targeting, so it can connect only to its dedicated Storyboard input.'
   if (source.kind === 'list' && sourceSignal === 'mixed' && target.kind === 'gallery') return 'A mixed List may include text or storyboard data. Connect a homogeneous Image, Video, or Audio List to Gallery instead.'
   if (target.kind === 'gallery' && handle === 'media-in' && !['image', 'video', 'audio'].includes(sourceSignal)) return 'Gallery is a media-only terminal. Connect a materialized Image, Video, or Audio output.'
-  if (['voiceover', 'sound-effects', 'music-generator'].includes(target.kind) && !native) return `${target.kind === 'voiceover' ? 'Voiceover' : target.kind === 'sound-effects' ? 'Sound Effects' : 'Music Generator'} is self-contained and does not expose an upstream input. Enter its prompt inside the node.`
+  if (['voiceover', 'sound-effects', 'music-generator'].includes(target.kind) && !native && !(target.kind === 'voiceover' && target.voiceEngine === 'elevenlabs-direct' && target.elevenSpeechMode === 'voice-change' && handle === 'audio-in')) return `${target.kind === 'voiceover' ? 'Voiceover' : target.kind === 'sound-effects' ? 'Sound Effects' : 'Music Generator'} is self-contained and does not expose an upstream input. Enter its prompt inside the node.`
   if (target.kind === 'character' && !['style-in', 'wardrobe-in', 'element-in'].includes(handle)) return 'Character accepts optional Style, Wardrobe, and Prop inputs. Create its prompt, Face, and remaining views inside the Character node.'
   if (target.kind === 'style-reference') return 'Style is an output-only visual-language asset. Build its prompt and add its optional reference inside the Style node.'
   if (target.kind === 'location' && !['style-in', 'character-in', 'element-in'].includes(handle)) return 'Location accepts optional Style, Character, and Prop inputs. Create its prompt, references, and generation inside the Location node.'

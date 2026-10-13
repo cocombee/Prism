@@ -1,5 +1,6 @@
 import { verifiedNativeVideoFrameRate } from './videoCadenceSelection'
-import { MOTION_CADENCES } from './videoModels'
+import { MOTION_CADENCES, formatDurationSeconds } from './videoModels'
+import { normalizedStoryboardDurationOptions } from './storyboardDurationBudget'
 import { describeFalRuntimeInputs, type FalRuntimeField } from './falRuntimeInputs'
 import { validateFalSchema, type FalJson, type FalSchemaContract, type FalSchemaNode } from './falSchemaBinding'
 import type { FalNativeNodeState } from './falNodeBinding'
@@ -67,7 +68,7 @@ function uniqueDefault(schema: FalSchemaNode): { hasDefault: boolean; value?: Fa
     : { hasDefault: false }
 }
 
-type NumericChoices = { status: 'ready'; values: number[] } | { status: 'unbounded' | 'unsupported' | 'too-many' }
+type NumericChoices = { status: 'ready'; values: number[]; sampledSeconds?: true } | { status: 'unbounded' | 'unsupported' | 'too-many' }
 
 function schemaLayers(schema: FalSchemaNode): FalSchemaNode[] {
   // A nullable scalar has one concrete branch. Read its bounds without
@@ -78,7 +79,12 @@ function schemaLayers(schema: FalSchemaNode): FalSchemaNode[] {
   return [schema, ...(nullableBranch ? schemaLayers(nullableBranch) : []), ...(schema.allOf || []).flatMap(schemaLayers)]
 }
 
-function numericChoices(schema: FalSchemaNode): NumericChoices {
+function hasDiscreteNumericRule(schema: FalSchemaNode, depth = 0): boolean {
+  if (depth > 32 || schema.enum || own(schema, 'const') || schema.multipleOf !== undefined) return true
+  return [...(schema.allOf || []), ...(schema.anyOf || []), ...(schema.oneOf || [])].some(child => hasDiscreteNumericRule(child, depth + 1))
+}
+
+function numericChoices(schema: FalSchemaNode, verifiedSeconds = false, exactValues: Array<FalJson | undefined> = []): NumericChoices {
   const layers = schemaLayers(schema)
   const types = new Set(layers.map(layer => layer.type).filter((type): type is 'integer' | 'number' => type === 'integer' || type === 'number'))
   if (types.size !== 1) return { status: 'unsupported' }
@@ -99,6 +105,19 @@ function numericChoices(schema: FalSchemaNode): NumericChoices {
 
   const increments = [...new Set(layers.map(layer => layer.multipleOf).filter((value): value is number => value !== undefined))]
   if (increments.length > 1) return { status: 'unsupported' }
+  if (verifiedSeconds && type === 'number' && !increments.length && !hasDiscreteNumericRule(schema)) {
+    if (!Number.isFinite(lowerValue) || !Number.isFinite(upperValue) || upperValue < lowerValue) return { status: 'unsupported' }
+    // Bound allocation before invoking the shared sampler. Provider validation,
+    // rather than UI rounding, owns every proposed and authored value.
+    const sampleCount = Math.max(0, Math.floor((upperValue - 1) / 0.5 + 1e-9) + 1)
+    if (sampleCount > 1199) return { status: 'too-many' }
+    const accepted = (value: number) => { try { validateFalSchema(schema, value, 'footer value'); return true } catch { return false } }
+    const values = normalizedStoryboardDurationOptions([upperValue]).filter(accepted)
+    for (const value of exactValues) if (typeof value === 'number' && Number.isFinite(value) && accepted(value) && !values.includes(value)) values.push(value)
+    if (!values.length) return { status: 'unsupported' }
+    if (values.length > 1200) return { status: 'too-many' }
+    return { status: 'ready', values: values.sort((left, right) => left - right), sampledSeconds: true }
+  }
   const step = increments[0] ?? (type === 'integer' ? 1 : undefined)
   if (!step || !Number.isFinite(step) || step <= 0) return { status: 'unsupported' }
   const near = (a: number, b: number) => Math.abs(a - b) <= Number.EPSILON * Math.max(Math.abs(a), Math.abs(b), 1) * 8
@@ -158,13 +177,15 @@ function optionsFor(
   value: FalJson | undefined,
   numericValues: number[] | undefined,
   sourceOwnedAspectRatio: boolean,
+  sampledSeconds = false,
 ): { options: FalNativeVideoFooterOption[]; selectedToken: string } {
   const options: FalNativeVideoFooterOption[] = []
+  const display = (value: FalJson) => sampledSeconds && key === 'duration' && typeof value === 'number' && Number.isFinite(value) ? formatDurationSeconds(value) : displayValue(key, value)
   const explicitRatioOnly = key === 'aspect_ratio' && !sourceOwnedAspectRatio && field.choices?.some(value => typeof value === 'string' && /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(value))
   if (!field.required && !explicitRatioOnly) {
     options.push({
       token: '@default', kind: 'default',
-      label: hasDefault && defaultValue !== undefined ? `Default (${displayValue(key, defaultValue)})` : 'Default',
+      label: hasDefault && defaultValue !== undefined ? `Default (${display(defaultValue)})` : 'Default',
     })
   }
   const values = field.control === 'choice' ? field.choices || []
@@ -177,7 +198,7 @@ function optionsFor(
     if (explicitRatioOnly && (optionValue === null || typeof optionValue === 'string' && optionValue.toLowerCase() === 'auto')) continue
     const label = control === 'boolean' && key === 'generate_audio'
       ? (optionValue ? 'On' : 'Off')
-      : displayValue(key, optionValue)
+      : display(optionValue)
     options.push({ token: tokenForValue(optionValue), kind: 'value', value: optionValue, label })
   }
 
@@ -188,7 +209,7 @@ function optionsFor(
   if (matching) return { options, selectedToken: matching.token }
 
   const token = `unavailable:${JSON.stringify(selected)}`
-  options.push({ token, kind: 'unavailable', value: selected, label: `Unavailable (${displayValue(key, selected)})`, disabled: true })
+  options.push({ token, kind: 'unavailable', value: selected, label: `Unavailable (${display(selected)})`, disabled: true })
   return { options, selectedToken: token }
 }
 
@@ -204,7 +225,24 @@ export function projectFalNativeVideoFooterControls(
   if (!contract || !state || !state.values || typeof state.values !== 'object') return []
   const runtime=describeFalRuntimeInputs(contract)
   const bindings=runtime.timing?.kind==='seconds' ? {duration:runtime.timing.field} : {}
-  return projectNativeVideoFooterFields(runtime.fields, state, bindings)
+  // Source-video timelines need an explicitly reviewed generated-extension adapter.
+  const verifiedSeconds = runtime.timing?.kind === 'seconds' && !runtime.fields.some(field => field.media?.role === 'source-video')
+  return projectNativeVideoFooterFields(runtime.fields, state, bindings, undefined, verifiedSeconds)
+}
+
+/** Endpoint-owned seconds declaration verified against its public API/playground.
+ * https://open.higgsfield.ai/models/pixverse/v6/text-to-video/api-reference
+ * https://open.higgsfield.ai/models/pixverse/v6/text-to-video/playground
+ * Other endpoints retain the generic projector's conservative unit policy.
+ */
+export function projectHiggsfieldNativeVideoFooterControls(
+  endpointId: string,
+  runtimeFields: readonly FalRuntimeField[],
+  state: FalNativeVideoFooterState,
+): FalNativeVideoFooterControl[] {
+  const verifiedSeconds = endpointId === 'pixverse/v6/text-to-video'
+    && !runtimeFields.some(field => field.media?.role === 'source-video')
+  return projectNativeVideoFooterFields(runtimeFields, state, {}, undefined, verifiedSeconds)
 }
 
 /** Shared projection for schema-owned native routes from any provider. */
@@ -213,6 +251,7 @@ export function projectNativeVideoFooterFields(
   state: FalNativeVideoFooterState | Pick<FalNativeNodeState, 'values' | 'drafts'>,
   bindings: Partial<Record<FalNativeVideoFooterField,string>> = {},
   sourceOwnedAspectRatio = runtimeFields.some(field => field.media?.role === 'source-video'),
+  verifiedSecondsDuration = false,
 ): FalNativeVideoFooterControl[] {
   if (!state || !state.values || typeof state.values !== 'object') return []
   const fields = new Map(runtimeFields.map(field => [field.key, field]))
@@ -231,17 +270,16 @@ export function projectNativeVideoFooterFields(
       new Set(field.choices.map(value => String(value).toLowerCase())).size === 2 &&
       field.choices.every(value => ['on', 'off'].includes(String(value).toLowerCase())))) continue
 
-    const numericRange = schemaControl === 'number' ? numericChoices(field.schema) : undefined
-    if (numericRange && numericRange.status !== 'ready' && numericRange.status !== 'unbounded') continue
-    const numericValues = numericRange?.status === 'ready' ? numericRange.values : undefined
-    const control: FalNativeVideoFooterControlType = numericValues ? 'choice' : schemaControl
-
     const hasValue = own(state.values, fieldKey)
     const value = hasValue ? state.values[fieldKey] : undefined
     const hasDraft = Boolean(state.drafts && own(state.drafts, fieldKey))
     const draft = hasDraft ? state.drafts?.[fieldKey] : undefined
     const { hasDefault, value: defaultValue } = uniqueDefault(field.schema)
-    const { options, selectedToken } = optionsFor(key, field, control, field.nullable, hasDefault, defaultValue, hasValue, value, numericValues, sourceOwnedAspectRatio)
+    const numericRange = schemaControl === 'number' ? numericChoices(field.schema, key === 'duration' && verifiedSecondsDuration, [value, defaultValue]) : undefined
+    if (numericRange && numericRange.status !== 'ready' && numericRange.status !== 'unbounded') continue
+    const numericValues = numericRange?.status === 'ready' ? numericRange.values : undefined
+    const control: FalNativeVideoFooterControlType = numericValues ? 'choice' : schemaControl
+    const { options, selectedToken } = optionsFor(key, field, control, field.nullable, hasDefault, defaultValue, hasValue, value, numericValues, sourceOwnedAspectRatio, numericRange?.status === 'ready' && numericRange.sampledSeconds === true)
     const label = key === 'aspect_ratio' ? 'Aspect Ratio'
       : key === 'duration' ? 'Duration'
         : key === 'resolution' ? 'Resolution'

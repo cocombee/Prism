@@ -38,7 +38,7 @@ it('bounds real prompt editors by visual lines, preserves field families and sep
       result.footers=[...document.querySelectorAll('[data-footer] .compact-generator-footer')].map(e=>{const s=getComputedStyle(e);return{sides:[s.paddingTop,s.paddingRight,s.paddingBottom,s.paddingLeft],gap:s.gap}});
       const upload=getComputedStyle(document.querySelector('.upload-drop'));result.upload={sides:[upload.borderTopLeftRadius,upload.borderTopRightRadius,upload.borderBottomLeftRadius,upload.borderBottomRightRadius]};
       const node=document.querySelector('[data-id="fixture-prompt"]'),footer=node.querySelector('.prompt-node-footer'),button=footer?.querySelector('[aria-label="Revamp Prompt"]');
-      result.prompt={enhanceSwitch:!!node.querySelector('.prompt-enhance-switch'),footer:!!footer,model:!!footer?.querySelector('[aria-label="Prompt Revamp model"]'),buttons:footer?.querySelectorAll('button').length,round:button?getComputedStyle(button).borderRadius:null};button?.click();result.prompt.calls=window.__calls;return result;
+      result.prompt={sides:footer?(()=>{const s=getComputedStyle(footer);return[s.paddingTop,s.paddingRight,s.paddingBottom,s.paddingLeft]})():null,enhanceSwitch:!!node.querySelector('.prompt-enhance-switch'),footer:!!footer,model:!!footer?.querySelector('[aria-label="Prompt Revamp model"]'),buttons:footer?.querySelectorAll('button').length,round:button?getComputedStyle(button).borderRadius:null};button?.click();result.prompt.calls=window.__calls;return result;
     })()`
     writeFileSync(join(dir,'main.cjs'), `const {app,BrowserWindow}=require('electron');app.setPath('userData',${JSON.stringify(join(dir,'user-data'))});app.whenReady().then(async()=>{const w=new BrowserWindow({show:false,width:1000,height:1600,webPreferences:{contextIsolation:false,sandbox:false}});w.webContents.on('console-message',(_e,_l,message)=>console.log('FIXTURE_CONSOLE:'+message));await w.loadFile(${JSON.stringify(join(dir,'index.html'))});const result=await w.webContents.executeJavaScript(${JSON.stringify(probe)});console.log('PROMPT_INSETS_RESULT:'+JSON.stringify(result));app.quit()}).catch(e=>{console.error(e);app.exit(1)});`)
     expect(spawnSync(process.execPath,['--check',join(dir,'main.cjs')],{encoding:'utf8'}).status).toBe(0)
@@ -57,8 +57,8 @@ it('bounds real prompt editors by visual lines, preserves field families and sep
       for(const p of [r.initial,r.seven,r.overflow,r.shrunk,r.wrapped,r.narrow,r.wide]){expect([p.top,p.bottom,p.left,p.right],name).toEqual([12,12,12,12]);expect(p.shell,name).toBe(p.height+p.shellBorder);expect(p.preWidth,name).toBe(p.textWidth+p.border);expect(p.prePadding,name).toEqual(['12px','12px','12px','12px'])}
     }
     expect(result.descriptionPadding).toEqual(['12px','12px','12px','12px'])
-    for(const f of result.footers)expect(f.sides).toEqual(['8px','8px','8px','8px'])
+    for(const f of result.footers)expect(f.sides).toEqual(['12px','12px','12px','12px'])
     expect(result.upload.sides).toEqual(['13px','13px','13px','13px'])
-    expect(result.prompt).toMatchObject({enhanceSwitch:false,footer:true,model:true,buttons:2,round:'50%',calls:['fixture-prompt']})
+    expect(result.prompt).toMatchObject({sides:['12px','12px','12px','12px'],enhanceSwitch:false,footer:true,model:true,buttons:2,round:'50%',calls:['fixture-prompt']})
   }finally{rmSync(dir,{recursive:true,force:true})}
 },55000)

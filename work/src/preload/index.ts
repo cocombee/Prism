@@ -100,6 +100,11 @@ const api: PrismAPI = {
     cancel: requestId => ipcRenderer.invoke('assistant:cancel', requestId),
     rewrite: (provider, text, instruction, model, options) => ipcRenderer.invoke('assistant:rewrite', provider, text, instruction, model, options),
   },
+  musicSubmissions: {
+    list: () => ipcRenderer.invoke('music-submissions:list'),
+    review: (command) => ipcRenderer.invoke('music-submissions:review', command),
+    recover: (command) => ipcRenderer.invoke('music-submissions:recover', command),
+  },
   generation: {
     higgsfieldJobs: () => ipcRenderer.invoke('generation:higgsfield-jobs'),
     higgsfieldAction: (command) => ipcRenderer.invoke('generation:higgsfield-action', command),

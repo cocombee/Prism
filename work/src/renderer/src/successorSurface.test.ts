@@ -9,7 +9,7 @@ const stylesNext = readFileSync(new URL('./styles-next.css', import.meta.url), '
 
 describe('successor renderer asset and reference surfaces', () => {
   it('shows the selected provider/model identity exactly once outside fluid control groups', () => {
-    expect(nodeCardNext).toContain("const selectedLabel = displayLabel || selected?.label || modelDisplayName(fallbackModelId)")
+    expect(nodeCardNext).toContain("const selectedLabel = displayLabel || selected?.label || (inFooter && !value ? `Select ${title || ariaLabel}` : modelDisplayName(fallbackModelId))")
     expect(nodeCardNext).toContain("const accessibleLabel = requestedAccessibleLabel || selected?.label || selectedLabel")
     expect(stylesNext).toMatch(/\.grouped-menu-select \.selected-label-compact\s*\{\s*display:\s*none;\s*\}/)
     expect(nodeCardNext).toContain('aria-selected={option.value === value}')

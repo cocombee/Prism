@@ -1,3 +1,10 @@
+import { allocateFooterControlRows, validateFooterControlLayout, type FooterControlLayoutOptions, type AllocatedFooterControlRow } from '../../shared/footerControlLayout'
+import { defaultSoundEffectDuration, soundEffectDurationOptions } from '../../shared/soundEffectsDuration'
+import { OriginalAudioInput, type OriginalAudioAvailability } from './OriginalAudioInput'
+import { MusicPlanEditor } from './MusicPlanEditor'
+import { initialMusicPlanDrafts } from '../../shared/musicPlanDrafts'
+import { isDirectMusicNode, musicPromptDurationMs } from '../../shared/musicNodeState'
+import type { MusicModel } from '../../shared/musicRequest'
 import { VoicePicker } from './VoiceBrowser'
 import { AudioPlayer, type AudioPlayerProps } from './AudioPlayer'
 import { MediaReferenceModes } from './MediaReferenceModes'
@@ -79,6 +86,7 @@ import type { AssistantProvider } from '../../shared/assistantModels'
 import { ASSISTANT_PROVIDER_GROUPS, latestAssistantModelGroups, resolveAssistantSelection, type AssistantCatalogs } from '../../shared/assistantProviderSelection'
 import { closedVideoModelLabel, defaultVideoRatio, formatDurationSeconds, knownOutputFrameRate, motionCadenceOptions, normalizedMotionCadence, resolvedVideoRatio, resolveVideoModel, videoModelDurationInventory, VIDEO_MODELS, VIDEO_MODEL_MENU_SECTIONS } from '../../shared/videoModels'
 import { normalizedGeneratorDurationPatch } from '../../shared/storyboardVideoSync'
+import { normalizedStoryboardDurationOptions } from '../../shared/storyboardDurationBudget'
 import { generationServiceProvider } from '../../shared/generationServiceProvider'
 import { SAVE_SUCCESS_TRANSIENT_MS, type FooterSavePhase } from '../../shared/footerSaveLifecycle'
 import { selectorReferenceTrackWidth, activeControlDescriptors, allocateMixedControlRows, controlDescriptorSignature, controlGroupWidthChanged, deterministicSafeControlRows, layoutSignature, rowMembershipKey, validateControlLayout, validatePaintedControlLayout, type AllocatedMixedControlRow, type FluidControlKind, type FluidControlPreferredZone, type MixedControlAllocationOptions, type VideoFooterControlId } from '../../shared/controlGroupLayout'
@@ -91,7 +99,7 @@ import { falNativeFlowForKind } from '../../shared/falNativeExecution'
 import { preserveFalNativeSelection, type FalNativeNodeState } from '../../shared/falNodeBinding'
 import type { FalSchemaContract, FalJson } from '../../shared/falSchemaBinding'
 import { nativeFpsLabel, nativeVideoOutputFrameRate } from '../../shared/videoCadenceSelection'
-import { nativeVideoSoundChoice, nativeVideoMotionCadenceOptions, normalizedNativeVideoMotionCadence, projectFalNativeVideoFooterControls, projectNativeVideoFooterFields, type FalNativeVideoFooterControl } from '../../shared/nativeVideoFooterControls'
+import { nativeVideoSoundChoice, nativeVideoMotionCadenceOptions, normalizedNativeVideoMotionCadence, projectFalNativeVideoFooterControls, projectHiggsfieldNativeVideoFooterControls, type FalNativeVideoFooterControl } from '../../shared/nativeVideoFooterControls'
 import { nativeVideoQuantityAvailable } from '../../shared/generationResultMedia'
 import { NodePort } from './NodePort'
 import { prioritizeConnectedInputRules, workflowTag, type ConnectedInputRule, type InputFidelity } from '../../shared/inputRules'
@@ -252,7 +260,8 @@ function selectorReferenceLabel(label: string, fallback: string): string {
 }
 
 type SelectorMenuPosition = { left: number; bottom?: number; top?: number; maxHeight?: number; width: number; fontSize: number }
-type SelectorSession = { open: boolean; search: string; active: string; expanded: Set<string>; position: SelectorMenuPosition | null; scrollTop: number; beforeSearch: number; focus: 'input' | 'option' | 'button' | null }
+type SelectorSession = { open: boolean; search: string; active: string; expanded: Set<string>; position: SelectorMenuPosition | null; scrollTop: number; beforeSearch: number; focus: 'input' | 'option' | 'button' | null; returnFocusPending: boolean }
+const NodeFooterContext = createContext(false)
 const FluidSelectorSessionContext = createContext<{ groupId: string; controlId: string; sessions: Map<string, SelectorSession> } | null>(null)
 
 /** Event writes precede parent reflow, including selection-triggered child unmounts. */
@@ -294,11 +303,12 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   onChange: (value: string) => void
 }) {
   const availability = useContext(ProviderAvailabilityContext)
+  const inFooter = useContext(NodeFooterContext)
   const flatCatalog = catalog && (promptCatalog || requestedFlatCatalog || /^(?:Video model|.*image model|Image engine|Image editing engine)$/i.test(ariaLabel))
   const groups = catalog || suppliedGroups.some(group => group.service) ? filterProviderModelGroups(suppliedGroups, promptCatalog ? availability.promptConnected : availability.mediaConnected) : suppliedGroups
   const owner = useContext(FluidSelectorSessionContext)
   const sessionKey = `${owner?.controlId || ''}::${ariaLabel}`
-  if (owner && !owner.sessions.has(sessionKey)) owner.sessions.set(sessionKey, {open:false,search:'',active:value,expanded:new Set(),position:null,scrollTop:0,beforeSearch:0,focus:null})
+  if (owner && !owner.sessions.has(sessionKey)) owner.sessions.set(sessionKey, {open:false,search:'',active:value,expanded:new Set(),position:null,scrollTop:0,beforeSearch:0,focus:null,returnFocusPending:false})
   const session = owner?.sessions.get(sessionKey)
   const resumed = useRef(Boolean(session?.open))
   const [open, setOpen] = useRetainedSelectorState(session, 'open', false)
@@ -348,7 +358,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   const filteredOrder = new Map(filteredOptions.map((option, index) => [option.value, index]))
   const visibleGroups = groups.map((group) => ({ ...group, options: group.options.filter((option) => filteredOrder.has(option.value)).sort((a, b) => (filteredOrder.get(a.value) || 0) - (filteredOrder.get(b.value) || 0)) })).filter((group) => group.options.length).sort((a, b) => Math.min(...a.options.map((option) => filteredOrder.get(option.value) || 0)) - Math.min(...b.options.map((option) => filteredOrder.get(option.value) || 0)))
   const fallbackModelId = value.replace(/^[^:]+::/, '')
-  const selectedLabel = displayLabel || selected?.label || modelDisplayName(fallbackModelId)
+  const selectedLabel = displayLabel || selected?.label || (inFooter && !value ? `Select ${title || ariaLabel}` : modelDisplayName(fallbackModelId))
   const accessibleLabel = requestedAccessibleLabel || selected?.label || selectedLabel
   const compactLabel = requestedCompactLabel || selectedLabel
   const defaultLabel = selectorReferenceLabel(ariaLabel, requestedDefaultLabel || groups.flatMap((group) => group.options)[0]?.label || selectedLabel)
@@ -388,8 +398,9 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
     const fontSize = selectorTriggerFontSize(buttonRef.current!)
     const above = Math.max(0, rect.top - 12)
     const below = Math.max(0, window.innerHeight - rect.bottom - 12)
-    const useBelow = catalog && below > above
-    const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), bottom: useBelow ? undefined : window.innerHeight - rect.top + 4, top: useBelow ? rect.bottom + 4 : undefined, maxHeight: catalog ? Math.min(520, useBelow ? below : above) : undefined, width, fontSize }
+    const preferredHeight = catalog ? 520 : 236
+    const useBelow = below > above && (catalog || above < preferredHeight)
+    const next = { left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), bottom: useBelow ? undefined : window.innerHeight - rect.top + 4, top: useBelow ? rect.bottom + 4 : undefined, maxHeight: Math.min(preferredHeight, useBelow ? below : above), width, fontSize }
     setPosition((current) => current && Math.abs(current.left - next.left) < .25 && current.bottom === next.bottom && current.top === next.top && current.maxHeight === next.maxHeight && Math.abs(current.width - next.width) < .25 && Math.abs(current.fontSize - next.fontSize) < .05 ? current : next)
   }
 
@@ -399,19 +410,31 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
     if (session && open && resultsRef.current) resultsRef.current.scrollTop = session.scrollTop
     if (session?.focus === 'input' && open) inputRef.current?.focus()
     else if (session?.focus === 'option' && open) document.getElementById(`${listboxId}-${session.active}`)?.focus()
-    else if (session?.focus === 'button' && !open) buttonRef.current?.focus()
+    else if (session?.focus === 'button' && !open) { buttonRef.current?.focus(); session.returnFocusPending = false }
     return () => {
       if (!session) return
       session.scrollTop = resultsRef.current?.scrollTop ?? session.scrollTop
       session.beforeSearch = preSearchScrollTop.current
-      session.focus = document.activeElement === inputRef.current ? 'input' : buttonRef.current === document.activeElement ? 'button' : document.getElementById(listboxId)?.contains(document.activeElement) ? 'option' : null
+      const activeElement = document.activeElement
+      // A selection may detach the old trigger before this cleanup runs.
+      // Retain its explicit return intent until the replacement trigger mounts.
+      const returningToDetachedButton = !session.open && session.returnFocusPending && activeElement === document.body
+      session.focus = returningToDetachedButton ? 'button' : activeElement === inputRef.current ? 'input' : buttonRef.current === activeElement ? 'button' : document.getElementById(listboxId)?.contains(activeElement) ? 'option' : null
     }
   }, [session])
 
-  const closeMenu = () => {
+  const closeMenu = (returnFocus = false) => {
+    if (session) { session.focus = returnFocus ? 'button' : null; session.returnFocusPending = returnFocus }
     setOpen(false)
     setSearchQuery('')
     setActiveValue(value)
+  }
+  const commitMenuSelection = (nextValue: string) => {
+    // Record focus ownership before onChange can reflow/remount the row.
+    if (session) { session.focus = 'button'; session.returnFocusPending = true }
+    onChange(nextValue)
+    closeMenu(true)
+    buttonRef.current?.focus()
   }
 
   useEffect(() => {
@@ -436,16 +459,21 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   }, [activeValue, enabledFiltered, open, searchQuery, value])
 
   useEffect(() => {
-    if (!open) return
+    if (!open && !session) return
     const close = (event: PointerEvent) => {
       const target = event.target as HTMLElement
-      if (!target.closest('.grouped-menu-select-menu') && !buttonRef.current?.contains(target)) closeMenu()
+      if (buttonRef.current?.contains(target)) return
+      if (!open) {
+        // A real outside interaction cancels even an allocation still pending
+        // after selection; it must never restore old focus on a later reflow.
+        if (session) { session.focus = null; session.returnFocusPending = false }
+      } else if (!target.closest('.grouped-menu-select-menu')) closeMenu()
     }
     window.addEventListener('pointerdown', close, true)
     return () => {
       window.removeEventListener('pointerdown', close, true)
     }
-  }, [open, value])
+  }, [open, value, session])
 
   const focusOption = (optionValue = value) => {
     window.requestAnimationFrame(() => document.getElementById(`${listboxId}-${optionValue}`)?.focus())
@@ -471,7 +499,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent) => {
     event.stopPropagation()
-    if (event.key === 'Escape') { event.preventDefault(); closeMenu(); buttonRef.current?.focus(); return }
+    if (event.key === 'Escape') { event.preventDefault(); closeMenu(true); buttonRef.current?.focus(); return }
     if (searchQuery && event.key === 'Backspace' && searchQuery.length === 1) { event.preventDefault(); hideSearch(); return }
     if (searchQuery && event.key.length === 1 && !(event.target instanceof HTMLInputElement) && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); setSearchQuery((current) => current + event.key); return }
     if (event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return }
@@ -481,7 +509,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
     if ((event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('[data-catalog-disclosure], .selector-search-row button')) return
     if (event.key === 'Enter' && activeValue) {
       const option = filteredOptions.find((candidate) => candidate.value === activeValue)
-      if (option && !option.disabled) { event.preventDefault(); onChange(option.value); closeMenu(); buttonRef.current?.focus() }
+      if (option && !option.disabled) { event.preventDefault(); commitMenuSelection(option.value) }
       return
     }
     if ((catalog || searchable) && event.target instanceof HTMLInputElement) return
@@ -517,7 +545,7 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   })
   const showFeaturedRelease = (provider: string, releaseKey: string, optionValue?: string) => {
     const release = catalogProviders.find(item => item.label === provider)?.releases.find(item => item.key === releaseKey)
-    if (release && !modelReleaseNeedsExpansion(release) && optionValue) { onChange(optionValue); closeMenu(); buttonRef.current?.focus(); return }
+    if (release && !modelReleaseNeedsExpansion(release) && optionValue) { commitMenuSelection(optionValue); return }
     setExpandedCatalog(current => new Set([...current, releaseKey]))
     if (optionValue) { setActiveValue(optionValue); focusOption(optionValue) }
   }
@@ -528,11 +556,11 @@ export function GroupedMenuSelect({ value, groups: suppliedGroups, ariaLabel, ar
   }
   const renderOption = (option: GroupedMenuOption, modeLabel: string | false = false, isNew = false) => {
     const company = catalogModelCompany(option)
-    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; onChange(option.value); closeMenu(); buttonRef.current?.focus() }}>{company ? <CompanyIcon provider={company} /> : option.iconText ? <span className="selector-flag-icon" aria-hidden="true">{option.iconText}</span> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || (catalog || groups.some(group => group.options.some(item => item.aspectRatioPreview || item.provider || item.iconPath || item.iconText)) ? <span className="model-company-logo-placeholder" aria-hidden="true" /> : null)}<span className="selector-option-label">{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
+    return <button id={`${listboxId}-${option.value}`} type="button" role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} disabled={option.disabled} tabIndex={searchQuery ? -1 : option.value === activeValue ? 0 : -1} className={`${option.value === value ? 'is-active' : ''} ${option.value === activeValue ? 'is-keyboard-active' : ''}`} key={option.value} onMouseMove={() => { if (!option.disabled) setActiveValue(option.value) }} onClick={() => { if (option.disabled) return; commitMenuSelection(option.value) }}>{company ? <CompanyIcon provider={company} /> : option.iconText ? <span className="selector-flag-icon" aria-hidden="true">{option.iconText}</span> : option.iconPath ? <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={option.iconPath} /></svg> : ratioPreview(option.aspectRatioPreview) || (catalog || groups.some(group => group.options.some(item => item.aspectRatioPreview || item.provider || item.iconPath || item.iconText)) ? <span className="model-company-logo-placeholder" aria-hidden="true" /> : null)}<span className="selector-option-label">{modeLabel || option.label}</span>{isNew && <em className="model-new-badge">New</em>}{option.value === value && <Check size={11} />}</button>
   }
 
   return <>
-    <button ref={buttonRef} type="button" className={`grouped-menu-select ${className}`} data-equalized-options={fillTrack ? JSON.stringify(equalizedLabels) : undefined} data-equalized-default={fillTrack ? defaultLabel : undefined} data-equalized-full={fillTrack ? selectedLabel : undefined} data-equalized-compact={fillTrack ? compactLabel : undefined} data-equalized-leading={fillTrack && hasEqualizedLeadingMark ? 'true' : undefined} style={fillTrack ? { width: '100%', minWidth: 0, maxWidth: '100%' } : { width: fittedWidth ?? 'max-content', minWidth: 0, maxWidth: '100%' }} aria-label={ariaLabel} aria-describedby={ariaDescribedBy} aria-description={accessibleLabel} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={toggle}>
+    <button ref={buttonRef} type="button" className={`grouped-menu-select ${className}`} data-equalized-options={fillTrack ? JSON.stringify(equalizedLabels) : undefined} data-equalized-default={fillTrack ? defaultLabel : undefined} data-equalized-full={fillTrack ? selectedLabel : undefined} data-equalized-compact={fillTrack ? compactLabel : undefined} data-equalized-leading={fillTrack && hasEqualizedLeadingMark ? 'true' : undefined} style={fillTrack ? { width: '100%', minWidth: 0, maxWidth: '100%' } : { width: fittedWidth ?? 'max-content', minWidth: 0, maxWidth: '100%' }} aria-label={ariaLabel} aria-describedby={ariaDescribedBy} aria-description={accessibleLabel} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onBlur={event => { if (session && !session.open && event.currentTarget.isConnected) { session.focus = null; session.returnFocusPending = false } }} onClick={toggle}>
       {(selectedCompany || selected?.iconPath || selected?.iconText) && <SelectorLeadingIcon identity={selectedCompany || selected!.iconText || selected!.iconPath!}>{selectedCompany ? <CompanyIcon provider={selectedCompany} /> : selected?.iconText ? <span className="selector-flag-icon">{selected.iconText}</span> : <svg className="model-company-logo" viewBox="0 0 24 24" aria-hidden="true"><path d={selected!.iconPath} /></svg>}</SelectorLeadingIcon>}<span className="selected-label"><span className="selected-label-full">{selectedLabel}</span><span className="selected-label-compact" aria-hidden="true">{compactLabel}</span></span><ChevronDown size={10} />
     </button>
     {open && position && createPortal(<div className={`grouped-menu-select-menu ${menuClassName} ${catalog ? 'model-catalog-menu' : ''} ${flatCatalog ? 'is-flat-catalog' : ''} nodrag`} style={{ left: position.left, bottom: position.bottom, top: position.top, maxHeight: position.maxHeight, width: position.width, '--floating-menu-font-size': `${position.fontSize}px` } as CSSProperties} onKeyDown={handleMenuKeyDown}>
@@ -591,8 +619,9 @@ export function SimpleMenuSelect({ value, options, ariaLabel, accessibleLabel, d
   searchable?: boolean
   onChange: (value: string) => void
 }) {
+  const inFooter = useContext(NodeFooterContext)
   return <GroupedMenuSelect
-    value={value || options[0]?.value || ''}
+    value={inFooter ? value || '' : value || options[0]?.value || ''}
     groups={[{ label: '', service, options }]}
     ariaLabel={ariaLabel}
     accessibleLabel={accessibleLabel}
@@ -673,6 +702,7 @@ type FluidControlGroupProps<Id extends string> = {
   ariaLabel?: string
   gap?: number
   allocation?: MixedControlAllocationOptions<Id>
+  footer?: FooterControlLayoutOptions<Id>
 }
 
 type FluidLayoutState<Id extends string> = {
@@ -681,7 +711,7 @@ type FluidLayoutState<Id extends string> = {
   rows: AllocatedMixedControlRow<Id>[]
 }
 
-export function FluidControlGroup<Id extends string>({ controls, recalculationKey, className = '', ariaLabel = 'Fluid Control Group', gap = 6, allocation = {} }: FluidControlGroupProps<Id>) {
+export function FluidControlGroup<Id extends string>({ controls, recalculationKey, className = '', ariaLabel = 'Fluid Control Group', gap = 6, allocation = {}, footer }: FluidControlGroupProps<Id>) {
   const groupRef = useRef<HTMLDivElement>(null)
   const selectorGroupId = useId().replace(/:/g, '')
   const selectorSessions = useRef(new Map<string, SelectorSession>())
@@ -704,8 +734,8 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
   const activeControls = activeControlDescriptors(normalizedControls)
   const descriptors = activeControls.map(({ node: _node, ...descriptor }) => descriptor)
   const descriptorSignature = controlDescriptorSignature(descriptors)
-  const allocationSignature = JSON.stringify(allocation)
-  const immediateRows = deterministicSafeControlRows(descriptors, 315, gap, allocation)
+  const allocationSignature = JSON.stringify({ allocation, footer })
+  const immediateRows = footer ? allocateFooterControlRows(descriptors, 315, gap, footer) : deterministicSafeControlRows(descriptors, 315, gap, allocation)
   const [layoutState, setLayoutState] = useState<FluidLayoutState<Id>>(() => ({ descriptorSignature, availableWidth: 315, rows: immediateRows }))
   const exactLastValid = lastValidRows.current.get(descriptorSignature)
   const rows = layoutState.descriptorSignature === descriptorSignature
@@ -774,6 +804,7 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
         probeRow.className = 'fluid-control-group-row'
         probeRow.style.gridTemplateColumns = row.gridTemplateColumns
         probeRow.style.columnGap = `${row.gap}px`
+        if (footer && (row as AllocatedFooterControlRow<Id>).alignment === 'right') probeRow.style.justifyContent = 'end'
         for (const allocated of row.controls) {
           const source = group.querySelector<HTMLElement>(`[data-fluid-control-id="${allocated.id}"]`)
           if (!source) continue
@@ -793,7 +824,11 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
         const rect = paintedElement(wrapper).getBoundingClientRect()
         return { id: (wrapper as HTMLElement).dataset.fluidControlId || 'unknown', left: rect.left, right: rect.right }
       }))
-      const validation = validatePaintedControlLayout(ariaLabel, usableLeft, usableRight, sharedGap, paintedRows)
+      const validations = footer ? candidate.map((row, index) => {
+        const leading = (row as AllocatedFooterControlRow<Id>).alignment === 'right' ? (row as AllocatedFooterControlRow<Id>).leadingUnusedWidth : 0
+        return validatePaintedControlLayout(`${ariaLabel}/row:${index}`, usableLeft + leading, usableRight, sharedGap, [paintedRows[index]])
+      }) : [validatePaintedControlLayout(ariaLabel, usableLeft, usableRight, sharedGap, paintedRows)]
+      const validation = { valid: validations.every(result => result.valid), reasons: validations.flatMap(result => result.reasons) }
       unmount()
       return validation
     }
@@ -803,6 +838,24 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
         const wrapper = group.querySelector<HTMLElement>(`[data-fluid-control-id="${descriptor.id}"]`)
         if (!wrapper) return descriptor
         if (descriptor.kind !== 'selector') {
+          if (footer && descriptor.kind === 'editable-field') {
+            const input = wrapper.querySelector<HTMLInputElement>('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"])')
+            if (input) {
+              const inputStyle = window.getComputedStyle(input)
+              const source = wrapper.firstElementChild as HTMLElement | null
+              const sourceStyle = source && source !== input ? window.getComputedStyle(source) : undefined
+              const chrome = numeric(inputStyle.paddingLeft) + numeric(inputStyle.paddingRight)
+                + numeric(inputStyle.borderLeftWidth) + numeric(inputStyle.borderRightWidth)
+                + (sourceStyle ? numeric(sourceStyle.paddingLeft) + numeric(sourceStyle.paddingRight)
+                  + numeric(sourceStyle.borderLeftWidth) + numeric(sourceStyle.borderRightWidth) : 0)
+              // Native max-content inputs reserve their default character capacity.
+              // A footer needs the authored value (or visible empty placeholder),
+              // its real chrome and the consumer's recognizable field minimum.
+              const contentWidth = paintedWidth(input, input.value || input.placeholder) + chrome
+              const exactWidth = Math.min(availableWidth, Math.max(descriptor.minimumWidth ?? descriptor.intrinsicWidth, contentWidth))
+              return { ...descriptor, intrinsicWidth: exactWidth, minimumWidth: exactWidth, compactWidth: exactWidth, preferredWidth: exactWidth, referenceSized: true }
+            }
+          }
           const measured = measureIntrinsicBorderBox(wrapper)
           if (descriptor.kind === 'intrinsic' || descriptor.kind === 'fixed-action') {
             const exactWidth = Math.max(descriptor.intrinsicWidth, measured)
@@ -815,13 +868,15 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
         const fixedChrome = selectorChromeWidth(selector)
         const fullLabel = selector.dataset.equalizedFull || selector.querySelector('.selected-label-full')?.textContent || selector.querySelector(':scope > span:not(.selector-leading-icon)')?.textContent || descriptor.fullLabel || selector.dataset.equalizedDefault || descriptor.defaultLabel || ''
         const referenceLabel = selector.dataset.equalizedDefault || descriptor.defaultLabel || fullLabel
-        const operationalWidth = selectorReferenceTrackWidth(paintedWidth(selector, fullLabel), paintedWidth(selector, referenceLabel), fixedChrome)
+        const operationalWidth = footer
+          ? Math.min(availableWidth, paintedWidth(selector, fullLabel) + fixedChrome)
+          : selectorReferenceTrackWidth(paintedWidth(selector, fullLabel), paintedWidth(selector, referenceLabel), fixedChrome)
         return { ...descriptor, intrinsicWidth: operationalWidth, fullLabel, compactLabel: fullLabel, minimumWidth: operationalWidth, compactWidth: operationalWidth, preferredWidth: operationalWidth, referenceSized: true, shrinkPriority: 'operational' as const }
       })
-      const optimized = allocateMixedControlRows(measuredDescriptors, availableWidth, gap, allocation)
-      const optimizedValidation = validateControlLayout(ariaLabel, measuredDescriptors, optimized, availableWidth)
-      const fallback = deterministicSafeControlRows(measuredDescriptors, availableWidth, gap, allocation)
-      const fallbackValidation = validateControlLayout(ariaLabel, measuredDescriptors, fallback, availableWidth)
+      const optimized = footer ? allocateFooterControlRows(measuredDescriptors, availableWidth, gap, footer) : allocateMixedControlRows(measuredDescriptors, availableWidth, gap, allocation)
+      const optimizedValidation = footer ? validateFooterControlLayout(ariaLabel, measuredDescriptors, optimized as AllocatedFooterControlRow<Id>[], availableWidth, { ...footer, gap }) : validateControlLayout(ariaLabel, measuredDescriptors, optimized, availableWidth)
+      const fallback = footer ? optimized : deterministicSafeControlRows(measuredDescriptors, availableWidth, gap, allocation)
+      const fallbackValidation = footer ? optimizedValidation : validateControlLayout(ariaLabel, measuredDescriptors, fallback, availableWidth)
       const arithmeticallyValid = optimizedValidation.valid ? optimized : fallbackValidation.valid ? fallback : undefined
       const paintedValidation = arithmeticallyValid ? validateCandidatePaint(arithmeticallyValid) : { valid: false, reasons: [] as string[] }
       const candidate = paintedValidation.valid ? arithmeticallyValid : undefined
@@ -832,7 +887,7 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
       const next: FluidLayoutState<Id> = { descriptorSignature, availableWidth, rows: candidate }
       lastValidRows.current.set(descriptorSignature, next)
       setLayoutState((current) => {
-        if (current.descriptorSignature === descriptorSignature && layoutSignature(current.rows) === layoutSignature(candidate)) return current
+        if (current.descriptorSignature === descriptorSignature && layoutSignature(current.rows) === layoutSignature(candidate) && (!footer || JSON.stringify(current.rows.map(row => [(row as AllocatedFooterControlRow<Id>).alignment, (row as AllocatedFooterControlRow<Id>).leadingUnusedWidth])) === JSON.stringify(candidate.map(row => [(row as AllocatedFooterControlRow<Id>).alignment, (row as AllocatedFooterControlRow<Id>).leadingUnusedWidth])))) return current
         group.dataset.allocationCommitCount = String(Number(group.dataset.allocationCommitCount || 0) + 1)
         return next
       })
@@ -869,8 +924,8 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
     const prefixes = activeControls.map(control => `${control.id}::`)
     for (const key of selectorSessions.current.keys()) if (!prefixes.some(prefix => key.startsWith(prefix))) selectorSessions.current.delete(key)
   }, [descriptorSignature])
-  return <div ref={groupRef} className={`equalized-control-group ${className}`} aria-label={ariaLabel} style={{ '--control-group-gap': `${rows[0]?.gap ?? gap}px` } as CSSProperties}>
-    {rows.map((row) => <div key={rowMembershipKey(row)} className="fluid-control-group-row" style={{ gridTemplateColumns: row.gridTemplateColumns, columnGap: `${row.gap}px` }}>
+  return <div ref={groupRef} className={`equalized-control-group ${footer ? 'generator-footer-control-group' : ''} ${className}`} aria-label={ariaLabel} style={{ '--control-group-gap': `${rows[0]?.gap ?? gap}px` } as CSSProperties}>
+    {rows.map((row) => <div key={rowMembershipKey(row)} className="fluid-control-group-row" style={{ gridTemplateColumns: row.gridTemplateColumns, columnGap: `${row.gap}px`, justifyContent: footer && (row as AllocatedFooterControlRow<Id>).alignment === 'right' ? 'end' : undefined }}>
       {row.controls.map((allocated) => {
         const control = controlById.get(allocated.id)!
         const geometry = {
@@ -880,6 +935,21 @@ export function FluidControlGroup<Id extends string>({ controls, recalculationKe
       })}
     </div>)}
   </div>
+}
+
+/** Every node footer uses one policy; panel and inspector groups remain independent. */
+export function GeneratorFooterControlGroup<Id extends string>({ controls, recalculationKey, className = '', ariaLabel = 'Node Footer Controls', modelId, runId, settingsId, iconIds }: {
+  controls: FluidGroupControl<Id>[]
+  recalculationKey?: string
+  className?: string
+  ariaLabel?: string
+  modelId?: Id
+  runId?: Id
+  settingsId?: Id
+  iconIds?: readonly Id[]
+}) {
+  const footer = { modelId, runId, settingsId, iconIds }
+  return <NodeFooterContext.Provider value={true}><FluidControlGroup controls={controls} recalculationKey={recalculationKey || ''} className={className} ariaLabel={ariaLabel} gap={7} footer={footer} /></NodeFooterContext.Provider>
 }
 
 type ImageDeliveryControlsProps = {
@@ -921,19 +991,10 @@ type ImageGenerationControlGroupProps = {
 }
 
 export function ImageGenerationControlGroup({ semantic = false, recalculationKey, model, format, resolution, quantity, slot, settings, run }: ImageGenerationControlGroupProps) {
-  return <FluidControlGroup
+  return <GeneratorFooterControlGroup
     className="compact-image-footer-group compact-image-footer-row"
     ariaLabel={semantic ? 'Semantic Image Controls' : 'Image Controls'}
-    allocation={{
-      minRows: 1,
-      maxRows: 3,
-      enforceBalancedRows: true,
-      firstId: 'model',
-      terminalIds: semantic ? ['save', 'settings', 'run'] : ['ratio', 'settings', 'run'],
-      preferredRows: semantic
-        ? [['model', 'resolution', 'quantity'], ['format', 'save', 'settings', 'run']]
-        : [['model', 'resolution', 'quantity'], ['format', 'ratio', 'settings', 'run']],
-    }}
+    modelId="model" settingsId="settings" runId="run" iconIds={semantic ? ['save'] : []}
     recalculationKey={recalculationKey}
     controls={[
       { id: 'model', kind: 'selector', defaultLabel: 'Image model', fullLabel: 'Image model', compactLabel: 'Image model', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 112, node: model },
@@ -1124,22 +1185,46 @@ export function voiceModelMenuGroups(models: ServiceModelAvailability['models'],
 }
 
 export function VoiceModelSelect({ data, models, onChange, className = '', falAvailability, fishAvailability, onFalSelect }: { data: StudioNodeData; models: ServiceModelAvailability['models']; onChange(patch: Partial<StudioNodeData>): void; className?: string; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+  if (data.elevenSpeechMode === 'voice-change' && data.voiceEngine === 'elevenlabs-direct') return <GroupedMenuSelect catalog flatCatalog catalogFlow="audio" className={className} ariaLabel="Voice Change model" fillTrack value={data.voiceModelId || ''} groups={[{ label: 'ElevenLabs · Direct', service: 'elevenlabs', options: models.filter(model => model.supportsVoiceConversion).map(model => ({ value: model.id, label: model.label, provider: 'elevenlabs' as const })) }]} onChange={voiceModelId => onChange({ voiceModelId, error: undefined })} />
   const value = data.voiceEngine === 'fish-audio' ? `fish-audio::${data.fishModel || 's2-pro'}` : data.voiceEngine === 'elevenlabs-direct' ? `elevenlabs-direct::${data.voiceModelId || ''}` : 'elevenlabs'
   const label = data.voiceEngine === 'elevenlabs-direct' ? models.find((model) => model.id === data.voiceModelId)?.label || data.voiceModelId || 'Choose ElevenLabs model' : data.voiceEngine === 'fish-audio' ? fishAvailability?.models.find(model => model.id === (data.fishModel || 's2-pro'))?.label || `Fish Audio ${data.fishModel || 's2-pro'}` : 'ElevenLabs Eleven v3'
   const groups = falAvailability ? liveFalModelGroups('voice', falAvailability, voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined), data.falNative) : voiceModelMenuGroups(models, fishAvailability, data.voiceEngine === 'fish-audio' ? data.fishModel || 's2-pro' : undefined)
   return <GroupedMenuSelect catalog flatCatalog catalogFlow="audio" className={className} ariaLabel="Voice provider and model" defaultLabel={data.voiceEngine === 'fish-audio' ? label : "ElevenLabs Eleven v3"} displayLabel={data.falNative?.label || label} fillTrack value={data.falNative ? `fal-native::${data.falNative.endpointId}` : value} groups={groups} onChange={(selection) => { if (selection.startsWith('fal-native::')) { onFalSelect?.(selection.slice(12)); return } const patch = voiceModelSelectionPatch(selection, data, models, fishAvailability?.catalogStale ? [] : fishAvailability?.models || []); if (patch) onChange({ ...preserveFalNativeSelection(data), ...patch }) }} />
 }
 
-export function SoundModelSelect({ data, onChange, className = '', falAvailability, onFalSelect }: { data: StudioNodeData; onChange(patch: Partial<StudioNodeData>): void; className?: string; falAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+export function SoundModelSelect({ data, onChange, className = '', fillTrack = false, falAvailability, onFalSelect }: { data: StudioNodeData; onChange(patch: Partial<StudioNodeData>): void; className?: string; fillTrack?: boolean; falAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
   const legacy: GroupedMenuGroup[] = [
     { label: 'ElevenLabs · Direct', service: 'elevenlabs', options: [{ value: 'elevenlabs', label: 'Sound Effects v2', provider: 'elevenlabs' }] },
     { label: 'fal.ai', service: 'fal', options: [{ value: 'fal', label: 'ElevenLabs Sound Effects v2', provider: 'elevenlabs' }] },
   ]
-  return <GroupedMenuSelect catalog flatCatalog catalogFlow="audio" className={className} ariaLabel="Sound effect provider and model" defaultLabel="Sound Effects v2" value={data.falNative ? `fal-native::${data.falNative.endpointId}` : data.audioProvider || 'fal'} displayLabel={data.falNative?.label} groups={falAvailability ? liveFalModelGroups('effects', falAvailability, legacy, data.falNative) : legacy} onChange={(provider) => { if (provider.startsWith('fal-native::')) onFalSelect?.(provider.slice(12)); else if (provider === 'elevenlabs' || provider === 'fal') onChange({ ...preserveFalNativeSelection(data), audioProvider: provider, error: undefined }) }} />
+  return <GroupedMenuSelect catalog flatCatalog catalogFlow="audio" fillTrack={fillTrack} className={className} ariaLabel="Sound effect provider and model" defaultLabel="Sound Effects v2" value={data.falNative ? `fal-native::${data.falNative.endpointId}` : data.audioProvider || 'fal'} displayLabel={data.falNative?.label} groups={falAvailability ? liveFalModelGroups('effects', falAvailability, legacy, data.falNative) : legacy} onChange={(provider) => { if (provider.startsWith('fal-native::')) onFalSelect?.(provider.slice(12)); else if (provider === 'elevenlabs' || provider === 'fal') onChange({ ...preserveFalNativeSelection(data), audioProvider: provider, error: undefined }) }} />
 }
 
 export function directAudioFormatLabel(format: string): string {
   return `${audioFormatLabel(format)}${/^(pcm|ulaw|alaw)_/.test(format) ? ' → WAV' : ''}`
+}
+
+/** Sound Effects shares the node footer policy; provider fields and callbacks are preserved. */
+export function SoundEffectsFooterControls({ data, quantity, settings, run, falAvailability, onFalSelect, onChange }: {
+  data: StudioNodeData
+  quantity: ReactNode
+  settings: ReactNode
+  run: ReactNode
+  falAvailability?: ServiceModelAvailability
+  onFalSelect?(endpointId: string): void
+  onChange(patch: Partial<StudioNodeData>): void
+}) {
+  const recalculationKey = `${data.audioProvider}:${data.duration}:${data.loop}:${data.audioOutputFormat}:${data.quantity}:${data.runState}`
+  return <GeneratorFooterControlGroup className="sound-effects-footer-controls" ariaLabel="Sound Effects Footer Controls" modelId="model" settingsId="settings" runId="run" recalculationKey={recalculationKey} controls={[
+        { id: 'model', kind: 'selector', defaultLabel: 'Sound Effects v2', fullLabel: 'Sound Effects v2', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138,
+          node: <SoundModelSelect className="compact-engine voice-engine" fillTrack data={data} falAvailability={falAvailability} onFalSelect={onFalSelect} onChange={onChange} /> },
+        { id: 'quantity', kind: 'bounded-elastic', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: quantity },
+        { id: 'duration', kind: 'selector', intrinsicWidth: 52, node: <SimpleMenuSelect fillTrack ariaLabel="Sound Effect Duration" title="Sound Effect Duration" value={String(defaultSoundEffectDuration(data.duration))} options={soundEffectDurationOptions(data.duration, data.audioProvider === 'elevenlabs' ? 'elevenlabs' : 'fal')} onChange={value => onChange({ duration: Number(value) })} /> },
+        { id: 'loop', kind: 'intrinsic', intrinsicWidth: 55, node: <label className="compact-toggle compact-loop" title="Loop Sound Effect"><span>Loop</span><input aria-label="Loop Sound Effect" type="checkbox" checked={Boolean(data.loop)} onChange={event => onChange({ loop: event.target.checked })} /><i /></label> },
+        { id: 'output', kind: 'selector', intrinsicWidth: 115, minimumWidth: 70, shrinkPriority: 'operational', node: <SimpleMenuSelect fillTrack className="sound-output-format" ariaLabel="Sound Effect Output Format" title="Sound Effect Output Format" value={data.audioOutputFormat || 'mp3_44100_128'} options={(data.audioProvider === 'elevenlabs' ? ELEVEN_DIRECT_OUTPUT_FORMATS : ELEVEN_AUDIO_OUTPUT_FORMATS).map(value => ({ value, label: data.audioProvider === 'elevenlabs' ? directAudioFormatLabel(value) : audioFormatLabel(value) }))} onChange={value => onChange({ audioOutputFormat: value })} /> },
+        { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28, node: settings },
+        { id: 'run', kind: 'fixed-action', intrinsicWidth: 28, node: run },
+  ]} />
 }
 
 export function DirectElevenVoiceSelect({ data, availability, onChange, ariaLabel = 'ElevenLabs voice ID' }: { ariaLabel?: string; data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void }) {
@@ -1154,6 +1239,27 @@ export function DirectElevenLanguageSelect({ data, availability, onChange }: { d
   return <SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" defaultLabel="Auto" fillTrack value={data.languageCode || ''} options={options} onChange={(languageCode) => onChange({ languageCode: languageCode || undefined })} />
 }
 
+function directElevenVoiceFooterFields({ data, availability, onChange, falAvailability, fishAvailability, onFalSelect, footer = true, quantityControl }: { footer?: boolean; quantityControl?: ReactNode; data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
+  const model = availability?.models.find((item) => item.id === data.voiceModelId)
+  const settingOptions = (selected: number) => {
+    const values = Array.from({ length: 21 }, (_, index) => index / 20)
+    if (!values.includes(selected)) values.push(selected)
+    return values.map((value) => ({ value: String(value), label: String(Number.isFinite(value) ? value.toFixed(2) : value), disabled: !Number.isFinite(value) || value < 0 || value > 1 }))
+  }
+  const modelControls: FluidGroupControl<string>[] = [
+      { id: 'model', kind: 'selector', defaultLabel: model?.label || 'Choose ElevenLabs model', fullLabel: model?.label || 'Choose ElevenLabs model', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><VoiceModelSelect className="voice-primary-model" data={data} models={availability?.models || []} onChange={onChange} falAvailability={falAvailability} fishAvailability={fishAvailability} onFalSelect={onFalSelect} /></label> },
+      ...(data.elevenSpeechMode === 'voice-change' ? [] : [{ id: 'mode', kind: 'selector' as const, intrinsicWidth: 100, node: <label><SimpleMenuSelect ariaLabel="ElevenLabs speech mode" displayLabel={data.elevenSpeechMode === undefined ? "Select Mode" : undefined} fillTrack value={data.elevenSpeechMode || 'speech'} options={[{ value: 'speech', label: 'Speech' }, { value: 'dialogue', label: 'Dialogue', disabled: !elevenSupportsDialogue(data.voiceModelId, model) }]} onChange={value => onChange(elevenSpeechModePatch(data, value as 'speech' | 'dialogue', () => crypto.randomUUID()))} /></label> }]),
+      ...(!footer && !isElevenDialogue(data) ? [{ id: 'voice', kind: 'selector' as const, intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><DirectElevenVoiceSelect data={data} availability={availability} onChange={onChange} /></label> }] : []),
+    ]
+  const settingControls: FluidGroupControl<string>[] = [
+      { id: 'stability', kind: 'selector', intrinsicWidth: 72, node: <label><SimpleMenuSelect ariaLabel="ElevenLabs stability" displayLabel={data.stability === undefined ? "Select Stability" : undefined} defaultLabel="0.50" fillTrack value={String(data.stability ?? 0.5)} options={settingOptions(data.stability ?? 0.5)} onChange={(value) => onChange({ stability: Number(value) })} /></label> },
+      { id: 'similarity', kind: 'selector', intrinsicWidth: 72, node: <label><SimpleMenuSelect ariaLabel="ElevenLabs similarity" displayLabel={data.similarityBoost === undefined ? "Select Similarity" : undefined} defaultLabel="0.75" fillTrack value={String(data.similarityBoost ?? 0.75)} options={settingOptions(data.similarityBoost ?? 0.75)} onChange={(value) => onChange({ similarityBoost: Number(value) })} /></label> },
+      ...(quantityControl && data.elevenSpeechMode !== 'voice-change' ? [{ id: 'quantity', kind: 'bounded-elastic' as const, intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: quantityControl }] : []),
+      ...(!footer && !isElevenDialogue(data) ? [{ id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <label><ElevenVoiceSampleButton voice={availability?.voices?.find((voice) => voice.id === data.voice)} availability={availability} /></label> }] : []),
+    ]
+  return [...modelControls, ...settingControls]
+}
+
 export function DirectElevenVoiceControls({ data, availability, onChange, falAvailability, fishAvailability, onFalSelect, footer = false, quantityControl }: { footer?: boolean; quantityControl?: ReactNode; data: StudioNodeData; availability?: ServiceModelAvailability; onChange(patch: Partial<StudioNodeData>): void; falAvailability?: ServiceModelAvailability; fishAvailability?: ServiceModelAvailability; onFalSelect?(endpointId: string): void }) {
   const model = availability?.models.find((item) => item.id === data.voiceModelId)
   const settingOptions = (selected: number) => {
@@ -1163,13 +1269,13 @@ export function DirectElevenVoiceControls({ data, availability, onChange, falAva
   }
   const modelControls: FluidGroupControl<string>[] = [
       { id: 'model', kind: 'selector', defaultLabel: model?.label || 'Choose ElevenLabs model', fullLabel: model?.label || 'Choose ElevenLabs model', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} models={availability?.models || []} onChange={onChange} falAvailability={falAvailability} fishAvailability={fishAvailability} onFalSelect={onFalSelect} /></label> },
-      { id: 'mode', kind: 'selector', intrinsicWidth: 100, node: <label><span>Mode</span><SimpleMenuSelect ariaLabel="ElevenLabs speech mode" fillTrack value={data.elevenSpeechMode || 'speech'} options={[{ value: 'speech', label: 'Speech' }, { value: 'dialogue', label: 'Dialogue', disabled: !elevenSupportsDialogue(data.voiceModelId, model) }]} onChange={value => onChange(elevenSpeechModePatch(data, value as 'speech' | 'dialogue', () => crypto.randomUUID()))} /></label> },
+      ...(data.elevenSpeechMode === 'voice-change' ? [] : [{ id: 'mode', kind: 'selector' as const, intrinsicWidth: 100, node: <label><span>Mode</span><SimpleMenuSelect ariaLabel="ElevenLabs speech mode" fillTrack value={data.elevenSpeechMode || 'speech'} options={[{ value: 'speech', label: 'Speech' }, { value: 'dialogue', label: 'Dialogue', disabled: !elevenSupportsDialogue(data.voiceModelId, model) }]} onChange={value => onChange(elevenSpeechModePatch(data, value as 'speech' | 'dialogue', () => crypto.randomUUID()))} /></label> }]),
       ...(!footer && !isElevenDialogue(data) ? [{ id: 'voice', kind: 'selector' as const, intrinsicWidth: 112, node: <label className="voice-primary-voice-field"><span>Voice</span><DirectElevenVoiceSelect data={data} availability={availability} onChange={onChange} /></label> }] : []),
     ]
   const settingControls: FluidGroupControl<string>[] = [
       { id: 'stability', kind: 'selector', intrinsicWidth: 72, node: <label><span>Stability</span><SimpleMenuSelect ariaLabel="ElevenLabs stability" defaultLabel="0.50" fillTrack value={String(data.stability ?? 0.5)} options={settingOptions(data.stability ?? 0.5)} onChange={(value) => onChange({ stability: Number(value) })} /></label> },
       { id: 'similarity', kind: 'selector', intrinsicWidth: 72, node: <label><span>Similarity</span><SimpleMenuSelect ariaLabel="ElevenLabs similarity" defaultLabel="0.75" fillTrack value={String(data.similarityBoost ?? 0.75)} options={settingOptions(data.similarityBoost ?? 0.75)} onChange={(value) => onChange({ similarityBoost: Number(value) })} /></label> },
-      ...(quantityControl ? [{ id: 'quantity', kind: 'bounded-elastic' as const, intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: quantityControl }] : []),
+      ...(quantityControl && data.elevenSpeechMode !== 'voice-change' ? [{ id: 'quantity', kind: 'bounded-elastic' as const, intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: quantityControl }] : []),
       ...(!footer && !isElevenDialogue(data) ? [{ id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <label><span>Test</span><ElevenVoiceSampleButton voice={availability?.voices?.find((voice) => voice.id === data.voice)} availability={availability} /></label> }] : []),
     ]
   const key = `${data.voiceModelId}:${data.stability}:${data.similarityBoost}:${data.voice}:${data.elevenSpeechMode}:${data.quantity}`
@@ -1397,10 +1503,10 @@ function nativeVideoFooterControlsWithOneSound(controls: readonly FalNativeVideo
   return controls.filter(control => control.key !== 'sound' && control.key !== 'generate_audio' || control === sound)
 }
 
-function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts?: Record<string, string> }>(state: T, fields: FalRuntimeField[], onChange: (state: T) => void, footerFieldKeys?: ReadonlySet<string>, voiceAvailability?: ServiceModelAvailability) {
+function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts?: Record<string, string> }>(state: T, fields: FalRuntimeField[], onChange: (state: T) => void, footerFieldKeys?: ReadonlySet<string>, voiceAvailability?: ServiceModelAvailability, headerless = false) {
   return fields.filter(field => !footerFieldKeys?.has(field.key)).map(field => {
     const value = state.values[field.key]
-    const optional = !field.required ? [{ value: '@unset', label: 'Default' }] : []
+    const optional = !field.required ? [{ value: '@unset', label: headerless ? `Select ${field.label}` : 'Default' }] : []
     const nullable = field.nullable ? [{ value: 'null', label: 'None' }] : []
     const selected = Object.prototype.hasOwnProperty.call(state.values, field.key) ? JSON.stringify(value) : '@unset'
     const changeChoice = (token: string) => {
@@ -1411,13 +1517,13 @@ function nativeFieldControls<T extends { values: Record<string, FalJson>; drafts
     const choices = [...optional, ...nullable, ...(field.control === 'boolean' ? [true, false] : field.choices || []).map(choice => ({ value: JSON.stringify(choice), label: typeof choice === 'string' ? choice : JSON.stringify(choice) }))]
     if (selected !== '@unset' && !choices.some(choice => choice.value === selected)) choices.push({ value: selected, label: `Unavailable (${String(value)})`, disabled: true } as typeof choices[number])
     const input = field.control === 'choice' || field.control === 'boolean'
-      ? <SimpleMenuSelect ariaLabel={`Model ${field.label}`} defaultLabel={choices.find(choice => choice.value === String(field.schema.default))?.label || choices[0]?.label} fillTrack value={selected} options={choices} onChange={changeChoice} />
+      ? <SimpleMenuSelect ariaLabel={`Model ${field.label}`} displayLabel={headerless && selected === '@unset' ? `Select ${field.label}` : undefined} defaultLabel={choices.find(choice => choice.value === String(field.schema.default))?.label || choices[0]?.label} fillTrack value={selected} options={choices} onChange={changeChoice} />
       : field.control === 'unsupported' ? <input className="voice-primary-input" aria-label={`Model ${field.label}`} readOnly disabled value="Requires supported adapter" />
-      : field.control === 'json' ? <textarea aria-label={`Model ${field.label}`} rows={3} value={state.drafts?.[field.key] ?? (value === undefined ? '' : JSON.stringify(value, null, 2))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, 'json'))} />
-      : <input className="voice-primary-input" aria-label={`Model ${field.label}`} type={field.control === 'number' ? 'number' : 'text'} step={field.schema.multipleOf || (field.schema.type === 'integer' ? 1 : 'any')} value={state.drafts?.[field.key] ?? (value === undefined || value === null ? '' : String(value))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, field.control === 'number' ? 'number' : 'text'))} />
+      : field.control === 'json' ? <textarea aria-label={`Model ${field.label}`} placeholder={headerless && !Object.prototype.hasOwnProperty.call(state.values, field.key) && state.drafts?.[field.key] === undefined ? `Select ${field.label}` : undefined} rows={3} value={state.drafts?.[field.key] ?? (value === undefined ? '' : JSON.stringify(value, null, 2))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, 'json'))} />
+      : <input className="voice-primary-input" aria-label={`Model ${field.label}`} placeholder={headerless && !Object.prototype.hasOwnProperty.call(state.values, field.key) && state.drafts?.[field.key] === undefined ? `Select ${field.label}` : undefined} type={field.control === 'number' ? 'number' : 'text'} step={field.schema.multipleOf || (field.schema.type === 'integer' ? 1 : 'any')} value={state.drafts?.[field.key] ?? (value === undefined || value === null ? '' : String(value))} onChange={event => onChange(editNativeInputValue(state, field.key, event.target.value, field.control === 'number' ? 'number' : 'text'))} />
     const voiceMatches = field.key === 'voice' && typeof value === 'string' ? voiceAvailability?.voices?.filter(voice => voice.id === value || voice.label.toLocaleLowerCase() === value.toLocaleLowerCase()) || [] : []
     const voiceSample = field.key === 'voice' && voiceAvailability ? <ElevenVoiceSampleButton voice={voiceMatches.length === 1 ? voiceMatches[0] : undefined} availability={voiceAvailability} /> : undefined
-    return { id: field.key, kind: 'selector' as const, intrinsicWidth: voiceSample ? 147 : 112, minimumWidth: voiceSample ? 107 : 72, node: <label key={field.key} title={field.schema.description}><span>{field.label}</span>{voiceSample ? <div className="voice-field-with-sample">{input}{voiceSample}</div> : input}</label> }
+    return { id: field.key, kind: headerless ? (field.control === 'choice' || field.control === 'boolean' ? 'selector' as const : 'editable-field' as const) : 'selector' as const, intrinsicWidth: voiceSample ? 147 : 112, minimumWidth: voiceSample ? 107 : 72, node: headerless ? <label key={field.key} title={field.schema.description}>{input}</label> : <label key={field.key} title={field.schema.description}><span>{field.label}</span>{voiceSample ? <div className="voice-field-with-sample">{input}{voiceSample}</div> : input}</label> }
   })
 }
 
@@ -1698,6 +1804,24 @@ export function normalizedVideoDuration(data: Pick<StudioNodeData, 'videoEngine'
   if (data.autoDuration) return 'auto'
   // This is an observational value: unsupported saved timing stays visible for review.
   return data.duration ?? generatorVideoDurationLimits(data).selectedSeconds ?? 5
+}
+
+export function musicDurationControl(data: Pick<StudioNodeData, 'musicSeconds' | 'duration'>): {value: string; options: GroupedMenuOption[]} {
+  const value = data.musicSeconds ?? String(data.duration ?? 3)
+  const options: GroupedMenuOption[] = normalizedStoryboardDurationOptions([600]).map(seconds => ({ value: String(seconds), label: formatDurationSeconds(seconds) }))
+  if (!options.some(option => option.value === value)) {
+    // Display rounding is observational: the option/request retains authored milliseconds.
+    try { options.unshift({ value: value, label: formatDurationSeconds(musicPromptDurationMs(value) / 1000) }) }
+    catch {
+      const numeric = /^[-+]?\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value))
+      options.unshift({ value: value, label: numeric ? `${formatDurationSeconds(Number(value))} · review` : 'Select duration', disabled: true })
+    }
+  }
+  options.sort((left, right) => {
+    const seconds = (raw: string) => /^\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : Number.NEGATIVE_INFINITY
+    return seconds(left.value) - seconds(right.value)
+  })
+  return {value, options}
 }
 
 export function videoDurationMenuOptions(data: Pick<StudioNodeData, 'videoEngine' | 'duration' | 'autoDuration' | 'frameRate'>) {
@@ -2013,7 +2137,15 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   }, [data.characterEditorOpen])
   const [costEstimate, setCostEstimate] = useState<GenerationCostEstimate | null>(null)
   const [upscaleWipe, setUpscaleWipe] = useState(50)
-  const meta = kindMeta[data.kind]
+  const voiceChange = data.kind === 'voiceover' && data.voiceEngine === 'elevenlabs-direct' && data.elevenSpeechMode === 'voice-change' && !data.falNative
+  const originalMedia = voiceChange ? runtime?.connectedInputMedia(id, 'audio-in') : undefined
+  const originalTitle = originalMedia?.path?.split(/[\\/]/).pop() || originalMedia?.title || 'Original Audio'
+  const originalSource: OriginalAudioAvailability = !originalMedia ? { status: 'empty' } : originalMedia.type === 'audio' && originalMedia.url ? { status: 'ready', assetId: originalMedia.path || id, revision: originalMedia.path || '', fileName: originalTitle, origin: 'imported', previewUrl: originalMedia.url } : { status: 'unavailable', assetId: originalMedia.path || id, revision: '', fileName: originalTitle }
+  const originalNotice = useRef({ binding: '', version: 0 })
+  const originalBinding = `${id}:${originalSource.status}:${originalMedia?.path || ''}`
+  if (originalNotice.current.binding !== originalBinding) originalNotice.current = { binding: originalBinding, version: originalNotice.current.version + 1 }
+  const originalAudioError = useNodeErrorNotice({ error: voiceChange && originalSource.status === 'unavailable' ? 'Original audio is unavailable. Reconnect a current asset.' : undefined, notificationVersion: originalNotice.current.version })
+  const meta = data.kind === 'voiceover' && data.elevenSpeechMode === 'voice-change' ? { ...kindMeta.voiceover, label: 'Voice Change', subtitle: 'Change Speaker' } : kindMeta[data.kind]
   const nodeAssetTag = fallbackAssetTag(data, meta.label)
   useEffect(() => {
     setAssetTagDraft(nodeAssetTag.slice(1))
@@ -2049,7 +2181,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const canRenameAsset = canRenameNodeAsset(data)
   const isImageGeneratorSurface = data.kind === 'image-generator' || data.kind === 'image-editor'
   const isCanvasGenerator = isImageGeneratorSurface || data.kind === 'video-generator'
-  const activeDisplayError = data.kind === 'video-generator' && videoPrompt?.mode === 'auto' ? videoPrompt.autoError || displayError : displayError
+  const activeDisplayError = data.kind === 'video-generator' && videoPrompt?.mode === 'auto' ? videoPrompt.autoError || displayError : displayError || originalAudioError
   const handleVideoPromptModeKey = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     const group = event.currentTarget.closest('.storyboard-transition-choice')
@@ -2097,7 +2229,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const rawNativeVideoFooterControls = data.falNative?.flow === 'video' && falNativeVideoContract
     ? projectFalNativeVideoFooterControls(falNativeVideoContract, data.falNative)
     : data.higgsfieldNative && higgsfieldNativeVideoView?.contract
-      ? projectNativeVideoFooterFields(higgsfieldVideoSchemaFields || [], data.higgsfieldNative)
+      ? projectHiggsfieldNativeVideoFooterControls(data.higgsfieldNative.endpointId, higgsfieldVideoSchemaFields || [], data.higgsfieldNative)
       : []
   const nativeVideoFooterControls = nativeVideoFooterControlsWithOneSound(rawNativeVideoFooterControls)
   const nativeVideoFooterFieldKeys = new Set(nativeVideoFooterControls.map(control => control.fieldKey || control.key))
@@ -2316,7 +2448,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
     let active = true
     const timer = window.setTimeout(() => { void runtime?.estimateNode(id).then((estimate) => { if (active) setCostEstimate(estimate) }).catch(() => { if (active) setCostEstimate(null) }) }, 260)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [data.kind, data.videoEngine, data.duration, data.quantity, data.resolution, data.scale, data.imageResolution, data.voiceEngine, id, runnable, runtime])
+  }, [data.kind, data.videoEngine, data.duration, data.quantity, data.resolution, data.scale, data.imageResolution, data.voiceEngine, data.musicModelId, data.musicGenerationMode, data.musicSeconds, data.musicPlanDrafts, id, runnable, runtime])
   const costTooltip = costEstimate ? `Estimated cost: ${costEstimate.totalCost.toLocaleString(undefined, { style: 'currency', currency: costEstimate.currency })}` : 'Estimated cost unavailable'
   const billingProvider: ServiceProvider = generationServiceProvider(data)
   const providerAccount = runtime?.providerAccount(billingProvider)
@@ -2450,10 +2582,9 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       : control.key === 'resolution' ? 48
         : control.key === 'fps' ? 62 : 28
   const nativeVideoFooterFieldNodes = nativeVideoFooterControls.map(control => ({
-    id: nativeVideoFooterFieldId(control), kind: control.key === 'sound' || control.key === 'generate_audio' ? 'intrinsic' as const : 'selector' as const,
+    id: nativeVideoFooterFieldId(control), kind: control.key === 'sound' || control.key === 'generate_audio' ? 'fixed-action' as const : 'selector' as const,
     visible: true, available: true, defaultLabel: control.selectedToken === '@default' && control.hasDefault ? nativeVideoFooterOptionLabel(control, { token: '@default', kind: 'default', label: '', value: control.defaultValue }) : control.options.find(option => option.token === control.selectedToken)?.label || control.label,
-    intrinsicWidth: nativeVideoFooterFieldWidth(control), minimumWidth: control.key === 'duration' ? 38 : 44, priority: control.key === 'sound' || control.key === 'generate_audio' ? 45 : 55,
-    preferredRow: control.key === 'aspect_ratio' || control.key === 'duration' ? 0 : 1, preferredZone: 'middle' as const,
+    intrinsicWidth: nativeVideoFooterFieldWidth(control), minimumWidth: control.key === 'sound' || control.key === 'generate_audio' ? 28 : control.key === 'duration' ? 38 : 44, priority: control.key === 'sound' || control.key === 'generate_audio' ? 45 : 55,
     node: data.falNative?.flow === 'video'
       ? <NativeVideoFooterField control={control} state={data.falNative} onChange={updateNativeVideoFooterState} running={running} draftNode={falDraftResolution ? data : undefined} onDraftPatch={patch => runtime?.updateNode(id, patch)} />
       : data.higgsfieldNative
@@ -2461,16 +2592,16 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
         : null,
   }))
   const nativeVideoFooterControlsForGroup: FluidGroupControl<string>[] = nativeVideoFooterState && nativeVideoModelSelect ? [
-    { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: 'Seedance 2.5…', fullLabel: nativeVideoModelLabel, compactLabel: nativeVideoModelLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, preferredRow: 0, preferredZone: 'start', fixedAnchor: 'first', node: nativeVideoModelSelect },
-    { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: nativeFpsLabel(nativeVideoOutputFps), intrinsicWidth: 62, minimumWidth: 46, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect className="compact-fps" ariaLabel="Motion FPS" disabled={running} displayLabel={nativeVideoCadenceIsNative || nativeVideoMotionCadence === undefined ? nativeFpsLabel(nativeVideoOutputFps) : `${nativeVideoMotionCadence} fps${nativeVideoMotionOptions.includes(nativeVideoMotionCadence) ? '' : ' · review'}`} defaultLabel={nativeFpsLabel(nativeVideoOutputFps)} fillTrack value={nativeVideoCadenceIsNative || nativeVideoMotionCadence === undefined ? '@native' : String(nativeVideoMotionCadence)} options={[
+    { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: 'Seedance 2.5…', fullLabel: nativeVideoModelLabel, compactLabel: nativeVideoModelLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, node: nativeVideoModelSelect },
+    { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: nativeFpsLabel(nativeVideoOutputFps), intrinsicWidth: 62, minimumWidth: 46, priority: 55, node: <SimpleMenuSelect className="compact-fps" ariaLabel="Motion FPS" disabled={running} displayLabel={nativeVideoCadenceIsNative || nativeVideoMotionCadence === undefined ? nativeFpsLabel(nativeVideoOutputFps) : `${nativeVideoMotionCadence} fps${nativeVideoMotionOptions.includes(nativeVideoMotionCadence) ? '' : ' · review'}`} defaultLabel={nativeFpsLabel(nativeVideoOutputFps)} fillTrack value={nativeVideoCadenceIsNative || nativeVideoMotionCadence === undefined ? '@native' : String(nativeVideoMotionCadence)} options={[
       { value: '@native', label: nativeFpsLabel(nativeVideoOutputFps) },
       ...nativeVideoMotionOptions.map(fps => ({ value: String(fps), label: `${fps} fps` })),
       ...(!nativeVideoCadenceIsNative && nativeVideoMotionCadence !== undefined && !nativeVideoMotionOptions.includes(nativeVideoMotionCadence) ? [{ value: String(nativeVideoMotionCadence), label: `${nativeVideoMotionCadence} fps · review`, disabled: true }] : []),
     ]} onChange={value => runtime?.updateNode(id, value === '@native' ? { motionCadenceMode: 'native' } : { motionCadence: Number(value), motionCadenceMode: 'custom' })} /> },
     ...nativeVideoFooterFieldNodes,
-    { id: 'quantity', kind: 'bounded-elastic', visible: nativeVideoLocalQuantityAvailable, available: nativeVideoLocalQuantityAvailable, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, preferredRow: 1, preferredZone: 'start', node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
-    { id: 'settings', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 95, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button> },
-    { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
+    { id: 'quantity', kind: 'bounded-elastic', visible: nativeVideoLocalQuantityAvailable, available: nativeVideoLocalQuantityAvailable, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
+    { id: 'settings', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 95, node: <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button> },
+    { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
   ] : []
 
   const nativeVoiceState = data.kind === 'voiceover' ? data.falNative : undefined
@@ -2480,15 +2611,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
   const nativeVoiceCatalog = useMemo(() => nativeVoiceField?.choices ? allNativeVoices && {...allNativeVoices,voices:allNativeVoices.voices?.filter(voice => nativeVoiceField.choices!.some(choice => typeof choice === 'string' && (nativeVoiceField.key === 'voice_id' ? choice === voice.id : choice.toLowerCase() === voice.label.toLowerCase())))} : allNativeVoices,[allNativeVoices,nativeVoiceField])
   const nativeVoiceValue = nativeVoiceField && nativeVoiceState?.values[nativeVoiceField.key]
   const nativeVoiceMatches = typeof nativeVoiceValue === 'string' ? nativeVoiceCatalog?.voices?.filter(voice => nativeVoiceField?.key === 'voice_id' ? voice.id === nativeVoiceValue : voice.label.toLocaleLowerCase() === nativeVoiceValue.toLocaleLowerCase()) || [] : []
-  const nativeVoiceInput = nativeVoiceState && nativeVoiceField ? /elevenlabs/i.test(nativeVoiceState.endpointId) ? <label><span>Voice</span><VoicePicker Selector={SimpleMenuSelect} provider="fal" availability={nativeVoiceCatalog} ariaLabel={nativeVoiceField.label || 'Voice'} value={typeof nativeVoiceValue === 'string' ? nativeVoiceValue : ''} valueType={nativeVoiceField.key === 'voice_id' ? 'id' : 'name'} onChange={voice => runtime?.updateNode(id,{falNative:{...nativeVoiceState,values:{...nativeVoiceState.values,[nativeVoiceField.key]:nativeVoiceField.key === 'voice_id' ? voice.id : voice.label}}})}/></label> : nativeFieldControls(nativeVoiceState, [nativeVoiceField], falNative => runtime?.updateNode(id, { falNative }))[0]?.node : undefined
-  const nativeVoiceModelAndFields = nativeVoiceState && <div className="native-model-field-section voice-footer-fields">
-    <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag">
-      <FluidControlGroup className="voice-primary-row" ariaLabel="Selected Live Model" recalculationKey={nativeVoiceState.endpointId} gap={7} allocation={{ minRows: 1, maxRows: 1 }} controls={[
-        { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <label><span>Model</span>{nativeModelSelect}</label> },
-      ]} />
-    </div>
-    <FalNativeFields state={nativeVoiceState} contract={nativeVoiceContract} placement="primary" onChange={falNative => runtime?.updateNode(id, { falNative })} footerFieldKeys={new Set(nativeVoiceField ? [nativeVoiceField.key] : [])} />
-  </div>
+  const nativeVoiceInput = nativeVoiceState && nativeVoiceField ? /elevenlabs/i.test(nativeVoiceState.endpointId) ? <label><VoicePicker Selector={SimpleMenuSelect} provider="fal" availability={nativeVoiceCatalog} ariaLabel={nativeVoiceField.label || 'Voice'} value={typeof nativeVoiceValue === 'string' ? nativeVoiceValue : ''} valueType={nativeVoiceField.key === 'voice_id' ? 'id' : 'name'} onChange={voice => runtime?.updateNode(id,{falNative:{...nativeVoiceState,values:{...nativeVoiceState.values,[nativeVoiceField.key]:nativeVoiceField.key === 'voice_id' ? voice.id : voice.label}}})}/></label> : nativeFieldControls(nativeVoiceState, [nativeVoiceField], falNative => runtime?.updateNode(id, { falNative }), undefined, undefined, true)[0]?.node : undefined
 
   const genericQuantity = <>{!data.falNative && !['element', 'location', 'wardrobe'].includes(data.kind) && <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster">
             <button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, -1) : runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={12} /></button>
@@ -2496,55 +2619,56 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
             <button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => data.kind === 'voiceover' ? runtime?.adjustVoiceoverQuantity(id, 1) : runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={12} /></button>
           </span></div>}</>
 
+  const genericSettings = <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button>
+  const genericRun = <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={13} fill="currentColor" />}</button></PlayTooltip>
+  const soundEffectsFooter = data.kind === 'sound-effects' && !data.falNative
+  const directMusic = isDirectMusicNode(data)
+  const musicPlanMode = directMusic && data.musicGenerationMode === 'plan'
+  const musicPlanDrafts = data.musicPlanDrafts === undefined ? initialMusicPlanDrafts() : data.musicPlanDrafts
+  const musicModelOptions: Array<{ value: MusicModel; label: string }> = [{ value: 'music_v1', label: 'Music v1' }, { value: 'music_v2', label: 'Music v2' }, { value: 'music_v2_5', label: 'Music v2.5' }]
+  const {value: musicDurationRaw, options: musicDurationOptions} = musicDurationControl(data)
+
+
   const voiceFooter = data.kind === 'voiceover'
   const directVoiceCatalog = runtime?.serviceAvailability?.('elevenlabs')
   const legacyVoiceCatalog = runtime?.serviceAvailability?.('fal')
   const voiceFooterCatalog = data.voiceEngine === 'elevenlabs-direct' && !data.falNative ? directVoiceCatalog : legacyVoiceCatalog
-  const nonNativeVoiceFields = <>{data.kind === 'voiceover' && !data.falNative && data.voiceEngine === 'elevenlabs-direct' && <DirectElevenVoiceControls footer quantityControl={genericQuantity} data={data} availability={runtime?.serviceAvailability?.('elevenlabs')} fishAvailability={runtime?.serviceAvailability?.('fish')} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
-{data.kind === 'voiceover' && !data.falNative && data.voiceEngine !== 'elevenlabs-direct' && <div className="voice-primary-controls equalized-control-group nodrag" aria-label="Primary Voice Controls">
-        <FluidControlGroup
-          className="voice-primary-row voice-primary-row-two"
-          ariaLabel="Voice Model And Voice Controls"
-          gap={7}
-          allocation={{ minRows: 1, maxRows: 2, firstId: 'model' }}
-          recalculationKey={`${data.voiceEngine}:${data.fishModel || ''}:${data.fishReferenceId || ''}:${data.voice || ''}`}
-          controls={[
-            { id: 'model', kind: 'selector', defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model', intrinsicWidth: 138, node: <label className="voice-primary-model-field"><span>Model</span><VoiceModelSelect className="voice-primary-model" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} fishAvailability={runtime?.serviceAvailability?.('fish')} models={runtime?.availableModels('elevenlabs') || []} onChange={(patch) => runtime?.updateNode(id, patch)} /></label> },
-          ] as FluidGroupControl<'model' | 'voice'>[]}
-        />
-        {data.voiceEngine !== 'fish-audio' && <>
-          <FluidControlGroup
-            className="voice-primary-row voice-primary-row-three"
-            ariaLabel="Voice Language Output And Speed Controls"
-            gap={7}
-            allocation={{ minRows: 1, maxRows: 2 }}
-            recalculationKey={`${data.languageCode || 'eng'}:${data.audioOutputFormat || 'mp3_44100_128'}:${data.speed ?? 1}`}
-            controls={[
-              { id: 'language', kind: 'selector', intrinsicWidth: 92, node: <label className="voice-primary-language-field"><span>Language</span><SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" defaultLabel="English" fillTrack value={normalizedElevenV3LanguageCode(data.languageCode) || 'eng'} options={[...ELEVEN_V3_LANGUAGES]} onChange={(languageCode) => runtime?.updateNode(id, { languageCode })} /></label> },
-              { id: 'output', kind: 'selector', intrinsicWidth: 130, node: <label className="voice-primary-output-field"><span>Output</span><SimpleMenuSelect ariaLabel="Voice Output Format" defaultLabel={audioFormatLabel(ELEVEN_AUDIO_OUTPUT_FORMATS[0])} fillTrack value={data.audioOutputFormat || 'mp3_44100_128'} options={ELEVEN_AUDIO_OUTPUT_FORMATS.map((value) => ({ value, label: audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></label> },
-              { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label className="voice-primary-speed-field"><span>Speed</span><SimpleMenuSelect ariaLabel="ElevenLabs speech speed" defaultLabel="1×" fillTrack value={String(Number((Math.min(1.2, Math.max(0.7, data.speed ?? 1)) * 20).toFixed(0)) / 20)} options={ELEVEN_SPEED_OPTIONS} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
-            ]}
-          />
-          {!usesBuiltInElevenVoice && <label className="voice-primary-custom"><span>Custom Voice</span><input className="voice-primary-input" aria-label="Custom ElevenLabs voice name or ID" value={data.voice || ''} onChange={(event) => runtime?.updateNode(id, { voice: event.target.value, error: undefined })} placeholder="Voice name or ID (required)" /></label>}
-        </>}
-        {data.voiceEngine === 'fish-audio' && <FluidControlGroup
-          className="voice-primary-row voice-primary-output-row"
-          ariaLabel="Fish Audio Output Controls"
-          gap={7}
-          allocation={{ minRows: 1, maxRows: 3 }}
-          recalculationKey={`${data.fishFormat || 'mp3'}:${data.fishSampleRate || 44100}:${data.fishMp3Bitrate || 128}:${data.fishOpusBitrate ?? -1000}:${data.fishVolume ?? 0}:${data.speed ?? 1}`}
-          controls={[
-            { id: 'format', kind: 'selector', intrinsicWidth: 52, node: <label><span>Format</span><SimpleMenuSelect ariaLabel="Fish Audio Format" defaultLabel="MP3" fillTrack value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label> },
-            { id: 'sample-rate', kind: 'selector', intrinsicWidth: 70, node: <label><span>Sample Rate</span><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" defaultLabel="44.1 kHz" fillTrack value={data.fishSampleRate === undefined ? '@default' : String(data.fishSampleRate)} options={fishSampleRateOptions(data.fishFormat, data.fishSampleRate)} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label> },
-            ...((data.fishFormat || 'mp3') === 'mp3' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" defaultLabel="128 kbps" fillTrack value={String(data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', data.fishMp3Bitrate ?? 128)} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label> }] : []),
-            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><span>Bitrate</span><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? -1000)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? -1000)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
-            { id: 'speed', kind: 'selector', intrinsicWidth: 52, node: <label><span>Speed</span><SimpleMenuSelect ariaLabel="Fish Audio Speed" defaultLabel="1×" fillTrack value={String(data.speed ?? 1)} options={fishNumberOptions(Array.from({ length: 31 }, (_, i) => Number((0.5 + i / 20).toFixed(2))), data.speed ?? 1, '×', 0.5, 2)} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
-            { id: 'volume', kind: 'selector', intrinsicWidth: 52, node: <label><span>Volume</span><SimpleMenuSelect ariaLabel="Fish Audio Volume" defaultLabel="0 dB" fillTrack value={String(data.fishVolume ?? 0)} options={fishNumberOptions(Array.from({ length: 41 }, (_, i) => i - 20), data.fishVolume ?? 0, ' dB', -20, 20)} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label> },
-          ]}
-        />}
-      </div>}</>
-  const nonNativeVoiceSpeaker = voiceFooter && !data.falNative && !isElevenDialogue(data) ? <label><span>{data.voiceEngine === 'fish-audio' ? 'Voice ID' : 'Voice'}</span>{data.voiceEngine === 'fish-audio' ? <input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" value={data.fishReferenceId || ''} onChange={event => runtime?.updateNode(id,{fishReferenceId:event.target.value,error:undefined})} placeholder="Reference ID (required)"/> : <VoicePicker Selector={SimpleMenuSelect} provider={data.voiceEngine === 'elevenlabs-direct' ? 'elevenlabs' : 'fal'} availability={voiceFooterCatalog} value={data.voice || ''} valueType={data.voiceEngine === 'elevenlabs-direct' ? 'id' : 'name'} ariaLabel={data.voiceEngine === 'elevenlabs-direct' ? 'ElevenLabs voice ID' : 'ElevenLabs voice'} onRefresh={runtime?.refreshVoiceAvailability ? () => runtime.refreshVoiceAvailability!(data.voiceEngine === 'elevenlabs-direct' ? 'elevenlabs' : 'fal') : undefined} onChange={voice => runtime?.updateNode(id,{voice:data.voiceEngine === 'elevenlabs-direct' ? voice.id : voice.label,error:undefined})}/>}</label> : undefined
+  const legacyVoiceFooterFields: FluidGroupControl<string>[] = [
+    ...[
+            { id: 'model', kind: 'selector' as const, defaultLabel: 'ElevenLabs Eleven v3', fullLabel: 'ElevenLabs Eleven v3', compactLabel: 'ElevenLabs v3', minimumWidth: 80, shrinkPriority: 'model' as const, intrinsicWidth: 138, node: <label className="voice-primary-model-field"><VoiceModelSelect className="voice-primary-model" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} fishAvailability={runtime?.serviceAvailability?.('fish')} models={runtime?.availableModels('elevenlabs') || []} onChange={(patch) => runtime?.updateNode(id, patch)} /></label> },
+          ],
+    ...(data.voiceEngine !== 'fish-audio' ? [
+              { id: 'language', kind: 'selector' as const, intrinsicWidth: 92, node: <label className="voice-primary-language-field"><SimpleMenuSelect className="voice-primary-language" menuClassName="voice-language-menu" ariaLabel="Voice language" displayLabel={data.languageCode === undefined ? "Select Language" : undefined} defaultLabel="English" fillTrack value={normalizedElevenV3LanguageCode(data.languageCode) || 'eng'} options={[...ELEVEN_V3_LANGUAGES]} onChange={(languageCode) => runtime?.updateNode(id, { languageCode })} /></label> },
+              { id: 'output', kind: 'selector' as const, intrinsicWidth: 130, node: <label className="voice-primary-output-field"><SimpleMenuSelect ariaLabel="Voice Output Format" displayLabel={data.audioOutputFormat === undefined ? "Select Output Format" : undefined} defaultLabel={audioFormatLabel(ELEVEN_AUDIO_OUTPUT_FORMATS[0])} fillTrack value={data.audioOutputFormat || 'mp3_44100_128'} options={ELEVEN_AUDIO_OUTPUT_FORMATS.map((value) => ({ value, label: audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></label> },
+              { id: 'speed', kind: 'selector' as const, intrinsicWidth: 52, node: <label className="voice-primary-speed-field"><SimpleMenuSelect ariaLabel="ElevenLabs speech speed" displayLabel={data.speed === undefined ? "Select Speed" : undefined} defaultLabel="1×" fillTrack value={String(Number((Math.min(1.2, Math.max(0.7, data.speed ?? 1)) * 20).toFixed(0)) / 20)} options={ELEVEN_SPEED_OPTIONS} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
+            ] : []),
+    ...(data.voiceEngine !== 'fish-audio' && !usesBuiltInElevenVoice ? [{ id: 'custom-voice', kind: 'editable-field' as const, intrinsicWidth: 132, minimumWidth: 72, node: <input className="voice-primary-input" aria-label="Custom ElevenLabs voice name or ID" value={data.voice || ''} onChange={(event) => runtime?.updateNode(id, { voice: event.target.value, error: undefined })} placeholder="Voice name or ID (required)" /> }] : []),
+    ...(data.voiceEngine === 'fish-audio' ? [
+            { id: 'format', kind: 'selector' as const, intrinsicWidth: 52, node: <label><SimpleMenuSelect ariaLabel="Fish Audio Format" displayLabel={data.fishFormat === undefined ? "Select Format" : undefined} defaultLabel="MP3" fillTrack value={data.fishFormat || 'mp3'} options={FISH_AUDIO_FORMATS.map((value) => ({ value, label: value.toUpperCase() }))} onChange={(value) => runtime?.updateNode(id, { fishFormat: value as StudioNodeData['fishFormat'] })} /></label> },
+            { id: 'sample-rate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><SimpleMenuSelect ariaLabel="Fish Audio Sample Rate" displayLabel={data.fishSampleRate === undefined ? "Select Sample Rate" : undefined} defaultLabel="44.1 kHz" fillTrack value={data.fishSampleRate === undefined ? '@default' : String(data.fishSampleRate)} options={fishSampleRateOptions(data.fishFormat, data.fishSampleRate)} onChange={(value) => runtime?.updateNode(id, { fishSampleRate: value === '@default' ? undefined : Number(value) })} /></label> },
+            ...((data.fishFormat || 'mp3') === 'mp3' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><SimpleMenuSelect ariaLabel="Fish MP3 Bitrate" displayLabel={data.fishMp3Bitrate === undefined ? "Select Bitrate" : undefined} defaultLabel="128 kbps" fillTrack value={String(data.fishMp3Bitrate ?? 128)} options={fishBitrateOptions('mp3', data.fishMp3Bitrate ?? 128)} onChange={(value) => runtime?.updateNode(id, { fishMp3Bitrate: Number(value) as StudioNodeData['fishMp3Bitrate'] })} /></label> }] : []),
+            ...(data.fishFormat === 'opus' ? [{ id: 'bitrate', kind: 'selector' as const, intrinsicWidth: 70, node: <label><SimpleMenuSelect ariaLabel="Fish Opus Bitrate" displayLabel={data.fishOpusBitrate === undefined ? "Select Bitrate" : undefined} defaultLabel="48 kbps" fillTrack value={String(data.fishOpusBitrate ?? -1000)} options={fishBitrateOptions('opus', data.fishOpusBitrate ?? -1000)} onChange={(value) => runtime?.updateNode(id, { fishOpusBitrate: Number(value) as StudioNodeData['fishOpusBitrate'] })} /></label> }] : []),
+            { id: 'speed', kind: 'selector' as const, intrinsicWidth: 52, node: <label><SimpleMenuSelect ariaLabel="Fish Audio Speed" displayLabel={data.speed === undefined ? "Select Speed" : undefined} defaultLabel="1×" fillTrack value={String(data.speed ?? 1)} options={fishNumberOptions(Array.from({ length: 31 }, (_, i) => Number((0.5 + i / 20).toFixed(2))), data.speed ?? 1, '×', 0.5, 2)} onChange={(value) => runtime?.updateNode(id, { speed: Number(value) })} /></label> },
+            { id: 'volume', kind: 'selector' as const, intrinsicWidth: 52, node: <label><SimpleMenuSelect ariaLabel="Fish Audio Volume" displayLabel={data.fishVolume === undefined ? "Select Volume" : undefined} defaultLabel="0 dB" fillTrack value={String(data.fishVolume ?? 0)} options={fishNumberOptions(Array.from({ length: 41 }, (_, i) => i - 20), data.fishVolume ?? 0, ' dB', -20, 20)} onChange={(value) => runtime?.updateNode(id, { fishVolume: Number(value) })} /></label> },
+          ] : []),
+  ]
+  const nonNativeVoiceSpeaker = voiceFooter && !data.falNative && !isElevenDialogue(data) ? <label>{data.voiceEngine === 'fish-audio' ? <input className="voice-primary-input" aria-label="Fish Audio voice Reference ID" value={data.fishReferenceId || ''} onChange={event => runtime?.updateNode(id,{fishReferenceId:event.target.value,error:undefined})} placeholder="Reference ID (required)"/> : <VoicePicker Selector={SimpleMenuSelect} provider={data.voiceEngine === 'elevenlabs-direct' ? 'elevenlabs' : 'fal'} availability={voiceFooterCatalog} value={data.voice || ''} valueType={data.voiceEngine === 'elevenlabs-direct' ? 'id' : 'name'} ariaLabel={data.voiceEngine === 'elevenlabs-direct' ? 'ElevenLabs voice ID' : 'ElevenLabs voice'} onRefresh={runtime?.refreshVoiceAvailability ? () => runtime.refreshVoiceAvailability!(data.voiceEngine === 'elevenlabs-direct' ? 'elevenlabs' : 'fal') : undefined} onChange={voice => runtime?.updateNode(id,{voice:data.voiceEngine === 'elevenlabs-direct' ? voice.id : voice.label,error:undefined})}/>}</label> : undefined
   const nonNativeVoicePreview = voiceFooterCatalog?.voices?.find(voice => data.voiceEngine === 'elevenlabs-direct' ? voice.id === data.voice : voice.label.toLowerCase() === (data.voice || '').toLowerCase())
+
+  const voiceFooterControls: FluidGroupControl<string>[] = nativeVoiceState ? [
+    { id: 'model', kind: 'selector' as const, intrinsicWidth: 138, minimumWidth: 80, node: nativeModelSelect },
+    ...nativeFieldControls(nativeVoiceState, (nativeVoiceContract?.runtime?.fields || []).filter(field => field.placement === 'primary' && field.key !== nativeVoiceState.promptField && field.control !== 'media' && !(field.key === 'draft' && supportsFalSeedanceDraft(nativeVoiceState.endpointId))), falNative => runtime?.updateNode(id, { falNative }), new Set(nativeVoiceField ? [nativeVoiceField.key] : []), undefined, true).map(control => ({ ...control, id: `native:${control.id}` })),
+    ...(nativeVoiceInput ? [{ id: 'voice', kind: 'selector' as const, intrinsicWidth: 112, minimumWidth: 72, node: nativeVoiceInput }, { id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <ElevenVoiceSampleButton voice={nativeVoiceMatches.length === 1 ? nativeVoiceMatches[0] : undefined} availability={nativeVoiceCatalog} /> }] : []),
+    { id: 'settings', kind: 'fixed-action' as const, intrinsicWidth: 28, node: genericSettings },
+    { id: 'run', kind: 'fixed-action' as const, intrinsicWidth: 28, node: genericRun },
+  ] : [
+    ...(data.voiceEngine === 'elevenlabs-direct' ? directElevenVoiceFooterFields({ data, availability: directVoiceCatalog, fishAvailability: runtime?.serviceAvailability?.('fish'), falAvailability: legacyVoiceCatalog, quantityControl: genericQuantity, onFalSelect: endpointId => runtime?.selectFalModel?.(id, endpointId), onChange: patch => runtime?.updateNode(id, patch) }) : legacyVoiceFooterFields),
+    ...(data.voiceEngine === 'elevenlabs-direct' && !isElevenDialogue(data) && !directVoiceCatalog?.voices?.some(voice => voice.id === data.voice) ? [{ id: 'custom-voice', kind: 'editable-field' as const, intrinsicWidth: 132, minimumWidth: 72, node: <input className="voice-primary-input" aria-label="ElevenLabs voice ID entry" value={data.voice || ''} placeholder="Voice ID (required)" onChange={event => runtime?.updateNode(id,{voice:event.target.value,error:undefined})}/> }] : []),
+    ...(data.voiceEngine !== 'elevenlabs-direct' ? [{ id: 'quantity', kind: 'bounded-elastic' as const, intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: genericQuantity }] : []),
+    ...(nonNativeVoiceSpeaker ? [{ id: 'voice', kind: data.voiceEngine === 'fish-audio' ? 'editable-field' as const : 'selector' as const, intrinsicWidth: 112, minimumWidth: 72, node: nonNativeVoiceSpeaker }, { id: 'sample', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <ElevenVoiceSampleButton voice={data.voiceEngine === 'fish-audio' ? undefined : nonNativeVoicePreview} availability={voiceFooterCatalog} /> }] : []),
+    { id: 'settings', kind: 'fixed-action' as const, intrinsicWidth: 28, node: genericSettings },
+    { id: 'run', kind: 'fixed-action' as const, intrinsicWidth: 28, node: genericRun },
+  ]
 
   return (
     <article className={`studio-node kind-${data.kind} tone-${meta.tone} ${selected ? 'is-selected' : ''} ${data.locked ? 'is-locked' : ''} ${running ? 'is-generating' : ''} ${isCanvasGenerator ? 'is-canvas-generator' : ''} ${isMediaTile ? 'is-media-tile' : ''}`} aria-busy={running || undefined}>
@@ -2580,9 +2704,11 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       )}
 
       {data.kind === 'prompt' && <footer className="compact-generator-footer prompt-node-footer nodrag">
-        <GroupedMenuSelect catalog promptCatalog fillTrack ariaLabel="Prompt Revamp model" defaultLabel="Choose Model" value={`${enhanceProvider}::${enhanceModel}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map(group => ({ label: group.label, options: group.models.map(model => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={selection => { const [provider, ...model] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: model.join('::'), error: undefined, progress: undefined }) }} />
-        <PlayTooltip tooltip={running ? 'Revamping prompt' : 'Revamp Prompt'} disabled={running || enhanceBlocked || !enhanceModel || !(data.prompt || '').trim()}><button type="button" className="footer-run prompt-revamp-button" aria-label="Revamp Prompt" disabled={running || enhanceBlocked || !enhanceModel || !(data.prompt || '').trim()} onClick={() => runtime?.runAssistantNode(id)}>{running ? <LoaderCircle size={13} className="spin" /> : <WandSparkles size={13} />}</button></PlayTooltip>
-      </footer>}
+          <GeneratorFooterControlGroup ariaLabel="Prompt Footer Controls" modelId="model" runId="revamp" recalculationKey={`${enhanceProvider}:${enhanceModel}:${running}`} controls={[
+            { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <GroupedMenuSelect catalog promptCatalog fillTrack ariaLabel="Prompt Revamp model" defaultLabel="Choose Model" value={`${enhanceProvider}::${enhanceModel}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map(group => ({ label: group.label, options: group.models.map(model => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={selection => { const [provider, ...model] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: model.join('::'), error: undefined, progress: undefined }) }} /> },
+            { id: 'revamp', kind: 'fixed-action', intrinsicWidth: 28, node: <PlayTooltip tooltip={running ? 'Revamping prompt' : 'Revamp Prompt'} disabled={running || enhanceBlocked || !enhanceModel || !(data.prompt || '').trim()}><button type="button" className="footer-run prompt-revamp-button" aria-label="Revamp Prompt" disabled={running || enhanceBlocked || !enhanceModel || !(data.prompt || '').trim()} onClick={() => runtime?.runAssistantNode(id)}>{running ? <LoaderCircle size={13} className="spin" /> : <WandSparkles size={13} />}</button></PlayTooltip> },
+          ]} />
+        </footer>}
 
       {data.kind === 'upload' && !data.assetUrl && (
         <button className="upload-drop media-tile-empty nodrag" onClick={() => runtime?.importAsset(id)}>
@@ -2697,11 +2823,12 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       {!isSemanticReference && !isCanvasGenerator && data.kind !== 'upscaler' && (mediaLinkState
         ? <div className="media-tile-preview"><MediaOfflineState mediaFamily={mediaLinkState.mediaFamily} state={mediaLinkState.state} findingDots={mediaLinkState.findingDots} onFind={() => runtime?.findOfflineAsset(mediaLinkState.assetId)} /></div>
         : activeGeneratedResult
-        ? <div className={`generated-media-stage nodrag ${isMediaTile ? 'media-tile-preview' : ''}`} {...generatedMediaInteraction}>{previewMedia()}{generatedMediaOverlay}</div>
+        ? <div className={`generated-media-stage nodrag ${isMediaTile ? 'media-tile-preview' : ''} ${voiceChange ? 'voice-change-output' : ''}`} {...generatedMediaInteraction}>{previewMedia()}{generatedMediaOverlay}</div>
         : isMediaTile && previewMedia()
           ? <div className="media-tile-preview">{previewMedia()}</div>
           : previewMedia())}
 
+      {voiceChange && <OriginalAudioInput source={originalSource} onAdd={() => runtime?.openInputQuickConnect(id, 'audio-in', window.innerWidth / 2, window.innerHeight / 2)} />}
       {isCanvasGenerator && <>
         {visibleInputRules.length > 0 && <div className="generator-connected-context nodrag">
           <div className="connected-input-rules" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>
@@ -2741,7 +2868,8 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       {mediaContextMenu && createPortal(<div className="generated-media-context-menu" style={{ left: Math.min(mediaContextMenu.x, window.innerWidth - 190), top: Math.min(mediaContextMenu.y, window.innerHeight - 54) }} onMouseDown={(event) => event.stopPropagation()} onMouseLeave={() => setMediaContextMenu(null)}><button onClick={() => { runtime?.copyGeneratedMedia(id, activeGeneratedIndex); setMediaContextMenu(null) }}><Copy size={13} />Copy {activeGeneratedResult?.type === 'video' ? 'Video' : activeGeneratedResult?.type === 'audio' ? 'Audio' : 'Image'}</button></div>, document.body)}
 
       {isElevenDialogue(data) && !data.falNative && <ElevenDialogueEditor data={data} availability={runtime?.serviceAvailability?.('elevenlabs')} onChange={patch => runtime?.updateNode(id, patch)} />}
-      {acceptsText && !isCanvasGenerator && !(isElevenDialogue(data) && !data.falNative) && data.kind !== 'style-reference' && data.kind !== 'character' && (
+      {musicPlanMode && data.musicModelId && <MusicPlanEditor modelId={data.musicModelId} drafts={musicPlanDrafts} onChange={musicPlanDrafts => runtime?.updateNode(id, { musicPlanDrafts, error: undefined })} newSectionId={() => crypto.randomUUID()} />}
+      {acceptsText && !voiceChange && !musicPlanMode && !isCanvasGenerator && !(isElevenDialogue(data) && !data.falNative) && data.kind !== 'style-reference' && data.kind !== 'character' && (
         <>
           {visibleInputRules.length > 0 && <div className="inline-connected-input-rules nodrag" aria-label="Connected Input Fidelity"><ConnectedRuleRows items={visibleInputRules} readOnly={Boolean(data.higgsfieldNative)} onMode={runtime!.setInputFidelity} /></div>}
           <TaggedPromptTextarea
@@ -2801,8 +2929,8 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
 
       {data.higgsfieldNative && <>
         <HiggsfieldFields state={data.higgsfieldNative} view={runtime?.higgsfieldPresets?.()} inputView={runtime?.higgsfieldSchema?.(data.higgsfieldNative.endpointId)} placement="primary" onChange={higgsfieldNative => runtime?.updateNode(id, { higgsfieldNative })} footerFieldKeys={higgsfieldNativeVideoView?.contract ? nativeVideoFooterFieldKeys : undefined} />
-        {nativeVideoFooterState && <div className="compact-generator-footer compact-video-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Video Footer Controls" recalculationKey={`${data.higgsfieldNative.endpointId}:${data.higgsfieldNative.fingerprint || ''}:${JSON.stringify(data.higgsfieldNative.values)}:${JSON.stringify(data.higgsfieldNative.drafts || {})}:${data.motionCadence}:${data.quantity || 1}:${nativeVideoPromptMode}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 2, maxRows: 3, firstId: 'model', terminalIds: ['settings', 'run'], preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'native-fps', 'resolution', 'sound', 'settings', 'run']] }} controls={nativeVideoFooterControlsForGroup} /></div>}
-        {!nativeVideoFooterState && <div className="compact-generator-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Higgsfield Model Actions" recalculationKey={`${data.higgsfieldNative.endpointId}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 1, maxRows: 1, firstId: 'model', terminalIds: ['settings', 'run'] }} controls={[
+        {nativeVideoFooterState && <div className="compact-generator-footer compact-video-footer nodrag"><GeneratorFooterControlGroup className="compact-video-footer-group" ariaLabel="Video Footer Controls" recalculationKey={`${data.higgsfieldNative.endpointId}:${data.higgsfieldNative.fingerprint || ''}:${JSON.stringify(data.higgsfieldNative.values)}:${JSON.stringify(data.higgsfieldNative.drafts || {})}:${data.motionCadence}:${data.quantity || 1}:${nativeVideoPromptMode}:${runDisabled}:${running}`} modelId="model" settingsId="settings" runId="run" iconIds={['sound']} controls={nativeVideoFooterControlsForGroup} /></div>}
+        {!nativeVideoFooterState && <div className="compact-generator-footer nodrag"><GeneratorFooterControlGroup className="compact-video-footer-group" ariaLabel="Higgsfield Model Actions" recalculationKey={`${data.higgsfieldNative.endpointId}:${runDisabled}:${running}`} modelId="model" settingsId="settings" runId="run" iconIds={['sound']} controls={[
           { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <GroupedMenuSelect catalog ariaLabel="Video Model" defaultLabel="Seedance 2.5…" fillTrack displayLabel={data.higgsfieldNative.label} value={`higgsfield-native::${data.higgsfieldNative.endpointId}`} groups={videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data)} onChange={selection => {
             if (selection.startsWith('higgsfield-native::')) runtime?.selectHiggsfieldModel?.(id, selection.slice('higgsfield-native::'.length))
             else if (selection.startsWith('fal-native::')) runtime?.selectFalModel?.(id, selection.slice(12))
@@ -2816,16 +2944,12 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       {data.falNative && <>
         {data.kind !== 'voiceover' && <>
         <div className="native-model-field-section">
-        {!isCanvasGenerator && <div className="primary-node-controls voice-primary-controls equalized-control-group nodrag">
-          <FluidControlGroup className="voice-primary-row" ariaLabel="Selected Live Model" recalculationKey={data.falNative.endpointId} gap={7} allocation={{ minRows: 1, maxRows: 1 }} controls={[
-            { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <label><span>Model</span>{nativeModelSelect}</label> },
-          ]} />
-        </div>}
+
         <FalNativeFields state={data.falNative} contract={runtime?.falSchema?.(data.falNative.endpointId).contract} placement="primary" onChange={(falNative) => runtime?.updateNode(id, { falNative })} footerFieldKeys={falNativeVideoContract ? nativeVideoFooterFieldKeys : undefined} />
         </div>
         </>}
-        {isCanvasGenerator && nativeVideoFooterState && <div className="compact-generator-footer compact-video-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Video Footer Controls" recalculationKey={`${data.falNative.endpointId}:${data.falNative.fingerprint || ''}:${JSON.stringify(data.falNative.values)}:${JSON.stringify(data.falNative.drafts || {})}:${data.motionCadence}:${data.quantity || 1}:${nativeVideoPromptMode}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 2, maxRows: 3, firstId: 'model', terminalIds: ['settings', 'run'], preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'native-fps', 'resolution', 'sound', 'settings', 'run']] }} controls={nativeVideoFooterControlsForGroup} /></div>}
-        {isCanvasGenerator && !nativeVideoFooterState && <div className="compact-generator-footer nodrag"><FluidControlGroup className="compact-video-footer-group" ariaLabel="Live Model Actions" recalculationKey={`${data.falNative.endpointId}:${runDisabled}:${running}`} gap={6} allocation={{ minRows: 1, maxRows: 1, firstId: 'model', terminalIds: ['settings', 'run'] }} controls={[
+        {isCanvasGenerator && nativeVideoFooterState && <div className="compact-generator-footer compact-video-footer nodrag"><GeneratorFooterControlGroup className="compact-video-footer-group" ariaLabel="Video Footer Controls" recalculationKey={`${data.falNative.endpointId}:${data.falNative.fingerprint || ''}:${JSON.stringify(data.falNative.values)}:${JSON.stringify(data.falNative.drafts || {})}:${data.motionCadence}:${data.quantity || 1}:${nativeVideoPromptMode}:${runDisabled}:${running}`} modelId="model" settingsId="settings" runId="run" iconIds={['sound']} controls={nativeVideoFooterControlsForGroup} /></div>}
+        {isCanvasGenerator && !nativeVideoFooterState && <div className="compact-generator-footer nodrag"><GeneratorFooterControlGroup className="compact-video-footer-group" ariaLabel="Live Model Actions" recalculationKey={`${data.falNative.endpointId}:${runDisabled}:${running}`} modelId="model" settingsId="settings" runId="run" iconIds={['sound']} controls={[
           { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: nativeModelSelect },
           { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28, node: <button className="compact-settings compact-options" aria-label="Node Settings" onClick={() => runtime?.openInspector(id)}><Settings size={14} /></button> },
           { id: 'run', kind: 'fixed-action', intrinsicWidth: 28, node: <PlayTooltip tooltip={runTooltip} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass}`} aria-label={running ? 'Stop' : 'Run'} disabled={!running && runDisabled} onClick={() => running ? runtime?.stopNode(id) : runtime?.runNode(id)}>{running ? <StopIcon size={14} /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
@@ -2855,14 +2979,13 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
           slot={<SimpleMenuSelect ariaLabel="Image Aspect Ratio" title="Image Aspect Ratio" defaultLabel={normalizedImageRatio(data.aspectRatio)} fillTrack value={normalizedImageRatio(data.aspectRatio)} options={aspectRatioMenuOptions(usesNanoImageModel ? NANO_IMAGE_RATIOS : IMAGE_RATIOS)} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} />}
           settings={<button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button>}
           run={<PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip>}
-        /> : <FluidControlGroup
+        /> : <GeneratorFooterControlGroup
           className="compact-video-footer-group"
           ariaLabel="Video Footer Controls"
-          allocation={{ minRows: 2, maxRows: 3, firstId: 'model', terminalIds: ['settings', 'run'], preferredRows: [['model', 'motion', 'ratio', 'duration'], ['quantity', 'resolution', 'sound', 'settings', 'run']] }}
-          gap={6}
+          modelId="model" settingsId="settings" runId="run" iconIds={['sound']}
           recalculationKey={`${selectedVideoModel?.id}:${normalizedVideoDuration(data)}:${data.resolution || ''}:${data.aspectRatio || ''}:${data.quantity || 1}:${effectiveMotionCadence}:${Boolean(data.generateAudio)}`}
           controls={([
-            { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: 'Seedance 2.5…', fullLabel: closedVideoLabel, compactLabel: closedVideoLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, preferredRow: 0, preferredZone: 'start', fixedAnchor: 'first', node: <GroupedMenuSelect catalog className="compact-engine video-engine" menuClassName="video-model-menu" ariaLabel="Video Model" accessibleLabel={selectedVideoModel?.label || 'WAN Controlled'} displayLabel={closedVideoLabel} compactLabel={closedVideoLabel} defaultLabel="Seedance 2.5…" fillTrack value={selectedVideoModel?.id || 'wan-controlled'} groups={videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data)} onChange={(engine) => {
+            { id: 'model', kind: 'selector', visible: true, available: true, defaultLabel: 'Seedance 2.5…', fullLabel: closedVideoLabel, compactLabel: closedVideoLabel, intrinsicWidth: 80, minimumWidth: 80, shrinkPriority: 'model', priority: 100, node: <GroupedMenuSelect catalog className="compact-engine video-engine" menuClassName="video-model-menu" ariaLabel="Video Model" accessibleLabel={selectedVideoModel?.label || 'WAN Controlled'} displayLabel={closedVideoLabel} compactLabel={closedVideoLabel} defaultLabel="Seedance 2.5…" fillTrack value={selectedVideoModel?.id || 'wan-controlled'} groups={videoModelGroups(runtime?.serviceAvailability?.('fal'), runtime?.serviceAvailability?.('higgsfield'), data)} onChange={(engine) => {
               if (engine.startsWith('higgsfield-native::')) { runtime?.selectHiggsfieldModel?.(id, engine.slice('higgsfield-native::'.length)); return }
               if (engine.startsWith('fal-native::')) { runtime?.selectFalModel?.(id, engine.slice(12)); return }
               const model = resolveVideoModel(engine)
@@ -2870,16 +2993,16 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
               const durationPatch = normalizedGeneratorDurationPatch({ videoEngine: engine, duration: data.duration, frameRate })
               runtime?.updateNode(id, { videoEngine: engine, aspectRatio: defaultVideoRatio(model) || data.aspectRatio, ...durationPatch, generateAudio: model.nativeAudio ? data.generateAudio : false, resolution: model.resolutions.length ? (model.resolutions.includes(data.resolution || '') ? data.resolution : model.resolutions[0] as StudioNodeData['resolution']) : model.fourK ? '4k' : undefined, frameRate, motionCadence: normalizedMotionCadence(model, frameRate, data.motionCadence), inferenceSteps: model.family === 'wan' ? 40 : data.inferenceSteps, guidanceScale: model.family === 'wan' ? 1 : model.family === 'kling' ? 0.5 : data.guidanceScale, acceleration: model.family === 'wan' ? 'regular' : data.acceleration })
             }} title={providerBlocked ? `${providerAccount?.message || 'This provider is unavailable.'} You can still inspect another model's controls.` : 'Video Model'} /> },
-            { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: nativeFpsLabel(nativeVideoFps), intrinsicWidth: 62, priority: 55, preferredRow: 0, preferredZone: 'middle', node: <GroupedMenuSelect className="compact-fps" ariaLabel="Motion FPS" disabled={running} displayLabel={data.motionCadenceMode === 'native' ? nativeFpsLabel(nativeVideoFps) : `${effectiveMotionCadence} fps`} defaultLabel={nativeFpsLabel(nativeVideoFps)} fillTrack value={data.motionCadenceMode === 'native' ? '@native' : String(effectiveMotionCadence)} groups={[
+            { id: 'motion', kind: 'selector', visible: true, available: true, defaultLabel: nativeFpsLabel(nativeVideoFps), intrinsicWidth: 62, priority: 55, node: <GroupedMenuSelect className="compact-fps" ariaLabel="Motion FPS" disabled={running} displayLabel={data.motionCadenceMode === 'native' ? nativeFpsLabel(nativeVideoFps) : `${effectiveMotionCadence} fps`} defaultLabel={nativeFpsLabel(nativeVideoFps)} fillTrack value={data.motionCadenceMode === 'native' ? '@native' : String(effectiveMotionCadence)} groups={[
               { label: 'Motion FPS', options: [{ value: '@native', label: nativeFpsLabel(nativeVideoFps) }, ...motionCadenceOptions(selectedVideoModel || resolveVideoModel(data.videoEngine), data.frameRate).map((fps) => ({ value: String(fps), label: `${fps} fps` }))] },
             ]} onChange={(value) => runtime?.updateNode(id, value === '@native' ? { motionCadenceMode: 'native' } : { motionCadence: Number(value), motionCadenceMode: 'custom' })} /> },
-            { id: 'ratio', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.ratios.length), defaultLabel: defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9', intrinsicWidth: 44, priority: 50, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Aspect Ratio" disabled={running} title="Video Aspect Ratio" defaultLabel={defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9'} fillTrack value={selectedVideoModel ? resolvedVideoRatio(selectedVideoModel, data.aspectRatio) : '16:9'} options={aspectRatioMenuOptions((selectedVideoModel?.ratios || []).filter((ratio) => ratio !== 'auto'))} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} /> },
-            { id: 'duration', kind: 'selector', visible: true, available: videoDurationOptions(data.videoEngine, data.frameRate).length > 1, defaultLabel: formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0])), intrinsicWidth: 42, priority: 60, preferredRow: 0, preferredZone: 'middle', node: <SimpleMenuSelect ariaLabel="Video Duration" title="Video Duration" defaultLabel={formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0]))} fillTrack value={String(normalizedVideoDuration(data))} options={videoDurationMenuOptions(data)} onChange={(value) => runtime?.updateNode(id, { duration: Number(value), autoDuration: false })} /> },
-            { id: 'quantity', kind: 'bounded-elastic', visible: true, available: true, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, preferredRow: 1, preferredZone: 'start', node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
-            { id: 'resolution', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.resolutions.length), defaultLabel: selectedVideoModel?.resolutions[0] || '720p', intrinsicWidth: 48, priority: 55, preferredRow: 1, preferredZone: 'middle', node: videoDraftProvider(data) === 'byteplus' ? <VideoDraftResolutionSelect data={data} value={data.resolution || selectedVideoModel?.resolutions[0] || '720p'} displayLabel={data.resolution || selectedVideoModel?.resolutions[0] || '720p'} options={(selectedVideoModel?.resolutions || []).map(resolution => ({ value: resolution, label: resolution }))} disabled={running} onPatch={patch => runtime?.updateNode(id, patch)} regularPatch={value => ({ resolution: value as StudioNodeData['resolution'] })} /> : <SimpleMenuSelect className="compact-resolution" ariaLabel="Video Resolution" title="Video Resolution" defaultLabel={selectedVideoModel?.resolutions[0] || '720p'} fillTrack value={selectedVideoModel?.resolutions.includes(data.resolution || '') ? data.resolution || selectedVideoModel.resolutions[0] : selectedVideoModel?.resolutions[0] || ''} options={(selectedVideoModel?.resolutions || []).map((resolution) => ({ value: resolution, label: resolution }))} onChange={(value) => runtime?.updateNode(id, { resolution: value as StudioNodeData['resolution'] })} /> },
-            { id: 'sound', kind: 'intrinsic', visible: true, available: Boolean(selectedVideoModel?.nativeAudio), defaultLabel: 'Sound', intrinsicWidth: 28, priority: 45, preferredRow: 1, preferredZone: 'middle', node: <button type="button" className={`compact-settings compact-options compact-sound ${data.generateAudio ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={Boolean(data.generateAudio)} disabled={running} onClick={() => runtime?.updateNode(id, { generateAudio: !data.generateAudio })}><Volume2 size={14} /></button> },
-            { id: 'settings', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 95, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button> },
-            { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, preferredRow: 1, preferredZone: 'end', fixedAnchor: 'terminal', node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
+            { id: 'ratio', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.ratios.length), defaultLabel: defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9', intrinsicWidth: 44, priority: 50, node: <SimpleMenuSelect ariaLabel="Video Aspect Ratio" disabled={running} title="Video Aspect Ratio" defaultLabel={defaultVideoRatio(selectedVideoModel || resolveVideoModel(data.videoEngine)) || '16:9'} fillTrack value={selectedVideoModel ? resolvedVideoRatio(selectedVideoModel, data.aspectRatio) : '16:9'} options={aspectRatioMenuOptions((selectedVideoModel?.ratios || []).filter((ratio) => ratio !== 'auto'))} onChange={(value) => runtime?.updateNode(id, { aspectRatio: value })} /> },
+            { id: 'duration', kind: 'selector', visible: true, available: videoDurationOptions(data.videoEngine, data.frameRate).length > 1, defaultLabel: formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0])), intrinsicWidth: 42, priority: 60, node: <SimpleMenuSelect ariaLabel="Video Duration" title="Video Duration" defaultLabel={formatDurationSeconds(Number(videoDurationOptions(data.videoEngine, data.frameRate)[0]))} fillTrack value={String(normalizedVideoDuration(data))} options={videoDurationMenuOptions(data)} onChange={(value) => runtime?.updateNode(id, { duration: Number(value), autoDuration: false })} /> },
+            { id: 'quantity', kind: 'bounded-elastic', visible: true, available: true, defaultLabel: 'x1', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, priority: 50, node: <div className="quantity-stepper"><span className="quantity-stepper-inner-cluster"><button title="Decrease Outputs" aria-label="Decrease Outputs" disabled={(data.quantity || 1) <= 1} onClick={() => runtime?.updateNode(id, { quantity: Math.max(1, (data.quantity || 1) - 1) })}><Minus size={11} /></button><span>x{data.quantity || 1}</span><button title="Increase Outputs" aria-label="Increase Outputs" disabled={(data.quantity || 1) >= 4} onClick={() => runtime?.updateNode(id, { quantity: Math.min(4, (data.quantity || 1) + 1) })}><Plus size={11} /></button></span></div> },
+            { id: 'resolution', kind: 'selector', visible: true, available: Boolean(selectedVideoModel?.resolutions.length), defaultLabel: selectedVideoModel?.resolutions[0] || '720p', intrinsicWidth: 48, priority: 55, node: videoDraftProvider(data) === 'byteplus' ? <VideoDraftResolutionSelect data={data} value={data.resolution || selectedVideoModel?.resolutions[0] || '720p'} displayLabel={data.resolution || selectedVideoModel?.resolutions[0] || '720p'} options={(selectedVideoModel?.resolutions || []).map(resolution => ({ value: resolution, label: resolution }))} disabled={running} onPatch={patch => runtime?.updateNode(id, patch)} regularPatch={value => ({ resolution: value as StudioNodeData['resolution'] })} /> : <SimpleMenuSelect className="compact-resolution" ariaLabel="Video Resolution" title="Video Resolution" defaultLabel={selectedVideoModel?.resolutions[0] || '720p'} fillTrack value={selectedVideoModel?.resolutions.includes(data.resolution || '') ? data.resolution || selectedVideoModel.resolutions[0] : selectedVideoModel?.resolutions[0] || ''} options={(selectedVideoModel?.resolutions || []).map((resolution) => ({ value: resolution, label: resolution }))} onChange={(value) => runtime?.updateNode(id, { resolution: value as StudioNodeData['resolution'] })} /> },
+            { id: 'sound', kind: 'fixed-action', visible: true, available: Boolean(selectedVideoModel?.nativeAudio), defaultLabel: 'Sound', intrinsicWidth: 28, priority: 45, node: <button type="button" className={`compact-settings compact-options compact-sound ${data.generateAudio ? 'is-active' : ''}`} data-tooltip="Sound" aria-label="Generate Native Sound" aria-pressed={Boolean(data.generateAudio)} disabled={running} onClick={() => runtime?.updateNode(id, { generateAudio: !data.generateAudio })}><Volume2 size={14} /></button> },
+            { id: 'settings', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 95, node: <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button> },
+            { id: 'run', kind: 'fixed-action', visible: true, available: true, intrinsicWidth: 28, priority: 100, node: <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={12} fill="currentColor" />}</button></PlayTooltip> },
           ]) as FluidGroupControl<VideoFooterControlId>[]}
         />}
 
@@ -2888,8 +3011,10 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       {semanticEditorActive && <div className="reusable-asset-footer-wrap nodrag">
         {saveNameOpen && <div className="asset-save-name-popover"><input ref={saveNameInputRef} autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label={`${semanticAssetLabel} name`} value={saveName} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setSaveName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') commitSaveName(); if (event.key === 'Escape') setSaveNameOpen(false) }} /></div>}
         <div className="asset-prompt-revamp-footer prompt-enhance-compact">
-          <GroupedMenuSelect catalog promptCatalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Prompt Revamp model" defaultLabel="Choose Model" fillTrack value={`${enhanceProvider}::${enhanceModel}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map(group => ({ label: group.label, options: group.models.map(model => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={selection => { const [provider, ...model] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: model.join('::'), error: undefined }) }} />
-          <button type="button" className="storyboard-shot-action" aria-label="Revamp Prompt" disabled={running || enhanceBlocked || !enhanceModel || !assetGenerationPrompt.trim()} onClick={() => runtime?.runAssistantNode(id)}><Sparkles size={11} /></button>
+          <GeneratorFooterControlGroup ariaLabel="Asset Prompt Revamp Footer Controls" modelId="model" runId="revamp" recalculationKey={`${enhanceProvider}:${enhanceModel}:${running}`} controls={[
+            { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <GroupedMenuSelect catalog promptCatalog className="prompt-enhance-model" menuClassName="prompt-enhance-model-menu" ariaLabel="Prompt Revamp model" defaultLabel="Choose Model" fillTrack value={`${enhanceProvider}::${enhanceModel}`} displayLabel={enhanceModelLabel} groups={enhanceGroups.map(group => ({ label: group.label, options: group.models.map(model => ({ value: `${group.provider}::${model.id}`, label: model.label })) }))} onChange={selection => { const [provider, ...model] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: model.join('::'), error: undefined }) }} /> },
+            { id: 'revamp', kind: 'fixed-action', intrinsicWidth: 28, node: <button type="button" className="storyboard-shot-action" aria-label="Revamp Prompt" disabled={running || enhanceBlocked || !enhanceModel || !assetGenerationPrompt.trim()} onClick={() => runtime?.runAssistantNode(id)}><Sparkles size={11} /></button> },
+          ]} />
         </div>
         <div className="compact-generator-footer">
           <ImageGenerationControlGroup
@@ -2907,7 +3032,7 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
       </div>}
 
       {data.kind === 'upscaler' && !data.falNative && <div className="primary-node-controls upscaler-primary-controls nodrag" aria-label="Primary Upscaler Controls">
-        <label className="upscaler-model-field"><span>Model</span><SimpleMenuSelect service="fal" ariaLabel="Upscaler model" value={data.upscalerModel || 'clarity-image'} options={[{ value: 'clarity-image', label: 'Clarity Image Upscaler' }, { value: 'realesrgan-video', label: 'RealESRGAN Video Upscaler' }]} onChange={(upscalerModel) => runtime?.updateNode(id, { upscalerModel: upscalerModel as StudioNodeData['upscalerModel'], outputPath: undefined, outputUrl: undefined, outputType: undefined, generatedResults: undefined, error: undefined })} /></label>
+
         <label className={upscalerIsVideo ? 'is-disabled' : ''}><span>Creativity · {(data.creativity ?? 0.35).toFixed(2)}</span><input disabled={upscalerIsVideo} type="range" min="0" max="1" step="0.05" value={data.creativity ?? 0.35} onChange={(event) => runtime?.updateNode(id, { creativity: Number(event.target.value) })} /></label>
         <label className={upscalerIsVideo ? 'is-disabled' : ''}><span>Resemblance · {(data.resemblance ?? 0.6).toFixed(2)}</span><input disabled={upscalerIsVideo} type="range" min="0" max="1" step="0.05" value={data.resemblance ?? 0.6} onChange={(event) => runtime?.updateNode(id, { resemblance: Number(event.target.value) })} /></label>
       </div>}
@@ -2915,38 +3040,32 @@ export const NodeCard = memo(({ id, data, selected }: NodeProps<StudioNode>) => 
 
 
       {runnable && !isCanvasGenerator && !['element', 'location', 'wardrobe'].includes(data.kind) && (
-        <div className={`compact-generator-footer compact-generic-footer nodrag${voiceFooter ? ' has-voice-footer' : ''}${nativeVoiceState ? ' has-native-voice' : ''}`}>
-          {nativeVoiceModelAndFields}
-          {voiceFooter && !nativeVoiceState && <div className="voice-footer-fields">{nonNativeVoiceFields}{data.voiceEngine === 'elevenlabs-direct' && !isElevenDialogue(data) && !directVoiceCatalog?.voices?.some(voice => voice.id === data.voice) && <div className="voice-primary-controls"><label><span>Voice ID</span><input className="voice-primary-input" aria-label="ElevenLabs voice ID entry" value={data.voice || ''} placeholder="Voice ID (required)" onChange={event => runtime?.updateNode(id,{voice:event.target.value,error:undefined})}/></label></div>}{data.voiceEngine !== 'elevenlabs-direct' && genericQuantity}</div>}
-          {nonNativeVoiceSpeaker && <div className="voice-footer-speaker voice-primary-controls">{nonNativeVoiceSpeaker}</div>}
-          {nonNativeVoiceSpeaker && <div className="voice-footer-sample"><ElevenVoiceSampleButton voice={data.voiceEngine === 'fish-audio' ? undefined : nonNativeVoicePreview} availability={voiceFooterCatalog}/></div>}
-
-          {nativeVoiceInput && <div className="voice-footer-speaker voice-primary-controls">{nativeVoiceInput}</div>}
-          {nativeVoiceInput && <div className="voice-footer-sample"><ElevenVoiceSampleButton voice={nativeVoiceMatches.length === 1 ? nativeVoiceMatches[0] : undefined} availability={nativeVoiceCatalog} /></div>}
-          {!voiceFooter && genericQuantity}
-
-          {data.kind === 'upscaler' && <SimpleMenuSelect className="upscaler-scale-select" ariaLabel="Upscale Amount" title="Upscale Amount" value={String(data.scale || 2)} options={[2, 3, 4].map((value) => ({ value: String(value), label: `${value}×` }))} onChange={(value) => runtime?.updateNode(id, { scale: Number(value) })} />}
-          {data.kind === 'sound-effects' && !data.falNative && <SoundModelSelect className="compact-engine voice-engine" data={data} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={(endpointId) => runtime?.selectFalModel?.(id, endpointId)} onChange={(patch) => runtime?.updateNode(id, patch)} />}
-          {data.kind === 'sound-effects' && !data.falNative && <><SimpleMenuSelect ariaLabel="Sound Effect Duration" title="Sound Effect Duration" value={String(data.duration || 5)} options={(data.audioProvider === 'elevenlabs' ? [0.5,1,2,3,5,8,10,15,22,30] : [0.5,1,2,3,5,8,10,15,22]).map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /><label className="compact-toggle compact-loop" title="Loop Sound Effect"><span>Loop</span><input aria-label="Loop Sound Effect" type="checkbox" checked={Boolean(data.loop)} onChange={(event) => runtime?.updateNode(id, { loop: event.target.checked })} /><i /></label><SimpleMenuSelect className="sound-output-format" ariaLabel="Sound Effect Output Format" title="Sound Effect Output Format" value={data.audioOutputFormat || 'mp3_44100_128'} options={(data.audioProvider === 'elevenlabs' ? ELEVEN_DIRECT_OUTPUT_FORMATS : ELEVEN_AUDIO_OUTPUT_FORMATS).map((value) => ({ value, label: data.audioProvider === 'elevenlabs' ? directAudioFormatLabel(value) : audioFormatLabel(value) }))} onChange={(value) => runtime?.updateNode(id, { audioOutputFormat: value })} /></>}
-          {data.kind === 'music-generator' && <><SimpleMenuSelect ariaLabel="Music Duration" title="Music Duration" value={String(data.duration || 30)} options={[10,30,60,120].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /><label className="compact-audio" title="Instrumental Only"><input aria-label="Instrumental Only" type="checkbox" checked={Boolean(data.forceInstrumental)} onChange={(event) => runtime?.updateNode(id, { forceInstrumental: event.target.checked })} /><Music2 size={12} /></label></>}
-          {['element', 'location', 'wardrobe'].includes(data.kind) && <GroupedMenuSelect catalog className="compact-engine image-engine" ariaLabel={`${data.kind === 'element' ? 'Element' : data.kind === 'wardrobe' ? 'Wardrobe' : 'Location'} image model`} title="Image model" value={`${imageProvider}::${imageModelId}`} groups={[
-            { label: 'fal.ai', service: 'fal', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider as ModelCompany })) },
-            { label: 'OpenAI', options: openAIImageModels.map((model) => ({ value: `openai::${model.id}`, label: model.label })) },
-            { label: 'Google', options: googleImageModels.map((model) => ({ value: `google::${model.id}`, label: model.label })) },
-          ]} onChange={(nextValue) => {
-            const [provider, ...modelParts] = nextValue.split('::')
-            runtime?.updateNode(id, { imageProvider: provider as StudioNodeData['imageProvider'], imageModelId: modelParts.join('::') })
-          }} />}
-          {data.kind === 'image-editor' && <GroupedMenuSelect catalog className="compact-engine image-engine" ariaLabel="Image editing engine" title="Image editing engine" value={`${imageProvider}::${imageModelId}`} groups={[
-            { label: 'fal.ai', service: 'fal', options: falImageModels.map((model) => ({ value: `fal::${model.id}`, label: model.label, provider: model.provider as ModelCompany })) },
-            { label: 'OpenAI', options: openAIImageModels.map((model) => ({ value: `openai::${model.id}`, label: model.label })) },
-            { label: 'Google', options: googleImageModels.map((model) => ({ value: `google::${model.id}`, label: model.label })) },
-          ]} onChange={(nextValue) => {
-            const [provider, ...modelParts] = nextValue.split('::')
-            runtime?.updateNode(id, { imageProvider: provider as StudioNodeData['imageProvider'], imageModelId: modelParts.join('::') })
-          }} />}
-          <button className="compact-settings compact-options" onClick={() => runtime?.openInspector(id)} data-tooltip="Options" aria-label="Node Settings"><Settings size={14} /></button>
-          <PlayTooltip tooltip={runTooltip} persistent={running} disabled={!running && runDisabled}><button type="button" className={`footer-run ${runButtonStateClass} ${runDisabled ? 'is-access-blocked' : ''} ${providerDisconnected ? 'is-connection-required' : ''}`} aria-label={running ? 'Stop' : data.draftCompletionPath ? 'Render Draft at 1080p' : rerun ? 'Rerun' : 'Run'} onClick={() => running ? runtime?.stopNode(id) : providerDisconnected ? runtime?.openConnections(billingProvider, providerModelLabel) : runtime?.runNode(id)} disabled={!running && runDisabled}>{running ? <StopIcon size={14} /> : rerun ? <RerunIcon /> : <Play size={13} fill="currentColor" />}</button></PlayTooltip>
+        <div className={`compact-generator-footer compact-generic-footer nodrag${voiceFooter ? ' has-fluid-voice-footer' : ''}${nativeVoiceState ? ' has-native-voice' : ''}${soundEffectsFooter ? ' has-fluid-sound-effects' : ''}`}>
+          {soundEffectsFooter && <SoundEffectsFooterControls data={data} quantity={genericQuantity} settings={genericSettings} run={genericRun} falAvailability={runtime?.serviceAvailability?.('fal')} onFalSelect={endpointId => runtime?.selectFalModel?.(id, endpointId)} onChange={patch => runtime?.updateNode(id, patch)} />}
+          {voiceFooter && !nativeVoiceState && data.voiceEngine === 'elevenlabs-direct' && directVoiceCatalog?.catalogError && <div className="voice-footer-catalog-error" role="alert" title={directVoiceCatalog.catalogError}>Could not load models · check Connections</div>}
+          {voiceFooter && <GeneratorFooterControlGroup className="voice-primary-controls voice-primary-row voice-generator-footer-controls" ariaLabel="Voice Footer Controls" modelId="model" settingsId="settings" runId="run" iconIds={['sample']} recalculationKey={JSON.stringify({ engine: data.voiceEngine, model: data.voiceModelId, native: nativeVoiceState, voice: data.voice, quantity: data.quantity, mode: data.elevenSpeechMode, stability: data.stability, similarity: data.similarityBoost, speed: data.speed, format: data.audioOutputFormat, fish: [data.fishModel, data.fishFormat, data.fishSampleRate, data.fishMp3Bitrate, data.fishOpusBitrate, data.fishVolume], catalog: voiceFooterCatalog?.verified })} controls={voiceFooterControls} />}
+          {directMusic && <GeneratorFooterControlGroup className="voice-primary-controls voice-primary-row music-generator-footer-controls" ariaLabel="Music Footer Controls" modelId="model" settingsId="settings" runId="run" iconIds={['instrumental']} recalculationKey={JSON.stringify({ model: data.musicModelId, mode: data.musicGenerationMode, seconds: data.musicSeconds, duration: data.duration, instrumental: data.forceInstrumental, quantity: data.quantity, running })} controls={[
+            { id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <SimpleMenuSelect service="elevenlabs" ariaLabel="Music model" defaultLabel="Select Music model" fillTrack value={data.musicModelId || ''} options={musicModelOptions} onChange={musicModelId => runtime?.updateNode(id, { musicModelId: musicModelId as MusicModel, error: undefined })} /> },
+            { id: 'mode', kind: 'selector', intrinsicWidth: 112, minimumWidth: 80, node: <SimpleMenuSelect ariaLabel="Music generation mode" fillTrack value={data.musicGenerationMode || 'prompt'} options={[{ value: 'prompt', label: 'Prompt' }, { value: 'plan', label: 'Custom lyrics' }]} onChange={mode => runtime?.updateNode(id, { musicGenerationMode: mode as 'prompt' | 'plan', ...(mode === 'plan' && data.musicPlanDrafts === undefined ? { musicPlanDrafts } : {}), error: undefined })} /> },
+            ...(!musicPlanMode ? [{ id: 'duration', kind: 'selector' as const, intrinsicWidth: 52, node: <SimpleMenuSelect fillTrack ariaLabel="Music Duration" title="Music Duration" value={musicDurationRaw} options={musicDurationOptions} onChange={musicSeconds => runtime?.updateNode(id, { musicSeconds, duration: Number(musicSeconds), error: undefined })} /> }] : []),
+            { id: 'quantity', kind: 'bounded-elastic', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: genericQuantity },
+            ...(!musicPlanMode ? [{ id: 'instrumental', kind: 'fixed-action' as const, intrinsicWidth: 28, node: <button type="button" className={`compact-settings compact-options${data.forceInstrumental ? ' is-active' : ''}`} aria-label="Instrumental Only" title="Instrumental Only" aria-pressed={Boolean(data.forceInstrumental)} disabled={running} onClick={() => runtime?.updateNode(id, { forceInstrumental: !data.forceInstrumental, error: undefined })}><Music2 size={12} /></button> }] : []),
+            { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28, node: genericSettings },
+            { id: 'run', kind: 'fixed-action', intrinsicWidth: 28, node: genericRun },
+          ]} />}
+          {!voiceFooter && !soundEffectsFooter && !directMusic && <GeneratorFooterControlGroup
+            className="generic-generator-footer-controls" ariaLabel="Generator Footer Controls"
+            modelId="model" settingsId="settings" runId="run" iconIds={['instrumental']}
+            recalculationKey={JSON.stringify({ kind: data.kind, native: data.falNative, model: data.upscalerModel, scale: data.scale, quantity: data.quantity, duration: data.duration, instrumental: data.forceInstrumental, running })}
+            controls={([
+              ...(data.falNative ? [{ id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: nativeModelSelect }] : data.kind === 'upscaler' ? [{ id: 'model', kind: 'selector', intrinsicWidth: 138, minimumWidth: 80, node: <SimpleMenuSelect service="fal" ariaLabel="Upscaler model" value={data.upscalerModel || 'clarity-image'} options={[{ value: 'clarity-image', label: 'Clarity Image Upscaler' }, { value: 'realesrgan-video', label: 'RealESRGAN Video Upscaler' }]} onChange={(upscalerModel) => runtime?.updateNode(id, { upscalerModel: upscalerModel as StudioNodeData['upscalerModel'], outputPath: undefined, outputUrl: undefined, outputType: undefined, generatedResults: undefined, error: undefined })} /> }] : []),
+              ...(!data.falNative ? [{ id: 'quantity', kind: 'bounded-elastic', intrinsicWidth: 42, maximumExtraWidth: 24, shortCharacterWidth: 5, node: genericQuantity }] : []),
+              ...(data.kind === 'upscaler' ? [{ id: 'scale', kind: 'selector', intrinsicWidth: 52, node: <SimpleMenuSelect className="upscaler-scale-select" ariaLabel="Upscale Amount" title="Upscale Amount" value={String(data.scale || 2)} options={[2, 3, 4].map((value) => ({ value: String(value), label: `${value}×` }))} onChange={(value) => runtime?.updateNode(id, { scale: Number(value) })} /> }] : []),
+              ...(data.kind === 'music-generator' ? [{ id: 'duration', kind: 'selector', intrinsicWidth: 52, node: <SimpleMenuSelect ariaLabel="Music Duration" title="Music Duration" value={String(data.duration || 30)} options={[10,30,60,120].map((seconds) => ({ value: String(seconds), label: `${seconds}s` }))} onChange={(value) => runtime?.updateNode(id, { duration: Number(value) })} /> }, { id: 'instrumental', kind: 'intrinsic', intrinsicWidth: 28, node: <label className="compact-audio" title="Instrumental Only"><input aria-label="Instrumental Only" type="checkbox" checked={Boolean(data.forceInstrumental)} onChange={(event) => runtime?.updateNode(id, { forceInstrumental: event.target.checked })} /><Music2 size={12} /></label> }] : []),
+              { id: 'settings', kind: 'fixed-action', intrinsicWidth: 28, node: genericSettings },
+              { id: 'run', kind: 'fixed-action', intrinsicWidth: 28, node: genericRun },
+            ]) as FluidGroupControl<string>[]}
+          />}
         </div>
       )}
 

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import { ArrowDown, ArrowUp, AudioLines, Bot, ChevronDown, Clapperboard, Clock3, Copy, Frame, Image as ImageIcon, Link2, List, Lock, MessageCircle, Play, Plus, Route, StickyNote, Trash2, Unlock, Video, Volume2, WandSparkles } from 'lucide-react'
 import type { StudioNode } from '../../shared/types'
-import { AssetRenamePopover, SemanticCreateToggle, fallbackAssetTag, FluidControlGroup, FooterSaveAction, GroupedMenuSelect, hasMaterializedAsset, NodeRuntimeContext, type FluidGroupControl } from './NodeCardNext'
+import { AssetRenamePopover, SemanticCreateToggle, fallbackAssetTag, FluidControlGroup, GeneratorFooterControlGroup, FooterSaveAction, GroupedMenuSelect, hasMaterializedAsset, NodeRuntimeContext, type FluidGroupControl } from './NodeCardNext'
 import type { AssistantProvider } from '../../shared/assistantModels'
 import { modelDisplayName } from '../../shared/modelNames'
 import { formatDurationSeconds } from '../../shared/videoModels'
@@ -261,7 +261,7 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
           const activePrompt = selectedStoryboardPrompt(panel)
           const panelBudget = durationBudget.budgets[index]
           const positiveDurationOptions: StoryboardMenuOption[] = panelBudget.options.map((option) => ({ value: String(option.value), label: option.label, disabled: option.disabled, disabledReason: option.disabledReason }))
-          const panelDurationOptions: StoryboardMenuOption[] = positiveDurationOptions.some(option => option.value === String(panelBudget.effectiveDuration)) ? positiveDurationOptions : [{ value: String(panelBudget.effectiveDuration), label: `${panelBudget.effectiveDuration}s · review`, disabled: true, disabledReason: 'Saved timing preserved. Choose a supported duration explicitly.' }, ...positiveDurationOptions]
+          const panelDurationOptions: StoryboardMenuOption[] = positiveDurationOptions.some(option => option.value === String(panelBudget.effectiveDuration)) ? positiveDurationOptions : [{ value: String(panelBudget.effectiveDuration), label: `${formatDurationSeconds(panelBudget.effectiveDuration)} · review`, disabled: true, disabledReason: 'Saved timing preserved. Choose a supported duration explicitly.' }, ...positiveDurationOptions]
           const durationDescription = panelBudget.description
           const durationAriaLabel = `Panel ${index + 1} duration, ${panelBudget.effectiveDuration.toFixed(1)} seconds.`
           return (
@@ -307,17 +307,18 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<StudioNode
       {connectedVideo?.timingError && <div className="storyboard-feedback-row storyboard-duration-helper" role="status" aria-live="polite">{connectedVideo.timingError}</div>}
       {connectedVideo && durationBudget.helper && <div className="storyboard-feedback-row storyboard-duration-helper is-overflow" role="status" aria-live="polite">{durationBudget.helper.text}</div>}
       <footer className="storyboard-footer nodrag">
-        <FluidControlGroup
+        <GeneratorFooterControlGroup
           className="storyboard-footer-group"
           ariaLabel="Storyboard Footer Controls"
-          gap={6}
-          allocation={{ minRows: 1, maxRows: 1, firstId: 'assistant-model' }}
+          modelId="assistant-model"
+          runId="revamp"
+          iconIds={['save']}
           recalculationKey={`${connectedVideo?.duration ?? 'disconnected'}:${panels.length}:${assistantDefaultLabel}`}
           controls={([
             { id: 'assistant-model', kind: 'selector', defaultLabel: assistantDefaultLabel, fullLabel: assistantDefaultLabel, compactLabel: assistantDefaultLabel, intrinsicWidth: 80, minimumWidth: 70, shrinkPriority: 'model', node: <GroupedMenuSelect catalog promptCatalog ariaLabel="Storyboard AI model" title="Revamp sends a paid AI text request to the selected provider." defaultLabel={assistantDefaultLabel} compactLabel={assistantDefaultLabel} fillTrack disabled={!groupedAssistantModels.some((group) => group.options.length)} value={assistantModelValue} groups={groupedAssistantModels} onChange={(selection) => { const [provider, ...modelParts] = selection.split('::'); runtime?.updateNode(id, { assistantProvider: provider as AssistantProvider, assistantModelId: modelParts.join('::'), error: undefined }) }} /> },
             connectedVideo?.duration !== undefined ? { id: 'budget', kind: 'bounded-elastic', intrinsicWidth: 68, maximumExtraWidth: 12, shortCharacterWidth: 6, node: <div className={`storyboard-budget ${overBudget ? 'is-over' : ''}`} role="status" aria-label={overBudget ? `Storyboard timing overflow, ${totalDuration.toFixed(1)} seconds used of ${connectedVideo.duration.toFixed(1)} seconds available` : `Storyboard timing, ${totalDuration.toFixed(1)} seconds used of ${connectedVideo.duration.toFixed(1)} seconds available`}><span style={{ width: `${Math.min(100, (totalDuration / Math.max(0.5, connectedVideo.duration)) * 100)}%` }} /><strong>{totalDuration.toFixed(1)} / {formatDurationSeconds(connectedVideo.duration)}</strong></div> } : null,
             { id: 'save', kind: 'fixed-action', intrinsicWidth: 28, node: <FooterSaveAction className="storyboard-save" ariaLabel="Save Storyboard" tooltip="Save Storyboard" disabled={nodeBusy} onSave={() => runtime?.saveStoryboard(id)} /> },
-            { id: 'revamp', kind: 'intrinsic', intrinsicWidth: 62, node: <button className="storyboard-revamp-all" data-tooltip="Revamp sends a paid AI text request to the selected provider." aria-label="Revamp All" disabled={nodeBusy} onClick={() => runtime?.rewriteStoryboardPanel(id)}><WandSparkles size={12} />All</button> },
+            { id: 'revamp', kind: 'fixed-action', intrinsicWidth: 62, node: <button className="storyboard-revamp-all" data-tooltip="Revamp sends a paid AI text request to the selected provider." aria-label="Revamp All" disabled={nodeBusy} onClick={() => runtime?.rewriteStoryboardPanel(id)}><WandSparkles size={12} />All</button> },
           ].filter(Boolean)) as FluidGroupControl<'budget' | 'assistant-model' | 'save' | 'revamp'>[]}
         />
       </footer>

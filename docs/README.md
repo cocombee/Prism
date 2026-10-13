@@ -11,6 +11,7 @@ Load only the branches affected by the task. Cross-domain work requires a writte
 - [Approved Prism semantic system scope and naming](product/prism-system-scope-and-naming.md)
 - [Approved and in-flight design artifacts](design/approved-artifacts.md)
 - [Prism interface and naming design contract](design/prism-interface-and-naming-design-contract.md)
+- [Node footer hard contract](design/node-footer-hard-contract.md)
 - [Prism project operations and delegation](operations/prism-operations-and-delegation.md)
 - [Change-impact template](CHANGE-IMPACT-TEMPLATE.md)
 - [Product-contract clause migration map](MIGRATION-CLAUSE-MAP.md)

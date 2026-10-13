@@ -22,7 +22,7 @@ export function unavailableInputPortLabel(label: string): string {
   return `Unavailable · ${label.replace(/^(?:Unavailable · )+/, '')}`
 }
 
-export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId' | 'falNative' | 'higgsfieldNative'>): NodeInputPortContract[] {
+export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'voiceEngine' | 'elevenSpeechMode' | 'videoEngine' | 'upscalerModel' | 'imageProvider' | 'imageModelId' | 'falNative' | 'higgsfieldNative'>): NodeInputPortContract[] {
   const text = (): NodeInputPortContract => ({ id: 'text-in', signal: 'text', label: 'Text or Prompt', top: 54, icon: 'prompt' })
   const storyboard = (): NodeInputPortContract => ({ id: 'storyboard-in', signal: 'storyboard', label: 'Storyboard (Optional)', top: 94, maxConnections: 1 })
   const image = (label = 'Image Reference', top = 94, icon?: NodeInputPortContract['icon'], maxConnections = 1): NodeInputPortContract => ({ id: 'image-in', signal: 'image', label, top, icon, maxConnections })
@@ -95,7 +95,7 @@ export function nodeInputPorts(data: Pick<StudioNodeData, 'kind' | 'videoEngine'
     ]
     case 'storyboard-asset': return [{ id: 'storyboard-in', signal: 'storyboard', label: 'Storyboard', top: 54, maxConnections: 1 }]
     case 'list': return [{ id: 'input', signal: 'mixed', label: 'Generated or Imported Media Batch', top: 86, icon: 'media-collection' }]
-    case 'voiceover':
+    case 'voiceover': return data.voiceEngine === 'elevenlabs-direct' && data.elevenSpeechMode === 'voice-change' ? [{ id: 'audio-in', signal: 'audio', label: 'Original Audio', top: 86, icon: 'reference-audio', maxConnections: 1 }] : []
     case 'sound-effects':
     case 'music-generator': return []
     case 'gallery': return [{ id: 'media-in', signal: 'mixed', label: 'Media Collection', top: 86, icon: 'media-collection' }]

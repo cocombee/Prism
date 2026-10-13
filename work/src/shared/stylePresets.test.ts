@@ -16,6 +16,7 @@ describe('built-in Style privacy', () => {
       'film-noir': 'center 50%',
       'storybook-gouache': 'center 38%',
       'retro-35mm': 'center 12%',
+      'handcrafted-paper-sculpture': 'center top',
     })
   })
 
@@ -28,6 +29,7 @@ describe('built-in Style privacy', () => {
       'film-noir': ['severe chiaroscuro', 'bright silver highlights'],
       'storybook-gouache': ['visible dry-brush texture', 'tactile paper-like foliage'],
       'retro-35mm': ['late-1970s color-negative character', 'gentle gate-weave character'],
+      'handcrafted-paper-sculpture': ['layered matte cardstock', 'blank except for one small paper mouth', 'No eyes, eye dots', 'rather than woven fabric'],
     }
     expect(STYLE_PRESETS.map((preset) => preset.id)).toEqual(Object.keys(expectedPromptAnchors))
     for (const preset of STYLE_PRESETS) {

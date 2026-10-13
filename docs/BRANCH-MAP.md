@@ -40,6 +40,12 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `SKILL-SECTION-MAP.md`
 - `change-impact-remove-abandoned-3d-camera-20260930.md`
 
+- `Assets Padding Change Impact.md`
+- `Footer Outer Insets Change Impact.md`
+- `Lip Sync Progress Change Impact.md`
+- `Music Backend Composition Change Impact.md`
+- `Shared Node Footer Repair Change Impact.md`
+
 ## API branch
 
 - `api/README.md`
@@ -76,6 +82,7 @@ Every entry below is populated. This file is a readable routing inventory, not a
 ## Design branch
 
 - `design/approved-artifacts.md`
+- `design/node-footer-hard-contract.md`
 - `design/prism-interface-and-naming-design-contract.md`
 - `design/reviews/prism-node-notification-category-audit-2026-08-23.md`
 - `design/reviews/storyboard-compiler-owned-prompt-camera-bridge-review-2026-08-23.md`
@@ -136,4 +143,4 @@ Every entry below is populated. This file is a readable routing inventory, not a
 - `testing/flight-tester-release-gate.md`
 - `testing/regression-firewall.md`
 
-Populated Markdown files excluding this map: **89**.
+Populated Markdown files excluding this map: **95**.

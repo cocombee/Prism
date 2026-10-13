@@ -145,3 +145,10 @@ The production menu preserves direct exact model/type/tier/provider choices acro
 ## fal Seedance reference syntax correction — 13 October 2026
 
 The current fal Seedance2.5 reference API uses @ImageN, @VideoN and @AudioN indexed separately by physical input array. nativeFalPromptTransport and the legacy fal transport apply this only at submission; visible/saved semantic asset names remain intact. Model version alone must not select another host's syntax. BytePlus2.5 behavior is retained independently. Original-audio Lip-sync intent does not establish exact waveform reproduction from a generative provider. Source: https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api. Regression owners: nativeFalPromptTransport.test.ts, falNativeGraph.test.ts, providerPromptBody.test.ts and mediaReferenceModes.test.ts.
+
+
+## Versioned direct Music — 13 October 2026
+
+Explicit new Music nodes use musicVersion1 with direct ElevenLabs, Music v1/v2/v2.5, Prompt or Custom lyrics. Legacy unversioned Music retirement remains unchanged; no fal Music route or fallback is invented. The pure shared musicRequest compiler validates exact prompt/plan schemas, decimal millisecond duration bounds, output and seed before main credentials. Music retains separate raw v1/v2 lyric drafts across model/mode changes and save/reopen. Encoded MP3/Opus delivery only is admitted; raw formats require review rather than silent substitution. Pricing remains unverified/null.
+
+Main dispatch captures the current project/account and saved canvas/page/node, uses one POST per output with no automatic paid retry, decodes bounded output and saves/indexes a separate managed Audio result. Renderer quantity1–4 is sequential; Stop keeps completed results and prevents another request. Uncertain or completed-but-undelivered submissions block another paid Run until explicit provider-history review or verified local repair. No authenticated Music generation or cat beat-dance efficacy is accepted by this software release.

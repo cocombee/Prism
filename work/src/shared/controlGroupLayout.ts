@@ -223,6 +223,8 @@ export interface MixedControlAllocationOptions<Id extends string = string> {
   preferredRows?: readonly (readonly Id[])[]
   /** Opt-in for groups whose approved contract prioritizes whole-group row balance over row-local selector slack. */
   enforceBalancedRows?: boolean
+  /** Footer membership favors the least crowded measured field after minimizing rows. */
+  balanceFieldPressure?: boolean
 }
 
 /** Closed fields grow no further than their reference name; shorter names release space to row peers. Chrome is measured at the actual rendered caller. */
@@ -523,9 +525,24 @@ export function allocateMixedControlRows<Id extends string>(
       const widestOperational = Math.max(0, ...finalRows.flatMap((row) => row.controls)
         .filter((control) => control.kind === 'selector' && control.shrinkPriority !== 'model')
         .map((control) => control.width))
+      // A wide track is useful space, not a penalty. Compare the fraction of each
+      // flexible track required by its current text/chrome so editable fields and
+      // selectors can exchange rows when that relieves the most crowded field.
+      const fieldPressures = finalRows.flatMap(row => row.controls)
+        .filter(flexibleTrack)
+        .map(control => minimumControlWidth(control) / Math.max(control.width, 0.001))
+      const movableFields = controls.filter(control => flexibleTrack(control) && control.id !== options.firstId)
+        .map((control, index) => ({ control, index }))
+        .sort((left, right) => minimumControlWidth(right.control) - minimumControlWidth(left.control) || left.index - right.index)
+      const allocatedFields = new Map(finalRows.flatMap(row => row.controls).map(control => [control.id, control]))
+      const movableFieldPressures = movableFields.map(({ control }) => minimumControlWidth(control) / Math.max(allocatedFields.get(control.id)!.width, 0.001))
+      const worstFieldPressure = Math.max(0, ...fieldPressures)
+      const totalFieldPressure = fieldPressures.reduce((sum, pressure) => sum + pressure, 0)
       candidates.push({
         rows: finalRows,
-        score: options.enforceBalancedRows
+        score: options.balanceFieldPressure
+          ? [modelCompaction, rowCount, ...movableFieldPressures, worstFieldPressure, totalFieldPressure, densityVariance, countSpread]
+          : options.enforceBalancedRows
           ? [modelCompaction, rowCount, orphanPenalty, countSpread, preferredPenalty, densityVariance, widestOperational, operationalExpansion]
           : [modelCompaction, widestOperational, rowCount, countSpread, densityVariance, operationalExpansion, preferredPenalty],
       })
