@@ -14,7 +14,11 @@
 
 ## Historical source material
 
-The external source is provenance and comparison material only. Hermes files under the continuation path are the active authority. Do not write back to the source package or retain it as a runtime dependency.
+The external source is provenance and comparison material only. Hermes files in the current task tree are the active authority; see Current Drive location below. Do not write back to the source package or retain it as a runtime dependency.
+
+## Current Drive location — 15 October 2026
+
+The original paths above preserve historical migration provenance. The active Hermes source and workspace is `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism`.
 
 ## Migration state
 

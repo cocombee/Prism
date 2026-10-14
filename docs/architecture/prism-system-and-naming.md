@@ -15,7 +15,7 @@ This is the canonical routing and naming contract for Prism as a Hermes-managed 
 | Layer | Canonical name or path | Rule |
 |---|---|---|
 | Hermes project/task | `AI Video → Prism` | Keep the existing project/task identity and do not create a replacement task. |
-| Hermes task root | `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism` | The Google Drive-synced Hermes tree is authoritative. |
+| Hermes task root | `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism` | The Google Drive-synced Hermes tree is authoritative. |
 | Product and app name | `Prism Foundry` | Use for the visible product, runtime app, package product name, and product documentation. |
 | Bundle identity | `com.cocombees.prismfoundry` | Preserve unless a separately approved migration explicitly changes user-data identity. |
 | User-testing candidate | `Prism Flight Tester` | A temporary candidate label only; it is not the promoted product identity or a new project. |

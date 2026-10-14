@@ -24,7 +24,7 @@ Use this skill as the selective-loading router for Prism Foundry. Product behavi
 
 ## Canonical task paths
 
-- Task: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism`
+- Task: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism`
 - Implementation: `work/`
 - Documentation router: `docs/README.md`
 - Outputs: `outputs/`

@@ -29,12 +29,12 @@ Before task work, read the relevant local `SKILL.md` file above and follow its l
 
 ## Hermes source and authority
 
-- Hermes source: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism`
-- Hermes workspace: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism`
+- Hermes source: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism`
+- Hermes workspace: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism`
 
 Hermes is authoritative for Hermes-native source files, outputs, decisions, history, and task ownership. Store new and updated work under this Hermes task folder. Historical source-bridge material is provenance only; normal Hermes work uses the Hermes task tree and current Hermes files. It is not runtime authority. Never place Hermes artifacts under `/Users/mrkokom/Documents`; the separate Obsidian vault is handled only through the Obsidian workflow.
 
 
 ## Architecture — user instruction, 12 October 2026
 
-Use the canonical Architecture skill from now on: /Users/mrkokom/My Drive (cocombees@gmail.com)/Codex/Apps/Audyt/skills/architecture/SKILL.md. Apply ownership, provider contracts, persistence/migration/recovery and verification to Prism; do not import Audyt accounting/stack assumptions. Use Designer for interface composition and preserve the user's design-first instruction for new ElevenLabs workflows. Current installed/source acceptance and unfinished goals are governed by docs/CURRENT-STATE.md and Codex Apps/Prism/Current Goal Acceptance Audit.json. No Git action is inferred.
+Use the canonical Architecture skill from now on: /Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Codex/Apps/Audyt/skills/architecture/SKILL.md. Apply ownership, provider contracts, persistence/migration/recovery and verification to Prism; do not import Audyt accounting/stack assumptions. Use Designer for interface composition and preserve the user's design-first instruction for new ElevenLabs workflows. Current installed/source acceptance and unfinished goals are governed by docs/CURRENT-STATE.md and Codex Apps/Prism/Current Goal Acceptance Audit.json. No Git action is inferred.

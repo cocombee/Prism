@@ -48,7 +48,7 @@ When a user correction reveals a reusable failure mode, update this skill or its
 ## Verification
 
 1. Run type checking, automated tests, and production build.
-2. During development, package only the unsigned internal Flight Tester runtime at `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism/outputs/build/mac-arm64/Prism Foundry.app`.
+2. During development, package only the unsigned internal Flight Tester runtime at `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism/outputs/build/mac-arm64/Prism Foundry.app`.
 3. Before overwriting Flight Tester, fully quit its existing process so no renderer keeps stale hashed asset URLs while the packaged archive changes. After packaging, launch exactly one newly packaged Flight Tester instance and verify its bundled images from that fresh process; raising or reusing the pre-package window is not a refresh.
 4. Exercise the changed interaction in Flight Tester, including negative and cancel paths, then hand it to the user for personal testing.
 5. Never present, link, send, or describe the internal `.app` bundle as a user deliverable unless the user explicitly asks for it. Report only that Flight Tester was refreshed/opened.

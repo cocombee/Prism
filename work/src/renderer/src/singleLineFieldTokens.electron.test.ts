@@ -15,7 +15,7 @@ describe('actual single-line field tokens',()=>{
  const directory=mkdtempSync(join(tmpdir(),'prism-single-line-fields-')),before=hashes()
  try{
  const entry=join(directory,'renderer.tsx'),html=join(directory,'index.html'),main=join(directory,'main.cjs'),baseline=join(directory,'baseline.css')
- const zip=resolve('/Users/mrkokom/My Drive (cocombees@gmail.com)/Codex/Apps/Prism/Shared Footer Source Before.zip')
+ const zip=resolve('/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Codex/Apps/Prism/Shared Footer Source Before.zip')
  const unzip=spawnSync('python3',['-c','import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); n=next(n for n in z.namelist() if n.endswith("styles-next.css"));open(sys.argv[2],"wb").write(z.read(n))',zip,baseline],{encoding:'utf8'})
  expect(unzip.status,unzip.stderr).toBe(0)
  writeFileSync(entry,String.raw`

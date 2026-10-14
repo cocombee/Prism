@@ -3,7 +3,7 @@ type: operations
 project: AI Video
 task: Prism
 status: current
-canonical_path: /Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism
+canonical_path: /Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism
 owner: Admin
 ---
 
@@ -18,8 +18,8 @@ owner: Admin
 
 - Hermes project: `AI Video`
 - Hermes task: `Prism`
-- Canonical folder: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism`
-- Manifest: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/PROJECT-TASK-MAP.md`
+- Canonical folder: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism`
+- Manifest: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/PROJECT-TASK-MAP.md`
 - Existing identity is reused in place. No replacement project, task, chat, or sibling folder was created.
 - The project/task map already contains the exact `AI Video -> Prism` entry; the physical folder resolves to the same real path.
 
@@ -103,9 +103,9 @@ The complete semantic naming contract is [`prism-system-scope-and-naming.md`](..
 The current path and names are fixed for this Prism work:
 
 - Hermes identity: `AI Video → Prism`
-- Canonical folder: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/AI Video/Prism`
+- Canonical folder: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/AI Video/Prism`
 - Product identity: `Prism Foundry`
-- Manifest: `/Users/mrkokom/My Drive (cocombees@gmail.com)/Hermes/PROJECT-TASK-MAP.md`
+- Manifest: `/Users/mrkokom/Library/CloudStorage/GoogleDrive-cocombees@gmail.com/My Drive/Hermes/PROJECT-TASK-MAP.md`
 - Stable routing record: `docs/architecture/prism-system-and-naming.md`
 - Admin operations record: `docs/operations/prism-operations-and-delegation.md`
 
