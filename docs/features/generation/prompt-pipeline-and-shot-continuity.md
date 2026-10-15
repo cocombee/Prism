@@ -61,3 +61,16 @@ Unsupported saved transition types block processing with original values retaine
 ## Lip-sync default completeness — 13 October 2026
 
 The editable audio Lip-sync template includes the full recording, introductory/lead-in words and original word/phrase spacing. Retain original voice, pitch, tempo, pauses and silent remainder without retuning, stretching, repeating or truncating. Experimental exact duration remains user-authored text/Storyboard data. Existing authored Descriptions are never overwritten. This default is implemented but generated fidelity remains unaccepted; see CURRENT-STATE.md and the Lip Sync Progress change impact. Executable owner: work/src/shared/mediaReferenceModes.ts; regression: mediaReferenceModes.test.ts plus resolver/compiler/native-adapter tests.
+
+
+## Scoped replacement evidence — 15 October 2026
+
+The user supplied a reference-based subject replacement prompt: retain the base footage’s motion, camera behaviour, timing, people count and audio; replace only the named subject from the actual replacement reference; preserve all other people, environment, lighting, props and background behaviour. This is prompting evidence, not verified provider output fidelity.
+
+Existing Object mode covers an explicitly named subject or object. Its editable image/video template assigns the source as the base and the replacement as appearance only. Video variants preserve duration, original audio and synchronization, source motion and the target’s placement. Background mode applies the same untouched-content discipline to foreground people, identities, outfits, props, lighting and timing/audio while changing only the assigned environment. Image templates remain visual and introduce no audio/timing obligations. Actual replacement targets and attached semantic references must be supplied; unresolved legacy and subject/object placeholders block generation.
+
+Description Revamp must retain an authored base, target, replacement and every authored preservation constraint, without inferring new replacement roles. Typed overrides and existing saved authored Descriptions remain unchanged. Selecting the same mode does not reseed text; changing mode explicitly seeds its current editable template. No project migration or new provider operation is selected.
+
+The shared compiler no longer infers total scene people count from the number of replacement Character references. Scoped Object replacement qualifies automatic face/wardrobe/prop replacement bans as unrequested changes; authored negatives remain exact. Video replacement defaults defer edit points, final state and motion to the assigned base/reference and authored timing rather than adding an invented stable ending. Explicit Continue hooks and Manual provider masters retain their existing authority. Ordinary Reference, Composition, Blocking and audio/Lip-sync behavior are unchanged.
+
+Executable owners: mediaReferenceModes.ts, assetReferenceDescriptions.ts and shotSpec.ts. Regression coverage exercises real resolver requests, semantic introductions, exact physical @Video1/@Image1 mapping, image/video scope, incomplete targets, inferred headcount, endpoint defaults and Manual bytes. The source review used CodeGraph’s explicit-path CLI fallback and a Sol 6.1 High reviewer. No paid output test is part of this update.

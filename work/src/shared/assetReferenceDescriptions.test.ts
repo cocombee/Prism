@@ -194,6 +194,8 @@ describe('authored asset descriptions independent of intake and generation histo
     expect(context.definitions[0].wardrobeFor).toEqual(['@haji'])
     expect(context.allowedTags).not.toContain('@unrelated')
     expect(assetDescriptionRevampInstruction(context)).toContain('Do not convert a location-state reference into a Starting/Ending Frame')
+    expect(assetDescriptionRevampInstruction(context)).toContain('retain the exact base reference, named replacement target, replacement reference and change-only scope')
+    expect(assetDescriptionRevampInstruction(context)).toContain('do not infer a replacement or new constraint when none is authored')
     expect(validateAssetDescriptionRevamp(context.description, 'Sole wardrobe and accessory reference for @haji; adds no separate person.', context.allowedTags)).toContain('@haji')
     expect(() => validateAssetDescriptionRevamp(context.description, 'A costume for somebody.', context.allowedTags)).toThrow(/removed/)
     expect(() => validateAssetDescriptionRevamp(context.description, 'For @haji and @unrelated.', context.allowedTags)).toThrow(/unrelated/)

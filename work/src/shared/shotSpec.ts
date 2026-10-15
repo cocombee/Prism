@@ -402,6 +402,15 @@ function storyboardAction(shot: NonNullable<GenerationRequest['storyboardShots']
   return shot.prompt.trim() || `[STORYBOARD PANEL ${shot.panelNumber || fallbackPanelNumber} INCOMPLETE — no action authored.]`
 }
 
+/** Replacement references do not enumerate the people already present in the base. */
+function hasReferenceReplacement(request: GenerationRequest, mode?: 'object' | 'background', mediaType?: 'image' | 'video'): boolean {
+  return (request.references || []).some(reference =>
+    (reference.mediaType === 'image' || reference.mediaType === 'video')
+    && (mode ? reference.mediaReferenceMode === mode : reference.mediaReferenceMode === 'object' || reference.mediaReferenceMode === 'background')
+    && (!mediaType || reference.mediaType === mediaType)
+    && Boolean(referenceIntroductionLine(reference)))
+}
+
 export function positiveLocks(request: GenerationRequest): string {
   const references = request.references || []
   const characters = new Map<string, Reference>()
@@ -417,7 +426,7 @@ export function positiveLocks(request: GenerationRequest): string {
   const lines: string[] = []
   // References identify assets; typed beat membership does not assert visible headcount.
   const typedCast = (request.storyboardShots || []).some(shot => shot.activeCharacterTags !== undefined || shot.characterStates?.length || shot.characterStateDeltas?.length)
-  if (characters.size && !typedCast) lines.push(characters.size === 1 ? 'Only 1 person appears.' : `Only ${characters.size} people appear.`)
+  if (characters.size && !typedCast && !hasReferenceReplacement(request)) lines.push(characters.size === 1 ? 'Only 1 person appears.' : `Only ${characters.size} people appear.`)
   for (const [tag, character] of characters) {
     const identity = isReferenceExclusive(character) ? '' : authoredDescription(character.description)
     if (identity) lines.push(`${tag} identity constants: ${identity}`)
@@ -430,7 +439,7 @@ export function positiveLocks(request: GenerationRequest): string {
   for (const tag of fidelityTags) lines.push(`${tag} matches the reference in every appearance.`)
   const shots = shotsFor(request), sequence = groupStoryboardSequence(shots)
   if (sequence.hardCutCount > 0) lines.push('Same lighting, same wardrobe across all cuts.')
-  lines.push(shots.length && !sequence.hardCutCount ? 'Continue through the authored intervals in the same unbroken shot.' : 'Cuts only at the specified points.')
+  lines.push(!shots.length && hasReferenceReplacement(request, undefined, 'video') ? 'Preserve the base video’s existing edit points and endpoint as assigned in its reference introduction; do not invent cuts, holds or stops.' : shots.length && !sequence.hardCutCount ? 'Continue through the authored intervals in the same unbroken shot.' : 'Cuts only at the specified points.')
   if (request.shotLocks?.trim()) lines.push(request.shotLocks.trim())
   return lines.join('\n')
 }
@@ -699,8 +708,8 @@ export function seedanceShotSpecSections(request: GenerationRequest, providerLeg
     { id: 'seedance-wardrobe', heading: 'WARDROBE, ACCESSORY, AND PROP CONTINUITY', text: wardrobe, priority: 91, required: Boolean(authoredFields.wardrobeContinuity) },
     { id: 'seedance-scene', heading: 'SCENE, VEHICLE, AND ENVIRONMENT CONTINUITY', text: sceneContinuity, priority: 90, required: Boolean(authoredFields.sceneContinuity || authoredFields.stateLedger || request.shotLocks?.trim()) },
     { id: 'seedance-camera-gate', heading: 'CAMERA, FRAMING, AND OPTICAL HARD GATE', text: [editableVideoAssignments ? 'Execute authored camera instructions and explicitly assigned reference-camera behavior. Do not infer camera authority from a connected video or mode alone. Keep assigned reference paths distinct; unassigned paths are not combined or averaged. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : referenceCamera.length > 1 ? 'Execute authored camera instructions and shot-specific reference assignments. Keep reference camera paths distinct; unassigned paths are not combined or averaged. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : referenceCamera.length ? 'Execute authored camera instructions; otherwise use the connected motion/camera reference for camera behavior. Preserve coherent geometry and physically valid parallax without inventing unobserved measurements.' : 'Execute only an authored camera path and framing; when none is authored, do not invent a move or lens change. Preserve coherent geometry and physically valid parallax.', authoredFields.cameraGate].filter(Boolean).join('\n'), priority: 111, required: true },
-    { id: 'seedance-final-gate', heading: 'FINAL-FRAME AND OUTPUT HARD GATE', text: ['Hard cuts occur only where explicitly marked at the authored timecodes. All other timed action intervals continue within the same uninterrupted take, carrying the prior camera endpoint into the next interval’s starting state. Preserve shot order, screen direction, identity, geometry, causal action outcome, timing relationships and accumulated state. Keep the authored final composition without visible prompt text.', shots.at(-1)?.transitionToNext === 'continue' ? 'The final interval continues beyond the clip boundary; retain its endpoint and performance state without inventing a following action or forcing an unauthored stop.' : 'End on a distinct, stable final composition.', authoredFields.finalAcceptance].filter(Boolean).join('\n'), priority: 113, required: true },
-    { id: 'seedance-negative-prompt', heading: 'NEGATIVE PROMPT', text: ['identity blending, face replacement, anatomy or geometry morphing, wardrobe or prop redesign, floating contact, rubbery motion, invented text, logos, subtitles, watermarks, contact sheets, storyboard borders, labels, continuity resets', propScaleNegativeTerms(request).join(', '), motion?.negative, cameraSupportNegative].filter(Boolean).join('\n'), priority: 115, required: true },
+    { id: 'seedance-final-gate', heading: 'FINAL-FRAME AND OUTPUT HARD GATE', text: [!shots.length && hasReferenceReplacement(request, undefined, 'video') ? 'Preserve the base video’s shot order, edit points, screen direction, geometry, camera motion, event timing and accumulated state as assigned in REFERENCE INTRODUCTIONS and the authored instructions. Apply only the assigned replacement without additional reframing or edits.' : 'Hard cuts occur only where explicitly marked at the authored timecodes. All other timed action intervals continue within the same uninterrupted take, carrying the prior camera endpoint into the next interval’s starting state. Preserve shot order, screen direction, identity, geometry, causal action outcome, timing relationships and accumulated state. Keep the authored final composition without visible prompt text.', shots.at(-1)?.transitionToNext === 'continue' ? 'The final interval continues beyond the clip boundary; retain its endpoint and performance state without inventing a following action or forcing an unauthored stop.' : hasReferenceReplacement(request, undefined, 'video') ? 'Preserve the final state and motion assigned in the reference introduction and authored timing; do not add an unrequested hold, settle or stop.' : 'End on a distinct, stable final composition.', authoredFields.finalAcceptance].filter(Boolean).join('\n'), priority: 113, required: true },
+    { id: 'seedance-negative-prompt', heading: 'NEGATIVE PROMPT', text: [hasReferenceReplacement(request, 'object') ? 'identity blending, unrequested face replacement, anatomy or geometry morphing, unrequested wardrobe or prop redesign, floating contact, rubbery motion, invented text, logos, subtitles, watermarks, contact sheets, storyboard borders, labels, continuity resets' : 'identity blending, face replacement, anatomy or geometry morphing, wardrobe or prop redesign, floating contact, rubbery motion, invented text, logos, subtitles, watermarks, contact sheets, storyboard borders, labels, continuity resets', propScaleNegativeTerms(request).join(', '), motion?.negative, cameraSupportNegative].filter(Boolean).join('\n'), priority: 115, required: true },
   ].filter((section) => section.text.trim()).map((section) => ({
     ...section,
     knowledgeIds: ['REFERENCE AUTHORITY', 'IDENTITY AND ANATOMY CONTINUITY', 'WARDROBE, ACCESSORY, AND PROP CONTINUITY'].includes(section.heading)

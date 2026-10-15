@@ -70,6 +70,63 @@ describe('Media reference mode intent', () => {
   })
 })
 
+describe('evidence-based scoped replacement compilation', () => {
+  it.each(['object', 'background'] as const)('keeps %s replacement authority complete through semantic and physical compilation', mode => {
+    const replacement = node('replacement', mode === 'object' ? 'character' : 'location', { assetPath: '/replacement.png', referenceAssets: [{ id: 'replacement', name: 'Replacement', path: '/replacement.png', mimeType: 'image/png', createdAt: 'fixture' }], referenceTag: '@replacement', referenceDescription: '@replacement supplies only the assigned replacement appearance.', referenceDescriptionMode: 'authored' })
+    const sample = mediaReferenceDescriptionTemplate(media.data, mode, 'video')
+    const description = sample.replace('[original subject or object]', 'the main character').replace('[replacement reference]', '@replacement').replace('[target location reference]', '@replacement')
+    const source = { ...media, data: { ...media.data, mediaReferenceMode: mode, referenceDescription: description, referenceDescriptionMode: 'authored' as const } }
+    const links = [edge(source.id, video.id, 'video-reference-in'), edge(replacement.id, video.id, mode === 'object' ? 'reference-in' : 'location-in')]
+    const request = buildGenerationRequest(video, [source, replacement, video], links)
+    expect(referenceDescriptionReadinessFailures(request)).toEqual([])
+    const visible = compileProviderPrompt(request, { preserveSemanticTags: true }).text
+    expect(visible).toContain(description)
+    expect(visible).toContain('people count')
+    expect(visible).toContain('original audio')
+    expect(visible).toContain('camera')
+    expect(visible).toContain('timing')
+    expect(visible).not.toContain('Only 1 person appears.')
+    const generic = compileProviderPrompt(request, { family: 'generic', preserveSemanticTags: true }).text
+    expect(generic).toContain(description)
+    expect(generic).not.toContain('Only 1 person appears.')
+    expect(generic).toContain('do not invent cuts, holds or stops')
+    expect(visible).not.toContain('End on a distinct, stable final composition.')
+    expect(visible).toContain('do not add an unrequested hold, settle or stop')
+    if (mode === 'object') {
+      expect(visible).not.toMatch(/(?:^|, )face replacement(?:,|$)/m)
+      expect(visible).toContain('unrequested face replacement')
+    }
+    const physical = providerSeedancePayloadCompilation(request).text
+    expect(physical).toContain(description.replaceAll('@guide', '@Video1').replaceAll('@replacement', '@Image1'))
+    expect(physical).not.toMatch(/@guide|@replacement/)
+    expect(source.data.referenceDescription).toBe(description)
+    const manual = 'Keep this manual master exactly.\n  Authored spacing.'
+    expect(compileProviderPrompt({ ...request, providerPromptOverride: manual, providerPromptOwnership: 'authored' }).text).toBe(manual)
+  })
+  it.each(['object', 'background'] as const)('keeps %s image replacements visual and blocks unresolved subjects', mode => {
+    const description = mediaReferenceDescriptionTemplate(media.data, mode, 'image')
+    expect(description).toContain('people count')
+    expect(description).not.toMatch(/audio|duration|timing|motion|camera path/i)
+    const request = { nodeId: 'gen', kind: 'image-generator' as const, prompt: 'Replace only the assigned target.', references: [{ role: 'reference' as const, mediaType: 'image' as const, path: '/source.png', tag: '@guide', mediaReferenceMode: mode, referenceDescription: description }] }
+    expect(referenceDescriptionReadinessFailures(request)).toContain('Fill the Description for @guide before generation.')
+    expect(compileProviderPrompt(request).text).not.toContain(description)
+    if (mode === 'object') {
+      request.references[0].referenceDescription = description.replace('[replacement reference]', 'the supplied target')
+      expect(referenceDescriptionReadinessFailures(request)).toContain('Fill the Description for @guide before generation.')
+    }
+  })
+  it('does not inject replacement preservation into ordinary references or blocking', () => {
+    for (const mode of ['reference', 'blocking'] as const) {
+      const description = mediaReferenceDescriptionTemplate(media.data, mode, 'video')
+      expect(description).not.toMatch(/original audio|people count|reference-based.*replacement/)
+    }
+    const description = '@guide supplies only the authored camera assignment.'
+    const source = { ...media, data: { ...media.data, mediaReferenceMode: 'object' as const, referenceDescription: description, referenceDescriptionMode: 'authored' as const } }
+    expect(resolvedAssetReferenceDescription(source, [source, video], [edge(source.id, video.id, 'video-reference-in')])).toBe(description)
+    expect(mediaReferenceModePatch(source.data, 'object', 'video')).toBeUndefined()
+  })
+})
+
 describe('materialized generated media share imported reference behavior', () => {
   it.each(['image', 'video', 'audio'] as const)('retains URL-only imported %s through a List with its exact tag and authored role', type => {
     const source = node('remote', 'upload', { assetUrl: `https://cdn.prism.example/remote.${type === 'image' ? 'png' : type === 'video' ? 'mp4' : 'wav'}`, outputType: type, referenceTag: '@remote', mediaReferenceMode: 'reference', referenceDescription: '@remote supplies the explicitly assigned reference role.', referenceDescriptionMode: 'authored' })

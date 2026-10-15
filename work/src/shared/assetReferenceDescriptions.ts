@@ -103,7 +103,7 @@ export function assetDescriptionPlaceholder(kind: StudioNode['data']['kind'], ta
 
 /** Exact unresolved sample fields are not completed asset-role assignments. */
 function pendingDescription(description: string | undefined): boolean {
-  return description !== undefined && (!description.trim() || /\[(?:original object|replacement reference|target location reference|speaker reference)\]/i.test(description))
+  return description !== undefined && (!description.trim() || /\[(?:original (?:object|subject(?: or object)?)|replacement reference|target location reference|speaker reference)\]/i.test(description))
 }
 
 /** A pending Description cannot yet assign provider-visible reference authority. */
@@ -168,7 +168,7 @@ export function assetDescriptionRevampInstruction(context: ReturnType<typeof ass
   return `Improve only this asset's Description for downstream reference introductions. Target: ${context.targetTag}.
 State exactly what the supplied asset represents, which reference domain it controls, and any explicitly authored part, state or relationship (for example, the same doorway open versus closed). Retain every authored semantic @tag. Where a connected Wardrobe owner is explicitly supplied, preserve that exact Character ownership. Do not guess ownership from names, image order, clothing in a sheet, or prose similarity.
 Use these read-only typed definitions as context: ${JSON.stringify(context.definitions)}
-These are authored descriptions and graph definitions, not inspected image contents. Do not invent unseen appearance, people, wardrobe, props, location parts, actions, camera moves, timing, state changes or provider capabilities. Do not convert a location-state reference into a Starting/Ending Frame unless its actual connection says so. Preserve uncertainty and every existing role assignment. Never write a generation prompt, ordinal attachment tokens, or an explanation. Return only the improved Description.`
+These are authored descriptions and graph definitions, not inspected image contents. Do not invent unseen appearance, people, wardrobe, props, location parts, actions, camera moves, timing, state changes or provider capabilities. Do not convert a location-state reference into a Starting/Ending Frame unless its actual connection says so. For an explicitly authored replacement, retain the exact base reference, named replacement target, replacement reference and change-only scope. Retain every authored preservation constraint on other subjects, people count, environment, lighting, props, motion, camera behaviour, timing and original audio; do not infer a replacement or new constraint when none is authored. Preserve uncertainty and every existing role assignment. Never write a generation prompt, ordinal attachment tokens, or an explanation. Return only the improved Description.`
 }
 
 export function validateAssetDescriptionRevamp(original: string, output: string, allowedTags: readonly string[]): string {
